@@ -1,106 +1,214 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Menubar } from "primereact/menubar";
-import { Card } from "primereact/card";
 import { Button } from "primereact/button";
-import { SplitButton } from "primereact/splitbutton";
-import { Avatar } from "primereact/avatar";
-import { Badge } from "primereact/badge";
-import { Chart } from "primereact/chart";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import { ProgressBar } from "primereact/progressbar";
 import { Tag } from "primereact/tag";
-import { Toolbar } from "primereact/toolbar";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
+import { Dropdown } from "primereact/dropdown";
+import { Password } from "primereact/password";
+import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
+import { Badge } from "primereact/badge";
+import { SplitButton } from "primereact/splitbutton";
+import { userService } from "../../services/userService";
+import "./Dashboard.css";
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [visible, setVisible] = useState(false);
-  const [newUser, setNewUser] = useState({});
-  const toast = React.useRef(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [activeNav, setActiveNav] = useState("overview");
+  const toast = useRef(null);
 
-  // Chart Data
-  const [chartData] = useState({
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-    datasets: [
-      {
-        label: "Projects",
-        data: [65, 59, 80, 81, 56, 55],
-        fill: false,
-        borderColor: "#4f46e5",
-        tension: 0.4,
-      },
-    ],
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: "",
+    first_name: "",
+    last_name: "",
+    phone: "",
+    user_role: "client",
   });
 
-  const [chartOptions] = useState({
-    maintainAspectRatio: false,
-    aspectRatio: 0.6,
-    plugins: {
-      legend: {
-        labels: {
-          color: "#64748b",
-        },
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          color: "#64748b",
-        },
-        grid: {
-          color: "#e2e8f0",
-        },
-      },
-      y: {
-        ticks: {
-          color: "#64748b",
-        },
-        grid: {
-          color: "#e2e8f0",
-        },
-      },
-    },
-  });
+  const roles = [
+    { label: "Admin", value: "admin" },
+    { label: "Staff", value: "staff" },
+    { label: "Client", value: "client" },
+    { label: "Contractor", value: "contractor" },
+  ];
 
-  // Sample Users Data
-  const [users] = useState([
-    {
-      id: 1,
-      username: "admin",
-      email: "admin@example.com",
-      role: "admin",
-      status: "Active",
-      created: "2024-01-01",
-    },
-    {
-      id: 2,
-      username: "staff1",
-      email: "staff1@example.com",
-      role: "staff",
-      status: "Active",
-      created: "2024-01-02",
-    },
-    {
-      id: 3,
-      username: "client1",
-      email: "client1@example.com",
-      role: "client",
-      status: "Active",
-      created: "2024-01-03",
-    },
-    {
-      id: 4,
-      username: "contractor1",
-      email: "contractor1@example.com",
-      role: "contractor",
-      status: "Inactive",
-      created: "2024-01-04",
-    },
-  ]);
+  // Load users on component mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await userService.getAllUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error("Load users error:", error);
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to load users",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openNewDialog = () => {
+    setIsEditing(false);
+    setSelectedUser(null);
+    setFormData({
+      username: "",
+      email: "",
+      password: "",
+      first_name: "",
+      last_name: "",
+      phone: "",
+      user_role: "client",
+    });
+    setVisible(true);
+  };
+
+  const openEditDialog = (usr) => {
+    setIsEditing(true);
+    setSelectedUser(usr);
+    setFormData({
+      username: usr.username,
+      email: usr.email,
+      password: "",
+      first_name: usr.first_name,
+      last_name: usr.last_name,
+      phone: usr.phone || "",
+      user_role: usr.user_role,
+    });
+    setVisible(true);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleRoleChange = (e) => {
+    setFormData({ ...formData, user_role: e.value });
+  };
+
+  const saveUser = async () => {
+    console.log(
+      "[AdminDashboard] saveUser called, isEditing:",
+      isEditing,
+      "formData:",
+      formData,
+    );
+    if (
+      !formData.username ||
+      !formData.email ||
+      !formData.first_name ||
+      !formData.last_name
+    ) {
+      toast.current?.show({
+        severity: "warn",
+        summary: "Warning",
+        detail: "Please fill in all required fields",
+      });
+      return;
+    }
+
+    if (!isEditing && !formData.password) {
+      toast.current?.show({
+        severity: "warn",
+        summary: "Warning",
+        detail: "Password is required for new users",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (isEditing) {
+        const updateData = { ...formData };
+        delete updateData.password;
+        console.log("Updating user:", selectedUser.user_id, updateData);
+        await userService.updateUser(selectedUser.user_id, updateData);
+        toast.current?.show({
+          severity: "success",
+          summary: "Success",
+          detail: "User updated successfully",
+        });
+      } else {
+        console.log("Creating user:", formData);
+        await userService.createUser(formData);
+        toast.current?.show({
+          severity: "success",
+          summary: "Success",
+          detail: "User created successfully",
+        });
+      }
+
+      setVisible(false);
+      loadUsers();
+    } catch (error) {
+      console.error("Save user error:", error);
+      toast.current?.show({
+        severity: "error",
+        summary: "Error",
+        detail:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to save user",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = (usr) => {
+    confirmDialog({
+      message: `Are you sure you want to delete ${usr.username}?`,
+      header: "Confirm",
+      icon: "pi pi-exclamation-triangle",
+      accept: async () => {
+        try {
+          setLoading(true);
+          console.log("Deleting user:", usr.user_id);
+          await userService.deleteUser(usr.user_id);
+          toast.current?.show({
+            severity: "success",
+            summary: "Success",
+            detail: "User deleted successfully",
+          });
+          loadUsers();
+        } catch (error) {
+          console.error("Delete user error:", error);
+          toast.current?.show({
+            severity: "error",
+            summary: "Error",
+            detail:
+              error.response?.data?.message ||
+              error.message ||
+              "Failed to delete user",
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
 
   const menuItems = [
     {
@@ -167,39 +275,14 @@ const AdminDashboard = () => {
     },
   ];
 
-  const startContent = (
-    <div className="flex align-items-center">
-      <i className="pi pi-th-large text-2xl mr-2 text-primary"></i>
-      <span className="text-xl font-semibold">Admin Dashboard</span>
-    </div>
-  );
-
-  const endContent = (
-    <div className="flex align-items-center gap-3">
-      <Badge value="3" severity="danger">
-        <i className="pi pi-bell text-xl cursor-pointer"></i>
-      </Badge>
-      <SplitButton
-        label={`${user?.first_name} ${user?.last_name}`}
-        icon="pi pi-user"
-        model={userMenuItems}
-        className="p-button-rounded p-button-text"
-      />
-    </div>
-  );
-
   const toolbarLeft = (
     <div className="flex gap-2">
+      <Button label="New User" icon="pi pi-user-plus" onClick={openNewDialog} />
       <Button
-        label="New User"
-        icon="pi pi-user-plus"
-        onClick={() => setVisible(true)}
-      />
-      <Button
-        label="Export"
-        icon="pi pi-download"
-        severity="secondary"
-        outlined
+        label="Refresh"
+        icon="pi pi-refresh"
+        onClick={loadUsers}
+        loading={loading}
       />
     </div>
   );
@@ -219,254 +302,399 @@ const AdminDashboard = () => {
     }
   };
 
-  const getStatusSeverity = (status) => {
-    return status === "Active" ? "success" : "danger";
-  };
-
   const roleTemplate = (rowData) => {
     return (
-      <Tag value={rowData.role} severity={getRoleSeverity(rowData.role)} />
+      <Tag
+        value={rowData.user_role}
+        severity={getRoleSeverity(rowData.user_role)}
+      />
     );
   };
 
   const statusTemplate = (rowData) => {
     return (
       <Tag
-        value={rowData.status}
-        severity={getStatusSeverity(rowData.status)}
+        value={rowData.is_active ? "Active" : "Inactive"}
+        severity={rowData.is_active ? "success" : "danger"}
       />
     );
   };
 
-  const actionTemplate = () => {
+  const actionTemplate = (rowData) => {
     return (
       <div className="flex gap-1">
-        <Button icon="pi pi-pencil" rounded text severity="secondary" />
-        <Button icon="pi pi-trash" rounded text severity="danger" />
+        <Button
+          icon="pi pi-pencil"
+          rounded
+          text
+          severity="secondary"
+          onClick={() => openEditDialog(rowData)}
+          tooltip="Edit"
+        />
+        <Button
+          icon="pi pi-trash"
+          rounded
+          text
+          severity="danger"
+          onClick={() => deleteUser(rowData)}
+          tooltip="Delete"
+        />
       </div>
     );
   };
 
   return (
-    <div className="surface-ground min-h-screen">
+    <div className="dashboard-container">
       <Toast ref={toast} />
+      <ConfirmDialog />
 
-      <Menubar
-        model={menuItems}
-        start={startContent}
-        end={endContent}
-        className="shadow-2 mb-4"
-      />
-
-      <div className="p-4">
-        {/* Stats Cards */}
-        <div className="grid">
-          <div className="col-12 md:col-6 lg:col-3">
-            <Card className="shadow-1">
-              <div className="flex justify-content-between mb-3">
-                <div>
-                  <span className="block text-500 font-medium mb-3">
-                    Total Users
-                  </span>
-                  <div className="text-900 font-medium text-xl">1,254</div>
-                </div>
-                <div
-                  className="flex align-items-center justify-content-center bg-blue-100 border-round"
-                  style={{ width: "2.5rem", height: "2.5rem" }}
-                >
-                  <i className="pi pi-users text-blue-500 text-xl"></i>
-                </div>
-              </div>
-              <ProgressBar value={75} className="h-1" />
-            </Card>
+      {/* Sidebar */}
+      <div className="dashboard-sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <i className="pi pi-shield"></i>
           </div>
-
-          <div className="col-12 md:col-6 lg:col-3">
-            <Card className="shadow-1">
-              <div className="flex justify-content-between mb-3">
-                <div>
-                  <span className="block text-500 font-medium mb-3">
-                    Active Projects
-                  </span>
-                  <div className="text-900 font-medium text-xl">42</div>
-                </div>
-                <div
-                  className="flex align-items-center justify-content-center bg-orange-100 border-round"
-                  style={{ width: "2.5rem", height: "2.5rem" }}
-                >
-                  <i className="pi pi-folder text-orange-500 text-xl"></i>
-                </div>
-              </div>
-              <ProgressBar value={60} className="h-1" severity="warning" />
-            </Card>
-          </div>
-
-          <div className="col-12 md:col-6 lg:col-3">
-            <Card className="shadow-1">
-              <div className="flex justify-content-between mb-3">
-                <div>
-                  <span className="block text-500 font-medium mb-3">
-                    Tasks Completed
-                  </span>
-                  <div className="text-900 font-medium text-xl">128</div>
-                </div>
-                <div
-                  className="flex align-items-center justify-content-center bg-cyan-100 border-round"
-                  style={{ width: "2.5rem", height: "2.5rem" }}
-                >
-                  <i className="pi pi-check-circle text-cyan-500 text-xl"></i>
-                </div>
-              </div>
-              <ProgressBar value={85} className="h-1" severity="success" />
-            </Card>
-          </div>
-
-          <div className="col-12 md:col-6 lg:col-3">
-            <Card className="shadow-1">
-              <div className="flex justify-content-between mb-3">
-                <div>
-                  <span className="block text-500 font-medium mb-3">
-                    Revenue
-                  </span>
-                  <div className="text-900 font-medium text-xl">$24.5K</div>
-                </div>
-                <div
-                  className="flex align-items-center justify-content-center bg-purple-100 border-round"
-                  style={{ width: "2.5rem", height: "2.5rem" }}
-                >
-                  <i className="pi pi-money-bill text-purple-500 text-xl"></i>
-                </div>
-              </div>
-              <ProgressBar value={90} className="h-1" severity="help" />
-            </Card>
+          <div className="sidebar-title">
+            <h3>Admin</h3>
+            <p>Control Panel</p>
           </div>
         </div>
 
-        {/* Charts and Data */}
-        <div className="grid mt-4">
-          <div className="col-12 lg:col-8">
-            <Card title="Project Statistics" className="shadow-1 h-full">
-              <Chart
-                type="line"
-                data={chartData}
-                options={chartOptions}
-                style={{ height: "300px" }}
-              />
-            </Card>
-          </div>
-
-          <div className="col-12 lg:col-4">
-            <Card title="Recent Activity" className="shadow-1 h-full">
-              <div className="flex flex-column gap-3">
-                {[1, 2, 3, 4].map((item) => (
-                  <div
-                    key={item}
-                    className="flex align-items-start gap-3 p-3 border-round surface-card hover:surface-hover transition-duration-150 cursor-pointer"
-                  >
-                    <Avatar icon="pi pi-user" size="large" shape="circle" />
-                    <div className="flex-1">
-                      <div className="font-medium">New user registered</div>
-                      <small className="text-500">5 minutes ago</small>
-                    </div>
-                    <Tag value="User" severity="info" />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {/* User Management Table */}
-        <Card className="mt-4 shadow-1">
-          <Toolbar left={toolbarLeft} className="mb-4" />
-
-          <DataTable
-            value={users}
-            paginator
-            rows={5}
-            rowsPerPageOptions={[5, 10, 25]}
-            tableStyle={{ minWidth: "50rem" }}
-            className="p-datatable-sm"
+        <div className="sidebar-nav">
+          <div
+            className={`nav-item ${activeNav === "overview" ? "active" : ""}`}
+            onClick={() => {
+              setActiveNav("overview");
+              setActiveTab("overview");
+            }}
           >
-            <Column
-              field="id"
-              header="ID"
-              sortable
-              style={{ width: "20%" }}
-            ></Column>
-            <Column
-              field="username"
-              header="Username"
-              sortable
-              style={{ width: "20%" }}
-            ></Column>
-            <Column
-              field="email"
-              header="Email"
-              sortable
-              style={{ width: "25%" }}
-            ></Column>
-            <Column
-              field="role"
-              header="Role"
-              body={roleTemplate}
-              sortable
-              style={{ width: "15%" }}
-            ></Column>
-            <Column
-              field="status"
-              header="Status"
-              body={statusTemplate}
-              sortable
-              style={{ width: "15%" }}
-            ></Column>
-            <Column
-              header="Actions"
-              body={actionTemplate}
-              style={{ width: "15%" }}
-            ></Column>
-          </DataTable>
-        </Card>
+            <i className="pi pi-home"></i>
+            <span>Overview</span>
+          </div>
+          <div
+            className={`nav-item ${activeNav === "users" ? "active" : ""}`}
+            onClick={() => {
+              setActiveNav("users");
+              setActiveTab("users");
+            }}
+          >
+            <i className="pi pi-users"></i>
+            <span>User Management</span>
+          </div>
+          <div
+            className={`nav-item ${activeNav === "reports" ? "active" : ""}`}
+            onClick={() => {
+              setActiveNav("reports");
+              setActiveTab("reports");
+            }}
+          >
+            <i className="pi pi-chart-bar"></i>
+            <span>Reports</span>
+          </div>
+          <div
+            className={`nav-item ${activeNav === "settings" ? "active" : ""}`}
+            onClick={() => {
+              setActiveNav("settings");
+              setActiveTab("settings");
+            }}
+          >
+            <i className="pi pi-cog"></i>
+            <span>Settings</span>
+          </div>
+        </div>
+
+        <div className="sidebar-footer">
+          <Button
+            className="logout-btn"
+            label="Logout"
+            icon="pi pi-sign-out"
+            onClick={logout}
+          />
+        </div>
       </div>
 
-      {/* Create User Dialog */}
+      {/* Main Content */}
+      <div className="dashboard-content">
+        {/* Header */}
+        <div className="dashboard-header">
+          <div className="header-left">
+            <div>
+              <h2 className="header-title">
+                {activeTab === "overview" && "Overview"}
+                {activeTab === "users" && "User Management"}
+                {activeTab === "reports" && "Reports"}
+                {activeTab === "settings" && "Settings"}
+              </h2>
+              <p className="header-subtitle">
+                {activeTab === "overview" && "Welcome back, Admin!"}
+                {activeTab === "users" && "Manage system users"}
+                {activeTab === "reports" && "View analytics and reports"}
+                {activeTab === "settings" && "Configure system settings"}
+              </p>
+            </div>
+          </div>
+          <div className="header-right">
+            <div className="user-profile">
+              <div className="user-avatar">
+                {user?.username?.charAt(0).toUpperCase()}
+              </div>
+              <div className="user-info">
+                <h4>
+                  {user?.first_name} {user?.last_name}
+                </h4>
+                <p>{user?.user_role?.toUpperCase()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="dashboard-body">
+          {/* Overview Tab */}
+          {activeTab === "overview" && (
+            <div>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-label">Total Users</div>
+                  <p className="stat-value">{users.length}</p>
+                  <div className="stat-change positive">
+                    <i className="pi pi-arrow-up"></i> 12% from last month
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Active Users</div>
+                  <p className="stat-value">
+                    {users.filter((u) => u.is_active).length}
+                  </p>
+                  <div className="stat-change positive">
+                    <i className="pi pi-arrow-up"></i> 8% from last month
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Inactive Users</div>
+                  <p className="stat-value">
+                    {users.filter((u) => !u.is_active).length}
+                  </p>
+                  <div className="stat-change negative">
+                    <i className="pi pi-arrow-down"></i> 2% from last month
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">System Health</div>
+                  <p className="stat-value">98%</p>
+                  <div className="stat-change positive">
+                    <i className="pi pi-check-circle"></i> All systems
+                    operational
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Users Tab */}
+          {activeTab === "users" && (
+            <div>
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3 className="card-title">User List</h3>
+                  <Button
+                    label="Add New User"
+                    icon="pi pi-plus"
+                    className="btn-primary p-button-sm"
+                    onClick={openNewDialog}
+                  />
+                </div>
+
+                <DataTable
+                  value={users}
+                  loading={loading}
+                  paginator
+                  rows={10}
+                  rowsPerPageOptions={[5, 10, 20, 50]}
+                  tableStyle={{ minWidth: "50rem" }}
+                  emptyMessage="No users found."
+                  responsiveLayout="scroll"
+                >
+                  <Column field="username" header="Username" sortable />
+                  <Column field="email" header="Email" sortable />
+                  <Column field="first_name" header="First Name" />
+                  <Column field="last_name" header="Last Name" />
+                  <Column
+                    field="user_role"
+                    header="Role"
+                    body={(rowData) => (
+                      <Tag
+                        value={rowData.user_role}
+                        style={{
+                          background:
+                            rowData.user_role === "admin"
+                              ? "#404a17"
+                              : rowData.user_role === "staff"
+                                ? "#556b2f"
+                                : rowData.user_role === "client"
+                                  ? "#10b981"
+                                  : "#f59e0b",
+                        }}
+                      />
+                    )}
+                  />
+                  <Column
+                    field="is_active"
+                    header="Status"
+                    body={(rowData) => (
+                      <Tag
+                        value={rowData.is_active ? "Active" : "Inactive"}
+                        severity={rowData.is_active ? "success" : "danger"}
+                      />
+                    )}
+                  />
+                  <Column
+                    header="Actions"
+                    body={(rowData) => (
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <Button
+                          icon="pi pi-pencil"
+                          className="p-button-rounded p-button-sm p-button-warning"
+                          onClick={() => openEditDialog(rowData)}
+                        />
+                        <Button
+                          icon="pi pi-trash"
+                          className="p-button-rounded p-button-sm p-button-danger"
+                          onClick={() => deleteUser(rowData)}
+                        />
+                      </div>
+                    )}
+                  />
+                </DataTable>
+              </div>
+            </div>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === "reports" && (
+            <div>
+              <div className="dashboard-card">
+                <h3 className="card-title">Analytics & Reports</h3>
+                <p style={{ color: "#6c757d", marginTop: "15px" }}>
+                  Reports section coming soon...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === "settings" && (
+            <div>
+              <div className="dashboard-card">
+                <h3 className="card-title">System Settings</h3>
+                <p style={{ color: "#6c757d", marginTop: "15px" }}>
+                  Settings section coming soon...
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* User Form Dialog */}
       <Dialog
-        header="Create New User"
         visible={visible}
-        style={{ width: "500px" }}
+        style={{ width: "90vw", maxWidth: "500px" }}
+        header={isEditing ? "Edit User" : "Add New User"}
+        modal
         onHide={() => setVisible(false)}
+        className="p-fluid"
       >
-        <div className="p-fluid">
+        <div className="field mt-3">
+          <label htmlFor="username">Username *</label>
+          <InputText
+            id="username"
+            name="username"
+            value={formData.username}
+            onChange={handleFormChange}
+            placeholder="Enter username"
+            disabled={isEditing}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label htmlFor="email">Email *</label>
+          <InputText
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleFormChange}
+            placeholder="Enter email"
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label htmlFor="first_name">First Name *</label>
+          <InputText
+            id="first_name"
+            name="first_name"
+            value={formData.first_name}
+            onChange={handleFormChange}
+            placeholder="Enter first name"
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label htmlFor="last_name">Last Name *</label>
+          <InputText
+            id="last_name"
+            name="last_name"
+            value={formData.last_name}
+            onChange={handleFormChange}
+            placeholder="Enter last name"
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label htmlFor="phone">Phone</label>
+          <InputText
+            id="phone"
+            name="phone"
+            value={formData.phone}
+            onChange={handleFormChange}
+            placeholder="Enter phone number"
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label htmlFor="user_role">Role *</label>
+          <Dropdown
+            id="user_role"
+            value={formData.user_role}
+            options={roles}
+            onChange={handleRoleChange}
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select role"
+          />
+        </div>
+
+        {!isEditing && (
           <div className="field mt-3">
-            <label htmlFor="username">Username</label>
-            <InputText id="username" className="w-full" />
-          </div>
-          <div className="field mt-3">
-            <label htmlFor="email">Email</label>
-            <InputText id="email" type="email" className="w-full" />
-          </div>
-          <div className="field mt-3">
-            <label htmlFor="role">Role</label>
-            <InputText id="role" className="w-full" />
-          </div>
-          <div className="flex justify-content-end gap-2 mt-5">
-            <Button
-              label="Cancel"
-              severity="secondary"
-              onClick={() => setVisible(false)}
+            <label htmlFor="password">Password *</label>
+            <Password
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleFormChange}
+              placeholder="Enter password"
+              toggleMask
             />
-            <Button
-              label="Create"
-              onClick={() => {
-                toast.current.show({
-                  severity: "success",
-                  summary: "Success",
-                  detail: "User created successfully",
-                });
-                setVisible(false);
-              }}
-            />
           </div>
+        )}
+
+        <div className="flex justify-content-end gap-2 mt-5">
+          <Button
+            label="Cancel"
+            severity="secondary"
+            onClick={() => setVisible(false)}
+          />
+          <Button label="Save" onClick={saveUser} loading={loading} />
         </div>
       </Dialog>
     </div>

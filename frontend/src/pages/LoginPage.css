@@ -215,6 +215,86 @@
   box-shadow: 0 0 0 3px rgba(64, 74, 23, 0.1) !important;
 }
 
+/* ===== Password Input Styling ===== */
+.p-password {
+  width: 100% !important;
+  display: flex !important;
+}
+
+.p-password.p-component {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.p-password .p-icon-field {
+  width: 100% !important;
+  position: relative !important;
+}
+
+.p-password .p-inputtext {
+  width: 100% !important;
+  padding: 12px 16px !important;
+  padding-right: 45px !important;
+  border: 2px solid #e9ecef !important;
+  border-radius: 10px !important;
+  font-size: 14px !important;
+  transition: all 0.3s ease !important;
+  background: #f8f9fa !important;
+  color: #1a1a2e !important;
+  box-sizing: border-box !important;
+}
+
+.p-password .p-inputtext::placeholder {
+  color: #adb5bd !important;
+}
+
+.p-password .p-inputtext:focus {
+  border-color: #404a17 !important;
+  background: white !important;
+  box-shadow: 0 0 0 3px rgba(64, 74, 23, 0.1) !important;
+  outline: none !important;
+}
+
+.p-password .p-icon-field {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.p-password .p-icon-field > .p-icon,
+.p-password .p-icon-wrapper > .p-icon {
+  position: absolute !important;
+  top: 50% !important;
+  right: 14px !important;
+  transform: translateY(-50%) !important;
+  color: #404a17 !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.p-password .p-icon-field > .p-icon:hover,
+.p-password .p-icon-wrapper > .p-icon:hover {
+  color: #556b2f !important;
+}
+
+/* Custom styling for the eye icon outside the password input */
+.custom-eye-icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #404a17;
+  font-size: 18px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+}
+
+.custom-eye-icon:hover {
+  color: #556b2f;
+}
+
 /* ===== Error Message ===== */
 .error-message-wrapper {
   margin-bottom: 20px;
@@ -336,7 +416,7 @@
 .demo-buttons {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 14px;
   margin-bottom: 25px;
 }
 
@@ -346,21 +426,30 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px;
+  min-width: 120px;
+  min-height: 70px;
+  padding: 14px 0;
   border: 2px solid #e9ecef;
   border-radius: 10px;
   background: #f8f9fa;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   transition: all 0.3s ease;
   color: #1a1a2e;
+  box-sizing: border-box;
 }
 
 .demo-btn i {
-  font-size: 18px;
+  font-size: 22px;
+}
+
+.demo-btn span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 .demo-btn:hover:not(:disabled) {
@@ -399,26 +488,26 @@
 
 /* Client Button */
 .demo-btn.client-btn {
-  border-color: #10b981;
-  color: #10b981;
+  border-color: #404a17;
+  color: #404a17;
 }
 
 .demo-btn.client-btn:hover:not(:disabled) {
-  background: #10b981;
+  background: #404a17;
   color: white;
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 8px 20px rgba(64, 74, 23, 0.3);
 }
 
 /* Contractor Button */
 .demo-btn.contractor-btn {
-  border-color: #f59e0b;
-  color: #f59e0b;
+  border-color: #556b2f;
+  color: #556b2f;
 }
 
 .demo-btn.contractor-btn:hover:not(:disabled) {
-  background: #f59e0b;
+  background: #556b2f;
   color: white;
-  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 8px 20px rgba(85, 107, 47, 0.3);
 }
 
 /* ===== Login Footer ===== */

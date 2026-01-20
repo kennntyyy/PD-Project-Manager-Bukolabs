@@ -17,21 +17,10 @@ export class UsersService {
   ) {}
 
   async findAll(): Promise<User[]> {
-    return this.usersRepository.find({
-      select: [
-        'user_id',
-        'username',
-        'email',
-        'first_name',
-        'last_name',
-        'phone',
-        'user_role',
-        'is_active',
-        'created_at',
-        'updated_at',
-      ],
+    const users = await this.usersRepository.find({
       order: { created_at: 'DESC' },
     });
+    return users;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -84,14 +73,17 @@ export class UsersService {
 
   async createUser(userData: any): Promise<User> {
     console.log('[UsersService.createUser] Received data:', userData);
-    
+
     // Check if user already exists
     const existingUser = await this.usersRepository.findOne({
       where: [{ email: userData.email }, { username: userData.username }],
     });
 
     if (existingUser) {
-      console.log('[UsersService.createUser] User already exists:', existingUser);
+      console.log(
+        '[UsersService.createUser] User already exists:',
+        existingUser,
+      );
       throw new ConflictException(
         'User with this email or username already exists',
       );
@@ -109,13 +101,18 @@ export class UsersService {
     console.log('[UsersService.createUser] Creating user:', user);
     const savedUser = await this.usersRepository.save(user);
     console.log('[UsersService.createUser] User saved:', savedUser);
-    
+
     return savedUser as unknown as Promise<User>;
   }
 
   async update(id: string, updateData: any): Promise<User> {
-    console.log('[UsersService.update] Updating user:', id, 'with data:', updateData);
-    
+    console.log(
+      '[UsersService.update] Updating user:',
+      id,
+      'with data:',
+      updateData,
+    );
+
     const user = await this.findById(id);
 
     // Check if email or username is being changed and if it's already in use
@@ -139,16 +136,37 @@ export class UsersService {
 
     Object.assign(user, updateData);
     console.log('[UsersService.update] Saving updated user:', user);
-    
+
     const savedUser = await this.usersRepository.save(user);
     console.log('[UsersService.update] User saved:', savedUser);
-    
+
     return savedUser as unknown as Promise<User>;
   }
 
   async delete(id: string): Promise<void> {
     const user = await this.findById(id);
     await this.usersRepository.remove(user);
+  }
+
+  async softDelete(id: string): Promise<User> {
+    const user = await this.findById(id);
+    user.is_deleted = true;
+    user.deleted_at = new Date();
+    return this.usersRepository.save(user) as unknown as Promise<User>;
+  }
+
+  async restore(id: string): Promise<User> {
+    const user = await this.usersRepository.findOne({
+      where: { user_id: id },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    user.is_deleted = false;
+    user.deleted_at = null;
+    return this.usersRepository.save(user) as unknown as Promise<User>;
   }
 
   async changePassword(id: string, passwordData: any): Promise<void> {

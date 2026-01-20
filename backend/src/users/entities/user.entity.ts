@@ -1,16 +1,16 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
-  UpdateDateColumn 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 export enum UserRole {
   ADMIN = 'admin',
   STAFF = 'staff',
   CLIENT = 'client',
-  CONTRACTOR = 'contractor'
+  CONTRACTOR = 'contractor',
 }
 
 @Entity('users')
@@ -30,7 +30,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.CLIENT
+    default: UserRole.CLIENT,
   })
   user_role: UserRole;
 
@@ -55,8 +55,8 @@ export class User {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @Column({ nullable: true })
-  deleted_at: Date;
+  @Column({ type: 'datetime', nullable: true })
+  deleted_at: Date | null;
 
   @Column({ default: false })
   is_deleted: boolean;

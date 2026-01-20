@@ -46,7 +46,10 @@ export class UsersController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createUserDto: CreateUserDto): Promise<User> {
-    console.log('[UsersController] POST /users - create with body:', createUserDto);
+    console.log(
+      '[UsersController] POST /users - create with body:',
+      createUserDto,
+    );
     try {
       const result = await this.usersService.createUser(createUserDto);
       console.log('[UsersController] Create success:', result);
@@ -78,8 +81,25 @@ export class UsersController {
     @Param('id') id: string,
     @Body() changeRoleDto: ChangeRoleDto,
   ): Promise<User> {
-    console.log('[UsersController] PUT /users/:id/change-role:', id, 'body:', changeRoleDto);
+    console.log(
+      '[UsersController] PUT /users/:id/change-role:',
+      id,
+      'body:',
+      changeRoleDto,
+    );
     return this.usersService.changeUserRole(id, changeRoleDto.role);
+  }
+
+  @Put(':id/soft-delete')
+  async softDelete(@Param('id') id: string): Promise<User> {
+    console.log('[UsersController] PUT /users/:id/soft-delete:', id);
+    return this.usersService.softDelete(id);
+  }
+
+  @Put(':id/restore')
+  async restore(@Param('id') id: string): Promise<User> {
+    console.log('[UsersController] PUT /users/:id/restore:', id);
+    return this.usersService.restore(id);
   }
 
   @Put(':id')
@@ -87,7 +107,12 @@ export class UsersController {
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<User> {
-    console.log('[UsersController] PUT /users/:id - update:', id, 'body:', updateUserDto);
+    console.log(
+      '[UsersController] PUT /users/:id - update:',
+      id,
+      'body:',
+      updateUserDto,
+    );
     try {
       const result = await this.usersService.update(id, updateUserDto);
       console.log('[UsersController] Update success:', result);

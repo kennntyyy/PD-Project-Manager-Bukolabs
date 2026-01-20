@@ -65,6 +65,18 @@ export const userService = {
     await api.delete(`${USERS_API}/${id}`);
   },
 
+  // Soft delete user (move to recycle bin)
+  softDeleteUser: async (id) => {
+    const response = await api.put(`${USERS_API}/${id}/soft-delete`);
+    return response.data;
+  },
+
+  // Restore user from recycle bin
+  restoreUser: async (id) => {
+    const response = await api.put(`${USERS_API}/${id}/restore`);
+    return response.data;
+  },
+
   // Change password
   changePassword: async (id, passwordData) => {
     const response = await api.post(

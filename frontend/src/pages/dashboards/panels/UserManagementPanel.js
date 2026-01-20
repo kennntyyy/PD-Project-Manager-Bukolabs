@@ -7,7 +7,6 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Toast } from "primereact/toast";
 import { Dropdown } from "primereact/dropdown";
-import { Password } from "primereact/password";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import { userService } from "../../../services/userService";
 
@@ -38,6 +37,9 @@ const UserManagementPanel = () => {
     phone: "",
     user_role: "client",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const roles = [
     { label: "Admin", value: "admin" },
@@ -354,35 +356,73 @@ const UserManagementPanel = () => {
 
       <div className="dashboard-card">
         <div className="card-header">
-          <h3 className="card-title">
-            {viewMode === "active" ? "User List" : "Recycle Bin"}
-          </h3>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <Button
-              label="Active Users"
-              icon="pi pi-users"
-              severity={viewMode === "active" ? "info" : "secondary"}
-              onClick={() => setViewMode("active")}
-              className="p-button-sm"
-            />
-            <Button
-              label="Recycle Bin"
-              icon="pi pi-trash"
-              severity={viewMode === "deleted" ? "warning" : "secondary"}
-              onClick={() => setViewMode("deleted")}
-              className="p-button-sm"
-              badge={users.filter((u) => u.is_deleted).length}
-            />
-            {viewMode === "active" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <h3 className="card-title">
+              {viewMode === "active" ? "Active Users" : "Recycle Bin"}
+            </h3>
+            <div
+              className="user-panel-switch"
+              style={{
+                marginBottom: "12px",
+                paddingLeft: "16px",
+                paddingRight: "16px",
+                paddingTop: "12px",
+              }}
+            >
               <Button
-                label="Add New User"
-                icon="pi pi-plus"
-                className="btn-primary p-button-sm"
-                onClick={openNewDialog}
+                label="Active Users"
+                icon="pi pi-users"
+                severity={viewMode === "active" ? "info" : "secondary"}
+                onClick={() => setViewMode("active")}
+                className={
+                  viewMode === "active"
+                    ? "p-button-sm user-switch-btn active"
+                    : "p-button-sm user-switch-btn"
+                }
+                text={viewMode !== "active"}
+                outlined={viewMode !== "active"}
               />
-            )}
+              <Button
+                label={`Recycle Bin (${users.filter((u) => u.is_deleted).length})`}
+                icon="pi pi-trash"
+                severity={viewMode === "deleted" ? "info" : "secondary"}
+                onClick={() => setViewMode("deleted")}
+                className={
+                  viewMode === "deleted"
+                    ? "p-button-sm user-switch-btn active"
+                    : "p-button-sm user-switch-btn"
+                }
+                text={viewMode !== "deleted"}
+                outlined={viewMode !== "deleted"}
+              />
+            </div>
           </div>
         </div>
+
+        {viewMode === "active" && (
+          <div
+            style={{
+              marginBottom: "16px",
+              paddingLeft: "16px",
+              paddingRight: "16px",
+            }}
+          >
+            <Button
+              label="Add New User"
+              icon="pi pi-plus"
+              severity="info"
+              onClick={openNewDialog}
+              className="add-user-btn"
+            />
+          </div>
+        )}
 
         <DataTable
           value={filteredUsers}
@@ -437,30 +477,26 @@ const UserManagementPanel = () => {
                   <>
                     <Button
                       icon="pi pi-pencil"
-                      className="p-button-rounded p-button-sm p-button-warning"
+                      className="p-button-rounded p-button-sm p-button-warning user-action-btn"
                       onClick={() => openEditDialog(rowData)}
-                      tooltip="Edit"
                     />
                     <Button
                       icon="pi pi-trash"
-                      className="p-button-rounded p-button-sm p-button-danger"
+                      className="p-button-rounded p-button-sm p-button-danger user-action-btn"
                       onClick={() => deleteUser(rowData)}
-                      tooltip="Delete"
                     />
                   </>
                 ) : (
                   <>
                     <Button
                       icon="pi pi-refresh"
-                      className="p-button-rounded p-button-sm p-button-success"
+                      className="p-button-rounded p-button-sm p-button-success user-action-btn"
                       onClick={() => restoreUser(rowData)}
-                      tooltip="Restore"
                     />
                     <Button
                       icon="pi pi-times"
-                      className="p-button-rounded p-button-sm p-button-danger"
+                      className="p-button-rounded p-button-sm p-button-danger user-action-btn"
                       onClick={() => permanentlyDeleteUser(rowData)}
-                      tooltip="Permanently Delete"
                     />
                   </>
                 )}
@@ -552,28 +588,67 @@ const UserManagementPanel = () => {
 
         {!isEditing && (
           <>
-            <div className="field mt-3">
+            <div className="field mt-3" style={{ position: "relative" }}>
               <label htmlFor="password">Password *</label>
-              <Password
+              <InputText
                 id="password"
                 name="password"
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleFormChange}
                 placeholder="Enter password"
-                toggleMask
+                className="form-input"
               />
+              <span
+                className="custom-eye-icon pi"
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: "14px",
+                  transform: "translateY(-50%)",
+                  cursor: "pointer",
+                  color: "#404a17",
+                  fontSize: "18px",
+                }}
+                onClick={() => setShowPassword((prev) => !prev)}
+              >
+                {showPassword ? (
+                  <i className="pi pi-eye-slash" />
+                ) : (
+                  <i className="pi pi-eye" />
+                )}
+              </span>
             </div>
-
-            <div className="field mt-3">
+            <div className="field mt-3" style={{ position: "relative" }}>
               <label htmlFor="confirmPassword">Confirm Password *</label>
-              <Password
+              <InputText
                 id="confirmPassword"
                 name="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={handleFormChange}
                 placeholder="Confirm password"
-                toggleMask
+                className="form-input"
               />
+              <span
+                className="custom-eye-icon pi"
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: "14px",
+                  transform: "translateY(-50%)",
+                  cursor: "pointer",
+                  color: "#404a17",
+                  fontSize: "18px",
+                }}
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+              >
+                {showConfirmPassword ? (
+                  <i className="pi pi-eye-slash" />
+                ) : (
+                  <i className="pi pi-eye" />
+                )}
+              </span>
             </div>
           </>
         )}

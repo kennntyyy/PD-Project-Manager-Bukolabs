@@ -1,31 +1,18 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { Menubar } from "primereact/menubar";
-import { Card } from "primereact/card";
 import { Button } from "primereact/button";
-import { SplitButton } from "primereact/splitbutton";
-import { Badge } from "primereact/badge";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
-import { Tag } from "primereact/tag";
+import { Toast } from "primereact/toast";
+import "./Dashboard.css";
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
-
-  const menuItems = [
-    { label: "Dashboard", icon: "pi pi-home" },
-    { label: "My Tasks", icon: "pi pi-check-square" },
-    { label: "Projects", icon: "pi pi-folder" },
-    { label: "Time Tracking", icon: "pi pi-clock" },
-    { label: "Reports", icon: "pi pi-chart-bar" },
-  ];
-
-  const userMenuItems = [
-    { label: "Profile", icon: "pi pi-user" },
-    { label: "Settings", icon: "pi pi-cog" },
-    { separator: true },
-    { label: "Logout", icon: "pi pi-sign-out", command: () => logout() },
-  ];
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem("staffActiveTab") || "overview",
+  );
+  const [activeNav, setActiveNav] = useState(
+    () => localStorage.getItem("staffActiveNav") || "overview",
+  );
+  const toast = useRef(null);
 
   const tasks = [
     {
@@ -54,98 +41,143 @@ const StaffDashboard = () => {
     },
   ];
 
-  const startContent = (
-    <div className="flex align-items-center">
-      <i className="pi pi-briefcase text-2xl mr-2 text-primary"></i>
-      <span className="text-xl font-semibold">Staff Dashboard</span>
-    </div>
-  );
+  const navItems = [
+    { key: "overview", icon: "pi pi-home", label: "Overview" },
+    { key: "tasks", icon: "pi pi-check-square", label: "My Tasks" },
+    { key: "projects", icon: "pi pi-folder", label: "Projects" },
+    { key: "reports", icon: "pi pi-chart-bar", label: "Reports" },
+    { key: "settings", icon: "pi pi-cog", label: "Settings" },
+  ];
 
-  const endContent = (
-    <div className="flex align-items-center gap-3">
-      <Badge value="5">
-        <i className="pi pi-bell text-xl cursor-pointer"></i>
-      </Badge>
-      <SplitButton
-        label={`${user?.first_name} ${user?.last_name}`}
-        icon="pi pi-user"
-        model={userMenuItems}
-        className="p-button-rounded p-button-text"
-      />
-    </div>
-  );
-
-  const priorityTemplate = (rowData) => {
-    const severity = {
-      High: "danger",
-      Medium: "warning",
-      Low: "success",
-    }[rowData.priority];
-
-    return <Tag value={rowData.priority} severity={severity} />;
-  };
-
-  const statusTemplate = (rowData) => {
-    const severity = {
-      "In Progress": "info",
-      Pending: "warning",
-      Completed: "success",
-    }[rowData.status];
-
-    return <Tag value={rowData.status} severity={severity} />;
-  };
+  React.useEffect(() => {
+    localStorage.setItem("staffActiveTab", activeTab);
+    localStorage.setItem("staffActiveNav", activeNav);
+  }, [activeTab, activeNav]);
 
   return (
-    <div className="surface-ground min-h-screen">
-      <Menubar
-        model={menuItems}
-        start={startContent}
-        end={endContent}
-        className="shadow-2 mb-4"
-      />
-
-      <div className="p-4">
-        <div className="grid">
-          <div className="col-12 md:col-4">
-            <Card title="Assigned Tasks" className="shadow-1">
-              <div className="text-4xl font-bold text-primary">12</div>
-              <small className="text-500">Active tasks assigned to you</small>
-            </Card>
+    <div className="dashboard-container">
+      <Toast ref={toast} />
+      <div className="dashboard-sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <i className="pi pi-briefcase"></i>
           </div>
-
-          <div className="col-12 md:col-4">
-            <Card title="Projects" className="shadow-1">
-              <div className="text-4xl font-bold text-primary">5</div>
-              <small className="text-500">Projects you're involved in</small>
-            </Card>
-          </div>
-
-          <div className="col-12 md:col-4">
-            <Card title="Hours This Week" className="shadow-1">
-              <div className="text-4xl font-bold text-primary">42</div>
-              <small className="text-500">Hours logged this week</small>
-            </Card>
+          <div className="sidebar-title">
+            <h3>Staff</h3>
+            <p>Control Panel</p>
           </div>
         </div>
-
-        <Card title="My Tasks" className="mt-4 shadow-1">
-          <DataTable value={tasks} size="small">
-            <Column field="name" header="Task Name"></Column>
-            <Column field="project" header="Project"></Column>
-            <Column
-              field="priority"
-              header="Priority"
-              body={priorityTemplate}
-            ></Column>
-            <Column field="due" header="Due Date"></Column>
-            <Column
-              field="status"
-              header="Status"
-              body={statusTemplate}
-            ></Column>
-            <Column body={() => <Button icon="pi pi-eye" text />}></Column>
-          </DataTable>
-        </Card>
+        <div className="sidebar-nav">
+          {navItems.map((item) => (
+            <div
+              key={item.key}
+              className={`nav-item ${activeNav === item.key ? "active" : ""}`}
+              onClick={() => {
+                setActiveNav(item.key);
+                setActiveTab(item.key);
+              }}
+            >
+              <i className={item.icon}></i>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <Button
+            className="logout-btn"
+            label="Logout"
+            icon="pi pi-sign-out"
+            onClick={logout}
+          />
+        </div>
+      </div>
+      <div className="dashboard-content">
+        <div className="dashboard-header">
+          <div className="header-left">
+            <div>
+              <h2 className="header-title">
+                {activeTab === "overview" && "Overview"}
+                {activeTab === "tasks" && "My Tasks"}
+                {activeTab === "projects" && "Projects"}
+                {activeTab === "reports" && "Reports"}
+                {activeTab === "settings" && "Settings"}
+              </h2>
+              <p className="header-subtitle">
+                {activeTab === "overview" && "Welcome back, Staff!"}
+                {activeTab === "tasks" && "View and manage your tasks"}
+                {activeTab === "projects" && "Project assignments"}
+                {activeTab === "reports" && "View reports"}
+                {activeTab === "settings" && "Configure your settings"}
+              </p>
+            </div>
+          </div>
+          <div className="header-right">
+            <div className="user-profile">
+              <div className="user-avatar">
+                {user?.username?.charAt(0).toUpperCase()}
+              </div>
+              <div className="user-info">
+                <h4>
+                  {user?.first_name} {user?.last_name}
+                </h4>
+                <p>{user?.user_role?.toUpperCase()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="dashboard-body">
+          {activeTab === "overview" && (
+            <div>
+              <h3>Quick Stats</h3>
+              {/* Add staff overview widgets here */}
+            </div>
+          )}
+          {activeTab === "tasks" && (
+            <div>
+              <h3>My Tasks</h3>
+              <table className="p-datatable-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Project</th>
+                    <th>Priority</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((task) => (
+                    <tr key={task.id}>
+                      <td>{task.name}</td>
+                      <td>{task.project}</td>
+                      <td>{task.priority}</td>
+                      <td>{task.due}</td>
+                      <td>{task.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {activeTab === "projects" && (
+            <div>
+              <h3>Projects</h3>
+              {/* Add staff projects panel here */}
+            </div>
+          )}
+          {activeTab === "reports" && (
+            <div>
+              <h3>Reports</h3>
+              {/* Add staff reports panel here */}
+            </div>
+          )}
+          {activeTab === "settings" && (
+            <div>
+              <h3>Settings</h3>
+              {/* Add staff settings panel here */}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

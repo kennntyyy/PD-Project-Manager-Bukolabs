@@ -22,8 +22,12 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [activeNav, setActiveNav] = useState("overview");
+  const [activeTab, setActiveTab] = useState(
+    () => localStorage.getItem("adminActiveTab") || "overview",
+  );
+  const [activeNav, setActiveNav] = useState(
+    () => localStorage.getItem("adminActiveNav") || "overview",
+  );
   const toast = useRef(null);
 
   // ============================================
@@ -33,6 +37,11 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("adminActiveTab", activeTab);
+    localStorage.setItem("adminActiveNav", activeNav);
+  }, [activeTab, activeNav]);
 
   const loadUsers = async () => {
     try {

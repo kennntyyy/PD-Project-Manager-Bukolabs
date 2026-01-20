@@ -7,6 +7,7 @@ import OverviewPanel from "./panels/OverviewPanel";
 import UserManagementPanel from "./panels/UserManagementPanel";
 import ReportsPanel from "./panels/ReportsPanel";
 import SettingsPanel from "./panels/SettingsPanel";
+import ProjectsPanel from "./panels/ProjectsPanel";
 import "./Dashboard.css";
 
 // ============================================
@@ -124,6 +125,16 @@ const AdminDashboard = () => {
             <i className="pi pi-cog"></i>
             <span>Settings</span>
           </div>
+          <div
+            className={`nav-item ${activeNav === "projects" ? "active" : ""}`}
+            onClick={() => {
+              setActiveNav("projects");
+              setActiveTab("projects");
+            }}
+          >
+            <i className="pi pi-folder"></i>
+            <span>Projects</span>
+          </div>
         </div>
 
         <div className="sidebar-footer">
@@ -147,12 +158,14 @@ const AdminDashboard = () => {
                 {activeTab === "users" && "User Management"}
                 {activeTab === "reports" && "Reports"}
                 {activeTab === "settings" && "Settings"}
+                {activeTab === "projects" && "Projects"}
               </h2>
               <p className="header-subtitle">
                 {activeTab === "overview" && "Welcome back, Admin!"}
                 {activeTab === "users" && "Manage system users"}
                 {activeTab === "reports" && "View analytics and reports"}
                 {activeTab === "settings" && "Configure system settings"}
+                {activeTab === "projects" && "Manage all projects"}
               </p>
             </div>
           </div>
@@ -177,6 +190,7 @@ const AdminDashboard = () => {
           {activeTab === "users" && <UserManagementPanel />}
           {activeTab === "reports" && <ReportsPanel />}
           {activeTab === "settings" && <SettingsPanel />}
+          {activeTab === "projects" && <ProjectsPanel />}
         </div>
       </div>
     </div>

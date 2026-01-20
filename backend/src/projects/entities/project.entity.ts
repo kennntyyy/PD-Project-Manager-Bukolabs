@@ -25,11 +25,11 @@ export class Project {
     @PrimaryGeneratedColumn('uuid')
     project_id: string;
 
-    @Column({ length: 100 })
+    @Column({ length: 100, nullable: false })
     project_name: string;
 
-    @Column()
-    project_description: Text;
+    @Column({ type: 'text', nullable: true })
+    project_description: string;
 
     @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     total_amount: number;
@@ -69,21 +69,21 @@ export class Project {
     @CreateDateColumn()
     deleted_at: Date;
 
-    @Column()
+    @Column({ default: false })
     isDeleted: boolean;
 
     //relationships
 
-    @Column()
+    @Column({ nullable: true })
     client_id: number;
 
-    @Column()
+    @Column({ nullable: true })
     staff_id: number;
 
-    @Column()
-    contractor_id: number;
+    @Column({ type: 'uuid',nullable: true })
+    contractor_id: string;
 
-    @Column()
-    created_by: number;
+    @Column({ nullable: true })
+    created_by: string;
 
 }

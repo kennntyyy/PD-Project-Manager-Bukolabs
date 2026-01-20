@@ -17,15 +17,34 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const loadUser = () => {
+    const loadUser = async () => {
       try {
         const savedUser = AuthService.getCurrentUser();
-        if (savedUser && AuthService.isAuthenticated()) {
-          setUser(savedUser);
+        const isAuthenticated = AuthService.isAuthenticated();
+
+        console.log("[AuthContext] Checking session...");
+        console.log("[AuthContext] Saved user:", savedUser);
+        console.log("[AuthContext] Is authenticated:", isAuthenticated);
+
+        if (savedUser && isAuthenticated) {
+          // Validate session with backend
+          const isSessionValid = await AuthService.validateSession();
+          console.log("[AuthContext] Session valid:", isSessionValid);
+
+          if (isSessionValid) {
+            setUser(savedUser);
+          } else {
+            console.log("[AuthContext] Session expired, clearing auth");
+            AuthService.clearAuth();
+            setUser(null);
+          }
+        } else {
+          setUser(null);
         }
       } catch (err) {
-        console.error("Failed to load user:", err);
+        console.error("[AuthContext] Failed to load user:", err);
         AuthService.clearAuth();
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -34,14 +53,18 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (username, password, rememberMe = false) => {
     setLoading(true);
     setError(null);
 
-    console.log("Login attempt with username:", { username, password });
+    console.log("Login attempt with username:", {
+      username,
+      password,
+      rememberMe,
+    });
 
     try {
-      const response = await AuthService.login(username, password);
+      const response = await AuthService.login(username, password, rememberMe);
       console.log("Login successful:", response);
 
       setUser(response.user);
@@ -49,6 +72,8 @@ export const AuthProvider = ({ children }) => {
       // Redirect based on role
       switch (response.user.user_role) {
         case "admin":
+          localStorage.setItem("adminActiveTab", "overview");
+          localStorage.setItem("adminActiveNav", "overview");
           window.location.href = "/admin";
           break;
         case "staff":
@@ -69,7 +94,6 @@ export const AuthProvider = ({ children }) => {
         err.response?.data?.message ||
         "Login failed. Please check your credentials.";
       setError(errorMessage);
-      throw err;
     } finally {
       setLoading(false);
     }

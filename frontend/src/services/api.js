@@ -12,7 +12,9 @@ const api = axios.create({
 // Add token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
+    const token =
+      localStorage.getItem("access_token") ||
+      sessionStorage.getItem("access_token");
     console.log(
       "[api interceptor] Request:",
       config.method?.toUpperCase(),

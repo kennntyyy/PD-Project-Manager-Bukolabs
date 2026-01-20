@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { InputText } from "primereact/inputtext";
-import { Password } from "primereact/password";
 import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import "./LoginPage.css";
@@ -12,8 +11,14 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setUsername("");
+    setPassword("");
+  }, []);
 
   useEffect(() => {
     // Check if user is already logged in
@@ -41,7 +46,7 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await login(username, password);
+    await login(username, password, rememberMe);
   };
 
   const fillCredentials = (user, pass) => {
@@ -107,21 +112,39 @@ const LoginPage = () => {
                 className={`input-wrapper ${
                   focusedField === "password" ? "focused" : ""
                 }`}
+                style={{ position: "relative" }}
               >
-                <Password
+                <InputText
                   id="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField("password")}
                   onBlur={() => setFocusedField(null)}
                   placeholder="Enter your password"
-                  toggleMask
-                  feedback={false}
                   required
                   disabled={loading}
                   className="form-input"
-                  inputClassName="w-full"
                 />
+                <span
+                  className="custom-eye-icon pi"
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    right: "14px",
+                    transform: "translateY(-50%)",
+                    cursor: "pointer",
+                    color: "#404a17",
+                    fontSize: "18px",
+                  }}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? (
+                    <i className="pi pi-eye-slash" />
+                  ) : (
+                    <i className="pi pi-eye" />
+                  )}
+                </span>
               </div>
             </div>
 

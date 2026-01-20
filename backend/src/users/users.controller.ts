@@ -9,6 +9,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { User, UserRole } from './entities/user.entity';
@@ -29,6 +30,15 @@ export class UsersController {
   async findAll(): Promise<User[]> {
     console.log('[UsersController] GET /users - findAll');
     return this.usersService.findAll();
+  }
+
+  @Get('profile')
+  async getProfile(@Request() req: any): Promise<User> {
+    console.log(
+      '[UsersController] GET /users/profile - getProfile for user:',
+      req.user.user_id,
+    );
+    return this.usersService.findById(req.user.user_id);
   }
 
   @Get('role/:role')

@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { Button } from "primereact/button";
-import { Toast } from "primereact/toast";
-import { userService } from "../../services/userService";
-import OverviewPanel from "./panels/OverviewPanel";
-import UserManagementPanel from "./panels/UserManagementPanel";
-import ReportsPanel from "./panels/ReportsPanel";
-import SettingsPanel from "./panels/SettingsPanel";
-import ProjectsPanel from "./panels/ProjectsPanel";
-import "./Dashboard.css";
+import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { Button } from 'primereact/button';
+import { Toast } from 'primereact/toast';
+import { userService } from '../../services/userService';
+import OverviewPanel from './panels/OverviewPanel';
+import UserManagementPanel from './panels/UserManagementPanel';
+import ReportsPanel from './panels/ReportsPanel';
+import SettingsPanel from './panels/SettingsPanel';
+import ProjectsPanel from './panels/ProjectsPanel';
+import './Dashboard.css';
 
 // ============================================
 // ADMIN DASHBOARD
@@ -24,10 +24,10 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(
-    () => localStorage.getItem("adminActiveTab") || "overview",
+    () => localStorage.getItem('adminActiveTab') || 'overview',
   );
   const [activeNav, setActiveNav] = useState(
-    () => localStorage.getItem("adminActiveNav") || "overview",
+    () => localStorage.getItem('adminActiveNav') || 'overview',
   );
   const toast = useRef(null);
 
@@ -40,8 +40,8 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("adminActiveTab", activeTab);
-    localStorage.setItem("adminActiveNav", activeNav);
+    localStorage.setItem('adminActiveTab', activeTab);
+    localStorage.setItem('adminActiveNav', activeNav);
   }, [activeTab, activeNav]);
 
   const loadUsers = async () => {
@@ -50,14 +50,14 @@ const AdminDashboard = () => {
       const data = await userService.getAllUsers();
       setUsers(data);
     } catch (error) {
-      console.error("Load users error:", error);
+      console.error('Load users error:', error);
       toast.current?.show({
-        severity: "error",
-        summary: "Error",
+        severity: 'error',
+        summary: 'Error',
         detail:
           error.response?.data?.message ||
           error.message ||
-          "Failed to load users",
+          'Failed to load users',
       });
     } finally {
       setLoading(false);
@@ -86,50 +86,50 @@ const AdminDashboard = () => {
 
         <div className="sidebar-nav">
           <div
-            className={`nav-item ${activeNav === "overview" ? "active" : ""}`}
+            className={`nav-item ${activeNav === 'overview' ? 'active' : ''}`}
             onClick={() => {
-              setActiveNav("overview");
-              setActiveTab("overview");
+              setActiveNav('overview');
+              setActiveTab('overview');
             }}
           >
             <i className="pi pi-home"></i>
             <span>Overview</span>
           </div>
           <div
-            className={`nav-item ${activeNav === "users" ? "active" : ""}`}
+            className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
             onClick={() => {
-              setActiveNav("users");
-              setActiveTab("users");
+              setActiveNav('users');
+              setActiveTab('users');
             }}
           >
             <i className="pi pi-users"></i>
             <span>User Management</span>
           </div>
           <div
-            className={`nav-item ${activeNav === "reports" ? "active" : ""}`}
+            className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
             onClick={() => {
-              setActiveNav("reports");
-              setActiveTab("reports");
+              setActiveNav('reports');
+              setActiveTab('reports');
             }}
           >
             <i className="pi pi-chart-bar"></i>
             <span>Reports</span>
           </div>
           <div
-            className={`nav-item ${activeNav === "settings" ? "active" : ""}`}
+            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
             onClick={() => {
-              setActiveNav("settings");
-              setActiveTab("settings");
+              setActiveNav('settings');
+              setActiveTab('settings');
             }}
           >
             <i className="pi pi-cog"></i>
             <span>Settings</span>
           </div>
           <div
-            className={`nav-item ${activeNav === "projects" ? "active" : ""}`}
+            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
             onClick={() => {
-              setActiveNav("projects");
-              setActiveTab("projects");
+              setActiveNav('projects');
+              setActiveTab('projects');
             }}
           >
             <i className="pi pi-folder"></i>
@@ -154,18 +154,18 @@ const AdminDashboard = () => {
           <div className="header-left">
             <div>
               <h2 className="header-title">
-                {activeTab === "overview" && "Overview"}
-                {activeTab === "users" && "User Management"}
-                {activeTab === "reports" && "Reports"}
-                {activeTab === "settings" && "Settings"}
-                {activeTab === "projects" && "Projects"}
+                {activeTab === 'overview' && 'Overview'}
+                {activeTab === 'users' && 'User Management'}
+                {activeTab === 'reports' && 'Reports'}
+                {activeTab === 'settings' && 'Settings'}
+                {activeTab === 'projects' && 'Projects'}
               </h2>
               <p className="header-subtitle">
-                {activeTab === "overview" && "Welcome back, Admin!"}
-                {activeTab === "users" && "Manage system users"}
-                {activeTab === "reports" && "View analytics and reports"}
-                {activeTab === "settings" && "Configure system settings"}
-                {activeTab === "projects" && "Manage all projects"}
+                {activeTab === 'overview' && 'Welcome back, Admin!'}
+                {activeTab === 'users' && 'Manage system users'}
+                {activeTab === 'reports' && 'View analytics and reports'}
+                {activeTab === 'settings' && 'Configure system settings'}
+                {activeTab === 'projects' && 'Manage all projects'}
               </p>
             </div>
           </div>
@@ -186,11 +186,11 @@ const AdminDashboard = () => {
 
         {/* Body - Render appropriate panel based on activeTab */}
         <div className="dashboard-body">
-          {activeTab === "overview" && <OverviewPanel users={users} />}
-          {activeTab === "users" && <UserManagementPanel />}
-          {activeTab === "reports" && <ReportsPanel />}
-          {activeTab === "settings" && <SettingsPanel />}
-          {activeTab === "projects" && <ProjectsPanel />}
+          {activeTab === 'overview' && <OverviewPanel users={users} />}
+          {activeTab === 'users' && <UserManagementPanel />}
+          {activeTab === 'reports' && <ReportsPanel />}
+          {activeTab === 'settings' && <SettingsPanel />}
+          {activeTab === 'projects' && <ProjectsPanel />}
         </div>
       </div>
     </div>

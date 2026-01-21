@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Button } from "primereact/button";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
-import { Tag } from "primereact/tag";
-import { Dialog } from "primereact/dialog";
-import { InputText } from "primereact/inputtext";
-import { Toast } from "primereact/toast";
-import { Dropdown } from "primereact/dropdown";
-import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
-import { userService } from "../../../services/userService";
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from 'primereact/button';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Tag } from 'primereact/tag';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { Toast } from 'primereact/toast';
+import { Dropdown } from 'primereact/dropdown';
+import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { userService } from '../../../services/userService';
 
 // ============================================
 // USER MANAGEMENT PANEL
@@ -24,28 +24,29 @@ const UserManagementPanel = () => {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [viewMode, setViewMode] = useState("active"); // 'active' or 'deleted'
+  const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
+  const [searchQuery, setSearchQuery] = useState(''); // Search query state
   const toast = useRef(null);
 
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    first_name: "",
-    last_name: "",
-    phone: "",
-    user_role: "client",
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    first_name: '',
+    last_name: '',
+    phone: '',
+    user_role: 'client',
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const roles = [
-    { label: "Admin", value: "admin" },
-    { label: "Staff", value: "staff" },
-    { label: "Client", value: "client" },
-    { label: "Contractor", value: "contractor" },
+    { label: 'Admin', value: 'admin' },
+    { label: 'Staff', value: 'staff' },
+    { label: 'Client', value: 'client' },
+    { label: 'Contractor', value: 'contractor' },
   ];
 
   // ============================================
@@ -57,6 +58,81 @@ const UserManagementPanel = () => {
   }, []);
 
   // ============================================
+  // SEARCH FUNCTIONALITY
+  // ============================================
+
+  // Filter users based on search query
+  const getFilteredUsers = () => {
+    if (!searchQuery.trim()) {
+      return users.filter((user) => {
+        if (viewMode === 'deleted') {
+          return user.is_deleted === true;
+        }
+        return user.is_deleted === false || user.is_deleted === undefined;
+      });
+    }
+
+    const query = searchQuery.toLowerCase();
+
+    return users.filter((user) => {
+      // Check view mode filter first
+      if (viewMode === 'deleted' && user.is_deleted !== true) return false;
+      if (viewMode === 'active' && user.is_deleted === true) return false;
+
+      // Search in username
+      if (user.username?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in email
+      if (user.email?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in first name
+      if (user.first_name?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in last name
+      if (user.last_name?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in full name (combined)
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`
+        .toLowerCase()
+        .trim();
+      if (fullName.includes(query)) {
+        return true;
+      }
+
+      // Search in phone
+      if (user.phone?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in role
+      if (user.user_role?.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Search in status
+      const statusText = user.is_active ? 'active' : 'inactive';
+      if (statusText.includes(query)) {
+        return true;
+      }
+
+      return false;
+    });
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
+
+  // ============================================
   // CRUD OPERATIONS
   // ============================================
 
@@ -66,14 +142,14 @@ const UserManagementPanel = () => {
       const data = await userService.getAllUsers();
       setUsers(data);
     } catch (error) {
-      console.error("Load users error:", error);
+      console.error('Load users error:', error);
       toast.current?.show({
-        severity: "error",
-        summary: "Error",
+        severity: 'error',
+        summary: 'Error',
         detail:
           error.response?.data?.message ||
           error.message ||
-          "Failed to load users",
+          'Failed to load users',
       });
     } finally {
       setLoading(false);
@@ -84,14 +160,14 @@ const UserManagementPanel = () => {
     setIsEditing(false);
     setSelectedUser(null);
     setFormData({
-      username: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      first_name: "",
-      last_name: "",
-      phone: "",
-      user_role: "client",
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      first_name: '',
+      last_name: '',
+      phone: '',
+      user_role: 'client',
     });
     setVisible(true);
   };
@@ -102,11 +178,11 @@ const UserManagementPanel = () => {
     setFormData({
       username: usr.username,
       email: usr.email,
-      password: "",
-      confirmPassword: "",
+      password: '',
+      confirmPassword: '',
       first_name: usr.first_name,
       last_name: usr.last_name,
-      phone: usr.phone || "",
+      phone: usr.phone || '',
       user_role: usr.user_role,
     });
     setVisible(true);
@@ -123,9 +199,9 @@ const UserManagementPanel = () => {
 
   const saveUser = async () => {
     console.log(
-      "[UserManagementPanel] saveUser called, isEditing:",
+      '[UserManagementPanel] saveUser called, isEditing:',
       isEditing,
-      "formData:",
+      'formData:',
       formData,
     );
 
@@ -137,27 +213,27 @@ const UserManagementPanel = () => {
       !formData.last_name
     ) {
       toast.current?.show({
-        severity: "warn",
-        summary: "Warning",
-        detail: "Please fill in all required fields",
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Please fill in all required fields',
       });
       return;
     }
 
     if (!isEditing && !formData.password) {
       toast.current?.show({
-        severity: "warn",
-        summary: "Warning",
-        detail: "Password is required for new users",
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Password is required for new users',
       });
       return;
     }
 
     if (!isEditing && formData.password !== formData.confirmPassword) {
       toast.current?.show({
-        severity: "error",
-        summary: "Error",
-        detail: "Passwords do not match",
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Passwords do not match',
       });
       return;
     }
@@ -168,34 +244,34 @@ const UserManagementPanel = () => {
       if (isEditing) {
         const updateData = { ...formData };
         delete updateData.password;
-        console.log("Updating user:", selectedUser.user_id, updateData);
+        console.log('Updating user:', selectedUser.user_id, updateData);
         await userService.updateUser(selectedUser.user_id, updateData);
         toast.current?.show({
-          severity: "success",
-          summary: "Success",
-          detail: "User updated successfully",
+          severity: 'success',
+          summary: 'Success',
+          detail: 'User updated successfully',
         });
       } else {
-        console.log("Creating user:", formData);
+        console.log('Creating user:', formData);
         await userService.createUser(formData);
         toast.current?.show({
-          severity: "success",
-          summary: "Success",
-          detail: "User created successfully",
+          severity: 'success',
+          summary: 'Success',
+          detail: 'User created successfully',
         });
       }
 
       setVisible(false);
       loadUsers();
     } catch (error) {
-      console.error("Save user error:", error);
+      console.error('Save user error:', error);
       toast.current?.show({
-        severity: "error",
-        summary: "Error",
+        severity: 'error',
+        summary: 'Error',
         detail:
           error.response?.data?.message ||
           error.message ||
-          "Failed to save user",
+          'Failed to save user',
       });
     } finally {
       setLoading(false);
@@ -205,29 +281,29 @@ const UserManagementPanel = () => {
   const deleteUser = (usr) => {
     confirmDialog({
       message: `Are you sure you want to delete ${usr.username}? This can be restored from the recycle bin.`,
-      header: "Confirm",
-      icon: "pi pi-exclamation-triangle",
+      header: 'Confirm',
+      icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
           setLoading(true);
-          console.log("Soft deleting user:", usr.user_id);
+          console.log('Soft deleting user:', usr.user_id);
           // Send soft delete request (mark as deleted)
           await userService.softDeleteUser(usr.user_id);
           toast.current?.show({
-            severity: "success",
-            summary: "Success",
-            detail: "User moved to recycle bin",
+            severity: 'success',
+            summary: 'Success',
+            detail: 'User moved to recycle bin',
           });
           loadUsers();
         } catch (error) {
-          console.error("Delete user error:", error);
+          console.error('Delete user error:', error);
           toast.current?.show({
-            severity: "error",
-            summary: "Error",
+            severity: 'error',
+            summary: 'Error',
             detail:
               error.response?.data?.message ||
               error.message ||
-              "Failed to delete user",
+              'Failed to delete user',
           });
         } finally {
           setLoading(false);
@@ -240,28 +316,28 @@ const UserManagementPanel = () => {
   const restoreUser = (usr) => {
     confirmDialog({
       message: `Restore ${usr.username} to active users?`,
-      header: "Confirm",
-      icon: "pi pi-refresh",
+      header: 'Confirm',
+      icon: 'pi pi-refresh',
       accept: async () => {
         try {
           setLoading(true);
-          console.log("Restoring user:", usr.user_id);
+          console.log('Restoring user:', usr.user_id);
           await userService.restoreUser(usr.user_id);
           toast.current?.show({
-            severity: "success",
-            summary: "Success",
-            detail: "User restored successfully",
+            severity: 'success',
+            summary: 'Success',
+            detail: 'User restored successfully',
           });
           loadUsers();
         } catch (error) {
-          console.error("Restore user error:", error);
+          console.error('Restore user error:', error);
           toast.current?.show({
-            severity: "error",
-            summary: "Error",
+            severity: 'error',
+            summary: 'Error',
             detail:
               error.response?.data?.message ||
               error.message ||
-              "Failed to restore user",
+              'Failed to restore user',
           });
         } finally {
           setLoading(false);
@@ -274,28 +350,28 @@ const UserManagementPanel = () => {
   const permanentlyDeleteUser = (usr) => {
     confirmDialog({
       message: `Permanently delete ${usr.username}? This cannot be undone.`,
-      header: "Confirm Permanent Delete",
-      icon: "pi pi-trash",
+      header: 'Confirm Permanent Delete',
+      icon: 'pi pi-trash',
       accept: async () => {
         try {
           setLoading(true);
-          console.log("Permanently deleting user:", usr.user_id);
+          console.log('Permanently deleting user:', usr.user_id);
           await userService.deleteUser(usr.user_id);
           toast.current?.show({
-            severity: "success",
-            summary: "Success",
-            detail: "User permanently deleted",
+            severity: 'success',
+            summary: 'Success',
+            detail: 'User permanently deleted',
           });
           loadUsers();
         } catch (error) {
-          console.error("Permanent delete user error:", error);
+          console.error('Permanent delete user error:', error);
           toast.current?.show({
-            severity: "error",
-            summary: "Error",
+            severity: 'error',
+            summary: 'Error',
             detail:
               error.response?.data?.message ||
               error.message ||
-              "Failed to permanently delete user",
+              'Failed to permanently delete user',
           });
         } finally {
           setLoading(false);
@@ -304,24 +380,16 @@ const UserManagementPanel = () => {
     });
   };
 
-  // Filter users based on view mode
-  const filteredUsers = users.filter((user) => {
-    if (viewMode === "deleted") {
-      return user.is_deleted === true;
-    }
-    return user.is_deleted === false || user.is_deleted === undefined;
-  });
-
   const getRoleSeverity = (role) => {
     switch (role) {
-      case "admin":
-        return "danger";
-      case "staff":
-        return "info";
-      case "client":
-        return "success";
-      case "contractor":
-        return "warning";
+      case 'admin':
+        return 'danger';
+      case 'staff':
+        return 'info';
+      case 'client':
+        return 'success';
+      case 'contractor':
+        return 'warning';
       default:
         return null;
     }
@@ -339,11 +407,14 @@ const UserManagementPanel = () => {
   const statusTemplate = (rowData) => {
     return (
       <Tag
-        value={rowData.is_active ? "Active" : "Inactive"}
-        severity={rowData.is_active ? "success" : "danger"}
+        value={rowData.is_active ? 'Active' : 'Inactive'}
+        severity={rowData.is_active ? 'success' : 'danger'}
       />
     );
   };
+
+  // Get filtered users
+  const filteredUsers = getFilteredUsers();
 
   // ============================================
   // RENDER
@@ -358,71 +429,123 @@ const UserManagementPanel = () => {
         <div className="card-header">
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
             }}
           >
             <h3 className="card-title">
-              {viewMode === "active" ? "Active Users" : "Recycle Bin"}
+              {viewMode === 'active' ? 'Active Users' : 'Recycle Bin'}
             </h3>
             <div
               className="user-panel-switch"
               style={{
-                marginBottom: "12px",
-                paddingLeft: "16px",
-                paddingRight: "16px",
-                paddingTop: "12px",
+                marginBottom: '12px',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                paddingTop: '12px',
               }}
             >
               <Button
                 label="Active Users"
                 icon="pi pi-users"
-                severity={viewMode === "active" ? "info" : "secondary"}
-                onClick={() => setViewMode("active")}
+                severity={viewMode === 'active' ? 'info' : 'secondary'}
+                onClick={() => {
+                  setViewMode('active');
+                  setSearchQuery('');
+                }}
                 className={
-                  viewMode === "active"
-                    ? "p-button-sm user-switch-btn active"
-                    : "p-button-sm user-switch-btn"
+                  viewMode === 'active'
+                    ? 'p-button-sm user-switch-btn active'
+                    : 'p-button-sm user-switch-btn'
                 }
-                text={viewMode !== "active"}
-                outlined={viewMode !== "active"}
+                text={viewMode !== 'active'}
+                outlined={viewMode !== 'active'}
               />
               <Button
                 label={`Recycle Bin (${users.filter((u) => u.is_deleted).length})`}
                 icon="pi pi-trash"
-                severity={viewMode === "deleted" ? "info" : "secondary"}
-                onClick={() => setViewMode("deleted")}
+                severity={viewMode === 'deleted' ? 'info' : 'secondary'}
+                onClick={() => {
+                  setViewMode('deleted');
+                  setSearchQuery('');
+                }}
                 className={
-                  viewMode === "deleted"
-                    ? "p-button-sm user-switch-btn active"
-                    : "p-button-sm user-switch-btn"
+                  viewMode === 'deleted'
+                    ? 'p-button-sm user-switch-btn active'
+                    : 'p-button-sm user-switch-btn'
                 }
-                text={viewMode !== "deleted"}
-                outlined={viewMode !== "deleted"}
+                text={viewMode !== 'deleted'}
+                outlined={viewMode !== 'deleted'}
               />
             </div>
           </div>
         </div>
 
-        {viewMode === "active" && (
+        {/* Search Bar and Action Buttons */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            gap: '16px',
+            flexWrap: 'wrap',
+          }}
+        >
+          {/* Search Bar */}
           <div
-            style={{
-              marginBottom: "16px",
-              paddingLeft: "16px",
-              paddingRight: "16px",
-            }}
+            className="p-inputgroup"
+            style={{ flex: '1', minWidth: '300px', maxWidth: '500px' }}
           >
-            <Button
-              label="Add New User"
-              icon="pi pi-plus"
-              severity="info"
-              onClick={openNewDialog}
-              className="add-user-btn"
+            <span className="p-inputgroup-addon">
+              <i className="pi pi-search" />
+            </span>
+            <InputText
+              placeholder={
+                viewMode === 'active'
+                  ? 'Search users by name, username, email, role...'
+                  : 'Search deleted users...'
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ flex: '1' }}
             />
+            {searchQuery && (
+              <Button
+                icon="pi pi-times"
+                className="p-button-text"
+                onClick={handleClearSearch}
+                tooltip="Clear search"
+              />
+            )}
           </div>
-        )}
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {viewMode === 'active' && (
+              <Button
+                label="Add New User"
+                icon="pi pi-plus"
+                severity="info"
+                onClick={openNewDialog}
+                className="add-user-btn"
+              />
+            )}
+            {searchQuery && (
+              <Button
+                label={`${filteredUsers.length} result${filteredUsers.length !== 1 ? 's' : ''} found`}
+                icon="pi pi-filter"
+                severity="secondary"
+                className="p-button-outlined"
+                disabled
+              />
+            )}
+          </div>
+        </div>
 
         <DataTable
           value={filteredUsers}
@@ -430,9 +553,13 @@ const UserManagementPanel = () => {
           paginator
           rows={10}
           rowsPerPageOptions={[5, 10, 20, 50]}
-          tableStyle={{ minWidth: "50rem" }}
+          tableStyle={{ minWidth: '50rem' }}
           emptyMessage={
-            viewMode === "active" ? "No users found." : "Recycle bin is empty."
+            searchQuery
+              ? 'No users match your search criteria.'
+              : viewMode === 'active'
+                ? 'No users found.'
+                : 'Recycle bin is empty.'
           }
           responsiveLayout="scroll"
         >
@@ -448,13 +575,13 @@ const UserManagementPanel = () => {
                 value={rowData.user_role}
                 style={{
                   background:
-                    rowData.user_role === "admin"
-                      ? "#404a17"
-                      : rowData.user_role === "staff"
-                        ? "#556b2f"
-                        : rowData.user_role === "client"
-                          ? "#10b981"
-                          : "#f59e0b",
+                    rowData.user_role === 'admin'
+                      ? '#404a17'
+                      : rowData.user_role === 'staff'
+                        ? '#556b2f'
+                        : rowData.user_role === 'client'
+                          ? '#10b981'
+                          : '#f59e0b',
                 }}
               />
             )}
@@ -464,16 +591,16 @@ const UserManagementPanel = () => {
             header="Status"
             body={(rowData) => (
               <Tag
-                value={rowData.is_active ? "Active" : "Inactive"}
-                severity={rowData.is_active ? "success" : "danger"}
+                value={rowData.is_active ? 'Active' : 'Inactive'}
+                severity={rowData.is_active ? 'success' : 'danger'}
               />
             )}
           />
           <Column
             header="Actions"
             body={(rowData) => (
-              <div style={{ display: "flex", gap: "8px" }}>
-                {viewMode === "active" ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {viewMode === 'active' ? (
                   <>
                     <Button
                       icon="pi pi-pencil"
@@ -511,8 +638,8 @@ const UserManagementPanel = () => {
       {/* ============================================ */}
       <Dialog
         visible={visible}
-        style={{ width: "90vw", maxWidth: "500px" }}
-        header={isEditing ? "Edit User" : "Add New User"}
+        style={{ width: '90vw', maxWidth: '500px' }}
+        header={isEditing ? 'Edit User' : 'Add New User'}
         modal
         onHide={() => setVisible(false)}
         className="p-fluid"
@@ -588,12 +715,12 @@ const UserManagementPanel = () => {
 
         {!isEditing && (
           <>
-            <div className="field mt-3" style={{ position: "relative" }}>
+            <div className="field mt-3" style={{ position: 'relative' }}>
               <label htmlFor="password">Password *</label>
               <InputText
                 id="password"
                 name="password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={handleFormChange}
                 placeholder="Enter password"
@@ -602,13 +729,13 @@ const UserManagementPanel = () => {
               <span
                 className="custom-eye-icon pi"
                 style={{
-                  position: "absolute",
-                  top: "50%",
-                  right: "14px",
-                  transform: "translateY(-50%)",
-                  cursor: "pointer",
-                  color: "#404a17",
-                  fontSize: "18px",
+                  position: 'absolute',
+                  top: '50%',
+                  right: '14px',
+                  transform: 'translateY(-50%)',
+                  cursor: 'pointer',
+                  color: '#404a17',
+                  fontSize: '18px',
                 }}
                 onClick={() => setShowPassword((prev) => !prev)}
               >
@@ -619,12 +746,12 @@ const UserManagementPanel = () => {
                 )}
               </span>
             </div>
-            <div className="field mt-3" style={{ position: "relative" }}>
+            <div className="field mt-3" style={{ position: 'relative' }}>
               <label htmlFor="confirmPassword">Confirm Password *</label>
               <InputText
                 id="confirmPassword"
                 name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
+                type={showConfirmPassword ? 'text' : 'password'}
                 value={formData.confirmPassword}
                 onChange={handleFormChange}
                 placeholder="Confirm password"
@@ -633,13 +760,13 @@ const UserManagementPanel = () => {
               <span
                 className="custom-eye-icon pi"
                 style={{
-                  position: "absolute",
-                  top: "50%",
-                  right: "14px",
-                  transform: "translateY(-50%)",
-                  cursor: "pointer",
-                  color: "#404a17",
-                  fontSize: "18px",
+                  position: 'absolute',
+                  top: '50%',
+                  right: '14px',
+                  transform: 'translateY(-50%)',
+                  cursor: 'pointer',
+                  color: '#404a17',
+                  fontSize: '18px',
                 }}
                 onClick={() => setShowConfirmPassword((prev) => !prev)}
               >

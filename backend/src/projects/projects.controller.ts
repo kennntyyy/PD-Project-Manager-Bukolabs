@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -15,17 +24,16 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Body() createProjectDto: CreateProjectDto, @Req() req: Request) {
-
     const user = req.user as any;
-    const userId = user.userId; 
+    const userId = user.userId;
     return this.projectsService.create(createProjectDto, userId);
   }
 
   @Get()
-  async getAllProjects(): Promise<Project[]>{
-    return this.projectsService.findAll();
+  async getAllProjects(@Req() req: Request): Promise<Project[]> {
+    const includeDeleted = req.query['includeDeleted'] === 'true';
+    return this.projectsService.findAll(includeDeleted);
   }
-  
 
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -34,18 +42,21 @@ export class ProjectsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async updateproject(
-    @Param('id') id: string,
-    @Body() updateData: any
-  ) {
+  async updateproject(@Param('id') id: string, @Body() updateData: any) {
     await this.projectsService.update(id, updateData);
     return { updated: true };
   }
-  
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  async deleteProject(@Param('id') id: string) {
-    await this.projectsService.remove(id);
-    return { deleted : true };
+  async deleteProject(@Param('id') id: string, @Req() req: Request) {
+    const permanent = req.query['permanent'] === 'true';
+    if (permanent) {
+      await this.projectsService.permanentRemove(id);
+      return { deleted: true, permanent: true };
+    } else {
+      await this.projectsService.remove(id);
+      return { deleted: true, permanent: false };
+    }
   }
 }

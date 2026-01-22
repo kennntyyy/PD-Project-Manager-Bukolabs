@@ -199,4 +199,15 @@ export class UsersService {
     user.user_role = newRole;
     return this.usersRepository.save(user) as unknown as Promise<User>;
   }
+
+  async updateLastActive(userId: string): Promise<void> {
+    try {
+      await this.usersRepository.update(
+        { user_id: userId },
+        { last_active: new Date() },
+      );
+    } catch (err) {
+      // Silently fail, don't block request
+    }
+  }
 }

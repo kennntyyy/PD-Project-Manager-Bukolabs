@@ -60,4 +60,11 @@ export class User {
 
   @Column({ default: false })
   is_deleted: boolean;
+
+  @Column({
+    type: 'datetime',
+    nullable: true,
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  last_active: Date;
 }

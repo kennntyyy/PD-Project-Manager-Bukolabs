@@ -72,7 +72,6 @@ const ProjectsPanel = () => {
       : '';
   };
 
-  // Function to get client name by ID
   const getClientName = (clientId) => {
     if (!clientId) return '';
     const client = clients.find((c) => c.user_id === clientId);
@@ -370,37 +369,6 @@ const ProjectsPanel = () => {
     });
   };
 
-  const handlePermanentDeleteProject = (project) => {
-    confirmDialog({
-      message: `Permanently delete "${project.project_name}"? This cannot be undone.`,
-      header: 'Confirm Permanent Delete',
-      icon: 'pi pi-trash',
-      accept: async () => {
-        try {
-          setLoading(true);
-          await api.delete(`/projects/${project.project_id}?permanent=true`);
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Project permanently deleted',
-          });
-          fetchProjects();
-        } catch (error) {
-          console.error('Permanent delete error:', error);
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail:
-              error.response?.data?.message ||
-              error.message ||
-              'Failed to permanently delete project',
-          });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  };
 
   // Contractor name template
   const contractorTemplate = (rowData) => {
@@ -471,7 +439,7 @@ const ProjectsPanel = () => {
                 paddingTop: '12px',
               }}
             >
-              <Button
+              {/* <Button
                 label="Active Projects"
                 icon="pi pi-folder"
                 severity={viewMode === 'active' ? 'info' : 'secondary'}
@@ -486,8 +454,8 @@ const ProjectsPanel = () => {
                 }
                 text={viewMode !== 'active'}
                 outlined={viewMode !== 'active'}
-              />
-              <Button
+              /> */}
+              {/* <Button
                 label={`Recycle Bin (${projects.filter((p) => p.isDeleted).length})`}
                 icon="pi pi-trash"
                 severity={viewMode === 'deleted' ? 'info' : 'secondary'}
@@ -502,7 +470,7 @@ const ProjectsPanel = () => {
                 }
                 text={viewMode !== 'deleted'}
                 outlined={viewMode !== 'deleted'}
-              />
+              /> */}
             </div>
           </div>
         </div>
@@ -642,11 +610,11 @@ const ProjectsPanel = () => {
                       className="p-button-rounded p-button-sm p-button-warning user-action-btn"
                       onClick={() => openEditDialog(rowData)}
                     />
-                    <Button
+                    {/* <Button
                       icon="pi pi-trash"
                       className="p-button-rounded p-button-sm p-button-danger user-action-btn"
                       onClick={() => handleDeleteProject(rowData)}
-                    />
+                    /> */}
                   </>
                 ) : (
                   <>
@@ -655,11 +623,11 @@ const ProjectsPanel = () => {
                       className="p-button-rounded p-button-sm p-button-success user-action-btn"
                       onClick={() => handleRestoreProject(rowData)}
                     />
-                    <Button
+                    {/* <Button
                       icon="pi pi-times"
                       className="p-button-rounded p-button-sm p-button-danger user-action-btn"
                       onClick={() => handlePermanentDeleteProject(rowData)}
-                    />
+                    /> */}
                   </>
                 )}
               </div>
@@ -761,6 +729,25 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
+            htmlFor="project-client"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Client
+          </label>
+          <Dropdown
+            id="project-client"
+            value={newProject.client_id}
+            onChange={(e) => setNewProject({ ...newProject, client_id: e.value })}
+            options={clients}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a client"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
             htmlFor="project-contractor"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
@@ -776,25 +763,6 @@ const ProjectsPanel = () => {
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"
             placeholder="Select a contractor"
-            style={{ borderColor: '#cbd5e1' }}
-          />
-        </div>
-
-        <div className="field mt-3">
-          <label
-            htmlFor="project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
-          >
-            Client
-          </label>
-          <Dropdown
-            id="project-client"
-            value={newProject.client_id}
-            onChange={(e) => setNewProject({ ...newProject, client_id: e.value })}
-            options={clients}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a client"
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>
@@ -907,6 +875,27 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
+            htmlFor="edit-project-client"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Client
+          </label>
+          <Dropdown
+            id="edit-project-client"
+            value={editingProject.client_id}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, client_id: e.value })
+            }
+            options={clients}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a client"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
             htmlFor="edit-project-contractor"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
@@ -922,25 +911,6 @@ const ProjectsPanel = () => {
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"
             placeholder="Select a contractor"
-            style={{ borderColor: '#cbd5e1' }}
-          />
-        </div>
-
-        <div className="field mt-3">
-          <label
-            htmlFor="edit-project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
-          >
-            Client
-          </label>
-          <Dropdown
-            id="edit-project-client"
-            value={editingProject.client_id}
-            onChange={(e) => setEditingProject({ ...editingProject, client_id: e.value })}
-            options={clients}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a client"
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>

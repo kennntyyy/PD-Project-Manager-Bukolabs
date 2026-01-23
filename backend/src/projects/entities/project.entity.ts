@@ -74,11 +74,11 @@ export class Project {
 
   //relationships
 
-  @Column({ nullable: true })
-  client_id: number;
+  @Column({ type: 'uuid', nullable: true })
+  client_id: string;
 
-  @Column({ nullable: true })
-  staff_id: number;
+  @Column({ type: 'uuid',nullable: true })
+  staff_id: string;
 
   @Column({ type: 'uuid', nullable: true })
   contractor_id: string;

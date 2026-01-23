@@ -22,6 +22,7 @@ export class ProjectsService {
       total_amount,
       project_deadline,
       contractor_id,
+      client_id,
     } = createProjectDto;
 
     const project = this.projectRepository.create({
@@ -31,6 +32,7 @@ export class ProjectsService {
       project_deadline,
       created_by: userId,
       contractor_id,
+      client_id,
     });
 
     return await this.projectRepository.save(project);
@@ -56,6 +58,8 @@ export class ProjectsService {
       project_description: UpdateProjectDto.project_description,
       total_amount: UpdateProjectDto.total_amount,
       project_deadline: UpdateProjectDto.project_deadline,
+      contractor_id: UpdateProjectDto.contractor_id,
+      client_id: UpdateProjectDto.client_id,
     };
     // If restoring, clear deleted_at and isDeleted
     if (UpdateProjectDto.isDeleted === false) {

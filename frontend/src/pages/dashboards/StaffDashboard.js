@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { DataTable } from "primereact/datatable";
-import { Column } from "primereact/column";
 import { Dialog } from "primereact/dialog";
 import { ConfirmDialog } from "primereact/confirmdialog";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
-import axios from "axios";
 import "./Dashboard.css";
-import api from '../../services/api';
+import StaffProjectsPanel from "./staff_panels/Staff_ProjectsPanel";
 
 const StaffDashboard = () => {
-  const [projects, setProjects] = useState([]);
-  const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem("staffActiveTab") || "overview",
@@ -21,138 +16,6 @@ const StaffDashboard = () => {
     () => localStorage.getItem("staffActiveNav") || "overview",
   );
   const toast = useRef(null);
-
-  //new project 
-  const [newProject, setNewProject] = useState({
-      name: '',
-      description: '',
-      amount: '',
-      dueDate: null,
-      contractor_id: null,
-    });
-  
-  //adding new projects
-  const handleAddProject = async () => {
-    //validation
-    if(!newProject.name.trim()) {
-      toast.current?.show({
-        severity: 'warn',
-        summary: 'Warning',
-        detail: 'Project name is required'
-      });
-      return;
-    }
-
-    try{
-      await api.post('/project', {
-        project_name: newProject.name,
-        project_description: newProject.description,
-        total_amount: newProject.amount,
-        project_deadline: newProject.dueDate,
-        contractor_id: newProject.contractor_id
-      });
-
-      //reset forms
-      setNewProject({
-        name: "",
-        description: "",
-        amount: "",
-        dueDate: null,
-        contractor_id: null
-      });
-
-      toast.current?.show({
-        severity: 'success',
-        summary: 'Success',
-        detail: 'Project Created!'
-      });
-      
-      //update table
-      fetchProjects();
-    } catch (error) {
-      console.log("Project creation error: ", error);
-
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Warning',
-        details: 'There was an error in creating a project'
-      });
-    }
-  }
-  
-  //FORMAT DATE
-  const dateTemplate = (rowData) => {
-    if (!rowData.project_deadline) return 'N/A';
-    return new Date(rowData.project_deadline).toLocaleDateString();
-  }
-
-  const fetchProjects = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await api.get('/projects', {
-        headers: { Authorization: `Bearer ${token}`}
-      });
-      console.log("Response from API:", response.data);
-      setProjects(response.data);
-
-    } catch (error) {
-
-      return (error);
-
-    }
-  };
-
-  //FORMAT AMOUNT WITH CURRENCY
-  const amountTemplate = (rowData) => {
-    if (!rowData.total_amount) return 'N/A';
-    return `₱${parseFloat(rowData.total_amount).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  }
-  
-  //FETCH ALL CONTRACTORS
-  const fetchContractors = async () => {
-    try {
-      const response = await api.get('/users');
-      const contractorsList = response.data.filter(
-        (user) => user.user_role === 'contractor',
-      );
-      setContractors(contractorsList);
-    } catch (error) {
-      console.error('Failed to fetch contractors:', error);
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load contractors',
-      });
-    }
-  };
-
-  //get contractor name by id
-  // const getContractorName = (contractorId) => {
-  //   if (!contractorId) return '';
-  //   const contractor = contractors.find((c) => c.user_id === contractorId);
-  //   return contractor
-  //     ? `${contractor.first_name} ${contractor.last_name}`.toLowerCase()
-  //     : '';
-  // };
-
-  //TEMPLATE FOR CONTRACTOR NAME
-  const contractorTemplate = (rowData) => {
-    if(!rowData.contractor_id) return 'N/A';
-
-    const contractor = contractors.find((c) => c.user_id === rowData.contractor_id);
-    return contractor
-      ? `${contractor.first_name} ${contractor.last_name}`
-      : 'N/A';
-  }
-
-  useEffect(() => {
-    fetchProjects();
-    fetchContractors();
-    
-  }, []);
 
   const navItems = [
     { key: "overview", icon: "pi pi-home", label: "Overview" },
@@ -252,41 +115,7 @@ const StaffDashboard = () => {
             </div>
           )}
           {activeTab === "projects" && (
-            <div>
-              <h2>PROJECTS</h2>
-
-              <DataTable
-                value={projects}
-                paginator
-                rows={10}
-                rowsPerPageOptions={[5, 10, 20, 50]}
-                tableStyle={{ minWidth : '50rem'}}
-                emptyMessage={
-                  'EmptyTable'
-                }
-                style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-              >
-                <Column field="project_name" header="Project name" sortable></Column>
-                <Column field="project_description" header="Description" sortable></Column>
-                <Column 
-                  field="total_amount" 
-                  header="Amount" 
-                  body={amountTemplate}
-                  sortable></Column>
-                <Column 
-                  field="project_deadline" 
-                  header="Due Date"
-                  body={dateTemplate}></Column>
-                <Column 
-                field="contractor_id"
-                header="Contractor"
-                body={contractorTemplate}>
-                </Column>
-              </DataTable>
-            </div>
+            <StaffProjectsPanel />
           )}
           {activeTab === "reports" && (
             <div>

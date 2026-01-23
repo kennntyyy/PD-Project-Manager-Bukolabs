@@ -35,12 +35,12 @@ export class CreateProjectDto {
   payment_status?: string;
 
   @IsOptional()
-  @IsNumber()
-  client_id?: number;
+  @IsString()
+  client_id?: string;
 
   @IsOptional()
-  @IsNumber()
-  staff_id?: number;
+  @IsString()
+  staff_id?: string;
 
   @IsOptional()
   @IsString()

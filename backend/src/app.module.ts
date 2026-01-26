@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { ProjectsModule } from './projects/projects.module';
 import { CronService } from './common/services/cron.service';
 import { User } from './users/entities/user.entity';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { User } from './users/entities/user.entity';
     AuthModule,
     UsersModule,
     ProjectsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService, CronService],

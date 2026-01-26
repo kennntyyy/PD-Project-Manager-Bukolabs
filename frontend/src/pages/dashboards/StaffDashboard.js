@@ -6,6 +6,7 @@ import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import "./Dashboard.css";
 import StaffProjectsPanel from "./staff_panels/Staff_ProjectsPanel";
+import StaffReportsPanel from "./staff_panels/Staff_ReportsPanel";
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
@@ -118,10 +119,7 @@ const StaffDashboard = () => {
             <StaffProjectsPanel />
           )}
           {activeTab === "reports" && (
-            <div>
-              <h3>Reports</h3>
-              {/* Add staff reports panel here */}
-            </div>
+            <StaffReportsPanel />
           )}
           {activeTab === "settings" && (
             <div>

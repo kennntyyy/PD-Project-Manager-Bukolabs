@@ -77,14 +77,14 @@ const StaffDashboard = () => {
                 {activeTab === "overview" && "Overview"}
                 {activeTab === "tasks" && "My Tasks"}
                 {activeTab === "projects" && "Projects"}
-                {activeTab === "reports" && "Reports"}
+                {activeTab === "reports" && "Accomplishment Reports"}
                 {activeTab === "settings" && "Settings"}
               </h2>
               <p className="header-subtitle">
                 {activeTab === "overview" && "Welcome back, Staff!"}
                 {activeTab === "tasks" && "View and manage your tasks"}
                 {activeTab === "projects" && "Project assignments"}
-                {activeTab === "reports" && "View reports"}
+                {activeTab === "reports" && "Generate reports"}
                 {activeTab === "settings" && "Configure your settings"}
               </p>
             </div>

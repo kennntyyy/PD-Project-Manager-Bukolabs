@@ -53,6 +53,9 @@ const LoginPage = () => {
     setUsername(user);
     setPassword(pass);
   };
+  const handleForgotPassword = () => {
+    navigate("/forgot-password");
+};
 
   return (
     <div className="login-container">
@@ -66,12 +69,13 @@ const LoginPage = () => {
       {/* Main content */}
       <div className="login-content">
         <div className="login-card">
+      
           {/* Header */}
           <div className="login-header">
             <div className="logo-wrapper">
-              <i className="pi pi-briefcase logo-icon"></i>
+
             </div>
-            <h1 className="login-title">Project Management</h1>
+            <h1 className="login-title">LOG IN YOUR ACCOUNT </h1>
             <p className="login-subtitle">Welcome back! Please sign in</p>
           </div>
 
@@ -182,56 +186,16 @@ const LoginPage = () => {
               className="signin-button"
             />
           </form>
+          <Button
+            label={loading ? "" : "Forgot password?"}
+            className="forgot-password-button"
+          />
 
           {/* Divider */}
           <div className="divider-wrapper">
             <div className="divider-line"></div>
             <span className="divider-text">Demo Credentials</span>
             <div className="divider-line"></div>
-          </div>
-
-          {/* Demo Buttons */}
-          <div className="demo-buttons">
-            <button
-              type="button"
-              className="demo-btn admin-btn"
-              onClick={() => fillCredentials("admin", "admin123")}
-              disabled={loading}
-              title="Admin Account"
-            >
-              <i className="pi pi-crown"></i>
-              <span>Admin</span>
-            </button>
-            <button
-              type="button"
-              className="demo-btn staff-btn"
-              onClick={() => fillCredentials("staff", "staff123")}
-              disabled={loading}
-              title="Staff Account"
-            >
-              <i className="pi pi-users"></i>
-              <span>Staff</span>
-            </button>
-            <button
-              type="button"
-              className="demo-btn client-btn"
-              onClick={() => fillCredentials("client", "client123")}
-              disabled={loading}
-              title="Client Account"
-            >
-              <i className="pi pi-user"></i>
-              <span>Client</span>
-            </button>
-            <button
-              type="button"
-              className="demo-btn contractor-btn"
-              onClick={() => fillCredentials("contractor", "contractor123")}
-              disabled={loading}
-              title="Contractor Account"
-            >
-              <i className="pi pi-briefcase"></i>
-              <span>Contractor</span>
-            </button>
           </div>
 
           {/* Footer */}

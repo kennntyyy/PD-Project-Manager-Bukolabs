@@ -189,21 +189,15 @@ const LoginPage = () => {
           <Button
             label={loading ? "" : "Forgot password?"}
             className="forgot-password-button"
+            style={{marginBottom: '4px'}}
           />
 
-          {/* Divider */}
-          <div className="divider-wrapper">
-            <div className="divider-line"></div>
-            <span className="divider-text">Demo Credentials</span>
-            <div className="divider-line"></div>
-          </div>
 
-          {/* Footer */}
-          <div className="login-footer">
+          {/* <div className="login-footer">
             <p className="footer-text">
               © 2026 Project Management System. All rights reserved.
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

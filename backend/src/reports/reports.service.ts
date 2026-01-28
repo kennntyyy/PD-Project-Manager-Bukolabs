@@ -13,19 +13,9 @@ export class ReportsService {
   ) {}
 
   //save data to db table = reports
-  async create(createReportDto: CreateReportDto) {
+  async create(createReportDto: CreateReportDto): Promise<Report> {
     const {
-      report_date,
-      current_progress,
-      report_description,
-      work_completed,
-      challenges,
-      next_steps,
-      payment_requested,
-      payment_triggered
-    } = createReportDto;
-
-    const report = this.reportRepository.create({
+      project_id,
       report_date,
       current_progress,
       report_description,
@@ -34,6 +24,20 @@ export class ReportsService {
       next_steps,
       payment_requested,
       payment_triggered,
+      
+    } = createReportDto;
+
+    const report = this.reportRepository.create({
+      project_id,
+      report_date,
+      current_progress,
+      report_description,
+      work_completed,
+      challenges,
+      next_steps,
+      payment_requested,
+      payment_triggered,
+      
     });
 
     return await this.reportRepository.save(report);

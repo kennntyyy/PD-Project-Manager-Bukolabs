@@ -21,16 +21,16 @@ export class Report {
     @Column({type: 'text', nullable: true})
     report_description: string;
 
-    @Column({type: 'text'})
+    @Column({type: 'text', nullable: true})
     work_completed: string;
 
-    @Column({type: 'text'})
+    @Column({type: 'text', nullable: true})
     challenges: string;
 
-    @Column({type: 'text'})
+    @Column({type: 'text', nullable: true})
     next_steps: string;
 
-    @Column({type: 'decimal'})
+    @Column({type: 'decimal', default: 0})
     payment_requested: number;
 
     @Column({ default: false})
@@ -53,6 +53,6 @@ export class Report {
     @Column({ type: 'uuid' })
     project_id: string;
 
-    @Column({ type: 'uuid' })
+    @Column({ type: 'uuid', default: "angeloTEST" })
     created_by: string;
 }

@@ -140,11 +140,11 @@ const StaffReportsPanel = () => {
         };
 
         //function for saving as CSV
-        const handleDownloadCSV = () => {
+        const handleDownloadCSV = async () => {
             if(!selectedProject) return;
 
             await logReportGeneration();
-            
+
             const rows = [
                 ["Field", "Value"],
                 ["Client", getClientName(selectedProject.client_id)],

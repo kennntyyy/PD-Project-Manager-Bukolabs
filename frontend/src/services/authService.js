@@ -32,14 +32,10 @@ const AuthService = {
       throw new Error('Password must be 6-32 characters');
     }
 
-    console.log('Sending to API:', { username, password });
-
     const response = await api.post('/auth/login', {
       username: username.trim(),
       password: password,
     });
-
-    console.log('API Response:', response.data);
 
     if (response.data.access_token && response.data.user) {
       if (rememberMe) {

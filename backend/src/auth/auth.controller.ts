@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Post, 
-  Body, 
-  UseGuards, 
-  Request, 
-  HttpCode, 
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  HttpCode,
   HttpStatus,
-  Logger 
+  Logger,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,8 +22,6 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    this.logger.log(`Login attempt: ${JSON.stringify(loginDto)}`);
-    
     try {
       const result = await this.authService.login(loginDto);
       this.logger.log(`Login successful for user: ${loginDto.username}`);

@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFDownloadLink } from '@react-pdf/renderer';
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  PDFDownloadLink,
+} from '@react-pdf/renderer';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
@@ -16,6 +23,13 @@ import { FloatLabel } from 'primereact/floatlabel';
 import { Slider } from 'primereact/slider';
 import { Divider } from 'primereact/divider';
 import { ProgressBar } from 'primereact/progressbar';
+import { Card } from 'primereact/card';
+import { Toolbar } from 'primereact/toolbar';
+import { TabView, TabPanel } from 'primereact/tabview';
+import { Badge } from 'primereact/badge';
+import { Skeleton } from 'primereact/skeleton';
+import { Menu } from 'primereact/menu';
+import { SplitButton } from 'primereact/splitbutton';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { pdf } from '@react-pdf/renderer';
@@ -23,454 +37,778 @@ import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF
 import api from '../../../services/api';
 
 const StaffReportsPanel = () => {
-    const [projects, setProjects] = useState([]);
-    const [contractors, setContractors] = useState([]);
-    const [clients, setClients] = useState([]);
-    const [reportStartDate, setReportStartDate] = useState('');
-    const [reportEndDate, setReportEndDate] = useState('');
-    const [selectedProject, setSelectedProject] = useState(null);
-    const [completionRate, setCompletionRate] = useState(0);
-    const [releasedAmount, setReleasedAmount] = useState(0);
-    const [reportValue, setReportValue] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [contractors, setContractors] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [completionRate, setCompletionRate] = useState(0);
+  const [releasedAmount, setReleasedAmount] = useState(0);
+  const [reportValue, setReportValue] = useState('');
+  const [reportStartDate, setReportStartDate] = useState(null);
+  const [reportEndDate, setReportEndDate] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
+  const [filteredReports, setFilteredReports] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const toast = useRef(null);
+  const menuRefs = useRef({});
 
-    //FETCH DATA FROM BACKEND
-    //fetching all projects from backend
-    const fetchProjects = async () => {
-        try{
-            const response =  await api.get('/projects');
-            setProjects(response.data);
+  // FETCH DATA FROM BACKEND
+  const fetchProjects = async () => {
+    try {
+      const response = await api.get('/projects');
+      setProjects(response.data);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      showToast('error', 'Error', 'Failed to fetch projects');
+    }
+  };
 
-            console.log("Projects fetched:", response.data);
-        }catch(error){
-            console.error("Error fetching projects:", error);
-        }
-    };
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get('/users');
+      const contractorsList = response.data.filter(
+        (user) => user.user_role === 'contractor',
+      );
+      setContractors(contractorsList);
 
-    const fetchUsers = async () => {
-        try{
-            const response = await api.get('/users');
-            const contractorsList = response.data.filter(
-                (user) => user.user_role === 'contractor',
-            );
-            setContractors(contractorsList);
+      const clientsList = response.data.filter(
+        (user) => user.user_role === 'client',
+      );
+      setClients(clientsList);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
-            const clientsList = response.data.filter(
-                (user) => user.user_role === 'client'
-            );
-            setClients(clientsList);
+  const fetchRecentReports = async () => {
+    try {
+      const response = await api.get('/reports');
+      setRecentReports(response.data);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    }
+  };
 
-            console.log("Clients Found: ", clientsList);
-            console.log('Contractors Found: ', contractorsList);
-        }catch(error){
-            console.error("Error fetching contractors:", error);
-        }
-    };
+  // GETTING THE NAMES OF USERS
+  const getContractorName = (contractorId) => {
+    if (!contractorId) return '';
+    const contractor = contractors.find((c) => c.user_id == contractorId);
+    return contractor ? `${contractor.first_name} ${contractor.last_name}` : '';
+  };
 
-    //GETTING THE NAMES OF USERS -> TEMPLATES
-    const getContractorName = (contractorId) => {
-        if(!contractorId) return '';
+  const getClientName = (clientId) => {
+    if (!clientId) return 'NO CLIENT RECORD';
+    const client = clients.find((c) => c.user_id === clientId);
+    return client ? `${client.first_name} ${client.last_name}` : '';
+  };
 
-        const contractor = contractors.find((c) => c.user_id == contractorId);
-        return contractor
-            ? `${contractor.first_name} ${contractor.last_name}` : '';
-    };
+  useEffect(() => {
+    fetchProjects();
+    fetchUsers();
+    fetchRecentReports();
+  }, []);
 
-    const getClientName = (clientId) => {
-        if(!clientId) return 'NO CLIENT RECORD';
+  useEffect(() => {
+    if (selectedProject) {
+      const filtered = recentReports.filter(
+        (report) => report.project_id === selectedProject.project_id,
+      );
+      // Sort by date, newest first
+      filtered.sort(
+        (a, b) =>
+          new Date(b.created_at || b.start_date) -
+          new Date(a.created_at || a.start_date),
+      );
+      setFilteredReports(filtered);
+    }
+  }, [selectedProject, recentReports]);
 
-        const client = clients.find((c) => c.user_id === clientId);
-        return client
-            ? `${client.first_name} ${client.last_name}` : '';
-    };
+  const showToast = (severity, summary, detail) => {
+    toast.current.show({ severity, summary, detail, life: 3000 });
+  };
 
-    useEffect(() => {
-        fetchProjects();
-        fetchUsers();
-    }, []);
+  const handleProjectClick = (project) => {
+    setSelectedProject(project);
+  };
 
-    // Debugging useEffect to log selectedProject changes
-    useEffect(() => {
-        console.log("Selected Project:", selectedProject)
-        console.log("Contractor Name:", selectedProject ? getContractorName(selectedProject.contractor_id) : 'None');
-    }, [selectedProject]);
+  const handleBackToList = () => {
+    setSelectedProject(null);
+    setFilteredReports([]);
+  };
 
-    const clearForms =() => {
-        setSelectedProject(null);
-        setCompletionRate(0);
-        setReleasedAmount(0);
-    };
+  const handleGenerateClick = () => {
+    resetForm();
+    setShowReportModal(true);
+  };
 
-    const reportRef = useRef();
+  const resetForm = () => {
+    setCompletionRate(0);
+    setReleasedAmount(0);
+    setReportValue('');
+    setReportStartDate(null);
+    setReportEndDate(null);
+  };
 
-    //function to save as PDF
-    const handleDownloadPDF = async () => {
+  const handleSubmitReport = async () => {
+    if (!reportStartDate || !reportEndDate) {
+      showToast('warn', 'Warning', 'Please select report start and end dates');
+      return;
+    }
 
-        await logReportGeneration();
-        // 1. Prepare your formatted dates
-        const reportDates = {
-            projectStart: selectedProject ? new Date(selectedProject.project_start_date).toLocaleDateString() : '',
-            projectEnd: selectedProject ? new Date(selectedProject.project_deadline).toLocaleDateString() : '',
-            reportStart: reportStartDate ? new Date(reportStartDate).toLocaleDateString() : '',
-            reportEnd: reportEndDate ? new Date(reportEndDate).toLocaleDateString() : '',
-        };
+    try {
+      setIsGenerating(true);
 
-        // 2. Generate the PDF blob
-        const doc = (
-            <ProjectReportPDF 
-            data={selectedProject}
-            clientName={getClientName(selectedProject.client_id)}
-            contractorName={getContractorName(selectedProject.contractor_id)}
-            completionRate={completionRate}
-            reportDates={reportDates}
-            />
+      // Save the report to database
+      await logReportGeneration();
+
+      // Close the input modal
+      setShowReportModal(false);
+
+      showToast('success', 'Success', 'Report generated successfully!');
+
+      // Refresh reports list
+      fetchRecentReports();
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showToast('error', 'Error', 'Failed to generate report');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadReportPDF = async (report) => {
+    try {
+      const project = projects.find((p) => p.project_id === report.project_id);
+      if (!project) {
+        showToast('error', 'Error', 'Project not found');
+        return;
+      }
+
+      const reportDates = {
+        projectStart: project.project_start_date
+          ? new Date(project.project_start_date).toLocaleDateString()
+          : '',
+        projectEnd: project.project_deadline
+          ? new Date(project.project_deadline).toLocaleDateString()
+          : '',
+        reportStart: report.start_date
+          ? new Date(report.start_date).toLocaleDateString()
+          : '',
+        reportEnd: report.end_date
+          ? new Date(report.end_date).toLocaleDateString()
+          : '',
+      };
+
+      const doc = (
+        <ProjectReportPDF
+          data={project}
+          clientName={getClientName(project.client_id)}
+          contractorName={getContractorName(project.contractor_id)}
+          completionRate={report.current_progress || 0}
+          reportDates={reportDates}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const fileName = `Report_${project.project_name}_${formatDateForFilename(report.start_date)}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'Success', 'PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      showToast('error', 'Error', 'Failed to generate PDF');
+    }
+  };
+
+  const downloadReportCSV = (report) => {
+    try {
+      const project = projects.find((p) => p.project_id === report.project_id);
+      if (!project) {
+        showToast('error', 'Error', 'Project not found');
+        return;
+      }
+
+      const rows = [
+        ['Field', 'Value'],
+        ['Project Name', project.project_name],
+        ['Client', getClientName(project.client_id)],
+        ['Contractor', getContractorName(project.contractor_id)],
+        ['Allocated Budget', `₱${project.total_amount}`],
+        ['Project Start Date', formatDate(project.project_start_date)],
+        ['Project End Date', formatDate(project.project_deadline)],
+        ['Report Start Date', formatDate(report.start_date)],
+        ['Report End Date', formatDate(report.end_date)],
+        ['Completion Rate', `${report.current_progress || 0}%`],
+        ['Payment Requested', `₱${report.payment_requested || 0}`],
+        ['Report Description', report.report_description || ''],
+        [
+          'Generated On',
+          formatDateTime(report.created_at || report.start_date),
+        ],
+      ];
+
+      const csvContent = rows.map((e) => e.join(',')).join('\n');
+      const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute(
+        'download',
+        `Report_${project.project_name}_${formatDateForFilename(report.start_date)}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('success', 'Success', 'CSV downloaded successfully');
+    } catch (error) {
+      console.error('Error generating CSV:', error);
+      showToast('error', 'Error', 'Failed to generate CSV');
+    }
+  };
+
+  const logReportGeneration = async () => {
+    try {
+      const reportRecord = {
+        project_id: selectedProject.project_id,
+        start_date: reportStartDate,
+        end_date: reportEndDate,
+        current_progress: completionRate,
+        payment_requested: releasedAmount,
+        report_description: reportValue,
+      };
+
+      await api.post('/reports', reportRecord);
+      fetchRecentReports();
+    } catch (error) {
+      console.error('Error logging report generation:', error);
+      throw error;
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '₱0.00';
+    return `₱${Number(amount).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not set';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateForFilename = (dateString) => {
+    if (!dateString) return 'unknown';
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getMenuItems = (report) => [
+    {
+      label: 'Download as PDF',
+      icon: 'pi pi-file-pdf',
+      command: () => downloadReportPDF(report),
+    },
+    {
+      label: 'Download as CSV',
+      icon: 'pi pi-file-excel',
+      command: () => downloadReportCSV(report),
+    },
+    {
+      separator: true,
+    },
+    {
+      label: 'Regenerate',
+      icon: 'pi pi-refresh',
+      command: () => {
+        setCompletionRate(report.current_progress || 0);
+        setReleasedAmount(report.payment_requested || 0);
+        setReportValue(report.report_description || '');
+        setReportStartDate(
+          report.start_date ? new Date(report.start_date) : null,
         );
+        setReportEndDate(report.end_date ? new Date(report.end_date) : null);
+        setShowReportModal(true);
+      },
+    },
+    {
+      label: 'View Details',
+      icon: 'pi pi-eye',
+      command: () => {
+        // You can implement a detailed view modal here
+        showToast(
+          'info',
+          'Report Details',
+          `Report ID: ${report.report_id || 'N/A'}`,
+        );
+      },
+    },
+  ];
 
-        const blob = await pdf(doc).toBlob();
-        
-        // 3. Trigger Save
-        const fileName = `Report_${selectedProject?.project_name || 'Project'}.pdf`;
-        
-        // If you don't want to install 'file-saver', use this native way:
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        link.click();
-        URL.revokeObjectURL(url);
-        };
+  // Project List View
+  const ProjectListView = () => (
+    <div>
+      <div className="mb-4">
+        <h2 className="m-0">Select a Project</h2>
+        <p className="text-color-secondary m-0">
+          Click on a project to view reports and generate new ones
+        </p>
+      </div>
 
-        //function for saving as CSV
-        const handleDownloadCSV = async () => {
-            if(!selectedProject) return;
-
-            await logReportGeneration();
-
-            const rows = [
-                ["Field", "Value"],
-                ["Client", getClientName(selectedProject.client_id)],
-                ["Project Name", selectedProject.project_name],
-                ["Allocated Budget", selectedProject.total_amount],
-                ["Start Date", selectedProject.project_start_date],
-                ["Completion Rate", `${completionRate}%`],
-                ["Report Period", `${reportStartDate} to ${reportEndDate}`]
-            ];
-
-            const csvContent = "data:text/csv;charset=utf-8,"  + rows.map(e => e.join(",")).join("\n");
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Report_${selectedProject.project_name}.csv`);
-            document.body.appendChild(link);
-            link.click();
-        };
-
-        const logReportGeneration = async () => {
-            try {
-
-                // const savedUser = JSON.parse(localStorage.getItem('user'));
-                // const userId =  savedUser?.user_id || savedUser?.id;
-
-                // if (!userId) {
-                //     console.error("No logged-in user found!");
-                //     // Optional: show a toast message to the user
-                //     return;
-                // }
-
-                const reportRecord = {
-                    
-                    project_id: selectedProject.project_id,
-
-                    start_date: reportStartDate,
-                    end_date: reportEndDate,
-                    current_progress: completionRate,
-                    payment_requested: releasedAmount,
-                    report_description: reportValue,
-                    // created_by: userId,
-                };
-
-                await api.post('/reports', reportRecord);
-                console.log("Report generation logged:", reportRecord);
-            }catch(error){
-                console.error("Error logging report generation:", error);
-            }
-        }
-
-    return(
-        <div>
-            {/* <Toast ref={toast} /> */}
-            <div className="header"
-                style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between'
-                }}>
-                <div>
-                    <h2>Generate Report</h2>
+      <div className="grid">
+        {projects.map((project) => (
+          <div key={project.project_id} className="col-12 md:col-6 lg:col-4">
+            <Card
+              className="cursor-pointer hover:shadow-2 transition-duration-150"
+              onClick={() => handleProjectClick(project)}
+            >
+              <div className="flex flex-column gap-3">
+                <div className="flex justify-content-between align-items-start">
+                  <h3 className="m-0 text-lg">{project.project_name}</h3>
+                  <Badge
+                    value={
+                      recentReports.filter(
+                        (r) => r.project_id === project.project_id,
+                      ).length
+                    }
+                    severity="info"
+                  />
                 </div>
-                <div>
-                    <Button
-                        label='NEW REPORT'
-                        onClick={clearForms}
-                        style={{
-                            backgroundColor: 'white',
-                            color: 'black',
-                            padding: '5px',
-                            paddingTop: '10px',
-                            paddingBottom: '10px',
-                            fontSize: 'small'
-                        }}>
-                    </Button>
+
+                <div className="flex flex-column gap-2">
+                  <div className="flex justify-content-between">
+                    <span className="font-bold">Client:</span>
+                    <span>{getClientName(project.client_id)}</span>
+                  </div>
+                  <div className="flex justify-content-between">
+                    <span className="font-bold">Budget:</span>
+                    <span>{formatCurrency(project.total_amount)}</span>
+                  </div>
+                  <div className="flex justify-content-between">
+                    <span className="font-bold">Status:</span>
+                    <Tag
+                      value={project.project_status || 'Active'}
+                      severity={
+                        project.project_status === 'Completed'
+                          ? 'success'
+                          : 'info'
+                      }
+                    />
+                  </div>
                 </div>
-                
-                
-            </div>
-            
-            <div className='staffreports-main-container'
-                style={{
-                    display: 'flex',
-                    flexDirection: 'row',
-                    // alignItems: 'center',
-                    width: '100%',
-                    // justifyContent: '',
-                    backgroundColor: 'white',
-                    padding: '10px',
-                    gap: '10px'
-                }}>
-                <div className="staffreports-dropdown"
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
-                        width: '50%',   
-                        fontSize: 'small',
-                        padding: '10px',
-                        border: '1px solid gray',
-                    }}>
-                    
-                    <Dropdown
-                        id="project-dropdown"
-                        value={selectedProject}
-                        onChange={(e) => setSelectedProject(e.value)}
-                        placeholder='Select Project'
-                        options={projects}
-                        optionLabel="project_name"
-                        // optionValue="project_id"
-                        style={{ borderColor: '#cbd5e1' }}>
-                    </Dropdown>
-                    
-                    <label htmlFor="contractor-name">Contractor / Company:</label>
-                    <InputText
-                        value={selectedProject ? getContractorName(selectedProject.contractor_id) : ''}
-                        id='contractor-name'
-                        type="text"
-                        disabled
-                        style={{ color: 'black',
-                            fontWeight: 'bold',
-                         }}
-                        >
-                    </InputText>
 
-                    <label htmlFor='allocated-amount'>Project Allocated Budget</label>
-                    <InputNumber
-                        id="allocated-amount"
-                        placeholder='TOTAL AMOUNT'
-                        prefix='₱ '
-                        value={selectedProject?.total_amount ? parseFloat(selectedProject.total_amount) : 'not a number'}
-                        mode="decimal"
-                        minFractionDigits={2}
-                        maxFractionDigits={2}
-                        disabled
-                    ></InputNumber>
-
-                    <div className='db-dates'
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: '4px',  
-                            
-                        }}>
-                        <div>
-                        <label htmlFor="project_start_date">Date of Project Start:</label>
-                        <Calendar
-                            id="project_start_date"
-                            value={ selectedProject ? new Date(selectedProject.project_start_date) : null}
-                            disabled
-                            dateFormat='mm/dd/yy'
-                            showIcon
-                            placeholder='Project Date'   
-                        ></Calendar>
-                        </div>
-                        <div>
-                            <label htmlFor="project_end_date">End of Project:</label>
-                           <Calendar
-                            id="project_end_date"
-                            value={ selectedProject ? new Date(selectedProject.project_deadline) : null}
-                            disabled
-                            dateFormat='mm/dd/yy'
-                            showIcon
-                            placeholder='Project Date'   
-                            ></Calendar> 
-                        </div>
-                    </div>
-                    
-                    <div className='genForm-dates'
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: '4px'
-                        }}>
-                        <div>
-                            <label htmlFor='generate-start-date'>Report Start Date</label>
-                            <Calendar
-                            id="generate-start-date"
-                            value={reportStartDate}
-                            onChange={(e) => setReportStartDate(e.target.value)}
-                            placeholder='Select Start Date'
-                            dateFormat='mm/dd/yy'
-                            showIcon
-                            >
-                            </Calendar>
-                        </div>
-                        <div>
-                            <label htmlFor='generate-start-date'>Report End Date</label>
-                            <Calendar
-                            id="generate-end-date"
-                            value={reportEndDate}
-                            onChange={(e) => setReportEndDate(e.target.value)}
-                            showIcon
-                            placeholder='Select End Date'
-                            dateFormat='mm/dd/yy'>
-                            </Calendar>
-                        </div>
-                    </div>
-                    <label htmlFor='comp-rate-input'>Project Completion Rate</label>
-                    <InputNumber
-                        id='comp-rate-input'
-                        value={completionRate}
-                        onValueChange={(e) => setCompletionRate(e.value)}
-                        min={0}
-                        max={100}
-                        placeholder="0%"
-                        showButtons
-                        buttonLayout="horizontal"
-                        suffix='%'
-                        style = {{
-                            width: '10%'
-                        }}
-                    ></InputNumber>
-                    <label htmlFor='amount-release-input'>Amount to be Released:</label> 
-                    <InputNumber
-                        id="amount-release-input"
-                        value={releasedAmount}
-                        onValueChange={(e) => setReleasedAmount(e.value)}
-                        placeholder="Enter Amount"
-                        prefix='₱'
-                        min={0}
-                    ></InputNumber>
-                    <h3>Report Notes:</h3>
-                    <label htmlFor="report-description-input">Report Description</label>
-                    <InputTextarea
-                        id="report-description-input"
-                        value={reportValue}
-                        onChange={(e) => setReportValue(e.target.value)}
-                        placeholder='Enter Report Description'
-                        rows={5}
-                        style={{
-                            resize: 'none',
-                        }}
-                    ></InputTextarea>
+                <div className="mt-2 pt-2 border-top-1">
+                  <div className="flex justify-content-between text-sm">
+                    <span>Start: {formatDate(project.project_start_date)}</span>
+                    <span>End: {formatDate(project.project_deadline)}</span>
+                  </div>
                 </div>
-                    
+              </div>
+            </Card>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
-                <div className="staffreports-preview"
-                    
-                    style={{border: '1px solid gray',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-start',
-                        alignItems: 'flex-start',
-                        width: '50%',
-                        gap: '10px',
-                        padding: '10px',
-                        // height: '100%'
-                    }}>
-                        <h4>Report Preview</h4>
-                    <div className="details-container"
-                        ref={reportRef}
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            padding: '5px',
-                            fontWeight: '500',
-                            width: '100%'
-                        }}>
+  // Project Detail View (when project is selected)
+  const ProjectDetailView = () => (
+    <div>
+      <div className="mb-4">
+        <Button
+          label="Back to Projects"
+          icon="pi pi-arrow-left"
+          className="p-button-text mb-3"
+          onClick={handleBackToList}
+        />
 
-                        <p>Client: {selectedProject ? getClientName(selectedProject.client_id) : ''}</p>    
-                        <p>PN: {selectedProject ? selectedProject.project_name : ''}</p>
-                        <p>Contractor: {selectedProject ? getContractorName(selectedProject.contractor_id) : ''}</p>
-                        <p>Allocated Budget: {selectedProject ? 
-                        `₱${Number(selectedProject.total_amount).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : '' }
-                        </p>
-                        <p>Project Start Date: {selectedProject ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
-                            month: 'long', day: 'numeric', year: 'numeric'
-                        }) : ''}</p>
-                        <p>Project End Date: {selectedProject ? new Date(selectedProject.project_deadline).toLocaleDateString(
-                            'en-US', {month: 'long', day: 'numeric', year: 'numeric'}
-                        ) : ''}</p>
-                        <h4 style={{marginTop: '8px' }}>Report Generation for the Month/s of: </h4>
-                        <p>Report Start Date: {reportStartDate ? new Date(reportStartDate).toLocaleDateString(
-                            'en-US', {month: 'long', day: 'numeric', year: 'numeric'}
-                        ) : ''}</p>
-                        <p>Report End Date: {reportEndDate ? new Date(reportEndDate).toLocaleDateString(
-                            'en-US', {month: 'long', day: 'numeric', year: 'numeric'}
-                        ) : ''}</p>
-                        <p>Completion Rate: {completionRate}%</p>
-                        <p>Payment Amount Requested: {selectedProject ? 
-                        `₱${Number(releasedAmount).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                        })}`
-                        : '' }</p>
-
-                        <ProgressBar
-                            value={completionRate}
-                            style={{ height: '10px'}}
-                            showValue={false}
-                        >
-                        </ProgressBar>
-                    </div>
-                    
-                    {selectedProject && (
-                        <div className="save-buttons"
-                            style={{
-                                display: 'flex',
-                                flexDirection: 'row',
-                                justifyContent: 'end',
-                                width: '100%',
-                                gap: '4px'
-                            }}
-                            hidden={selectedProject ? false : true}>
-                            
-                            <Button 
-                                label = "Save as PDF"
-                                onClick={handleDownloadPDF}
-                            ></Button>
-                            <Button 
-                                label = "Save as CSV"
-                                 onClick={handleDownloadCSV}
-                            ></Button>
-                        </div>
-                    )}
-                </div>
-            </div>
+        <div className="flex justify-content-between align-items-center">
+          <div>
+            <h2 className="m-0">{selectedProject.project_name}</h2>
+            <p className="text-color-secondary m-0">
+              Client: {getClientName(selectedProject.client_id)} | Contractor:{' '}
+              {getContractorName(selectedProject.contractor_id)}
+            </p>
+          </div>
+          <Button
+            label="Generate New Report"
+            icon="pi pi-plus"
+            onClick={handleGenerateClick}
+          />
         </div>
-    )
-}
+      </div>
+
+      <TabView>
+        <TabPanel header={`Recent Reports (${filteredReports.length})`}>
+          {filteredReports.length > 0 ? (
+            <div className="grid">
+              {filteredReports.map((report, index) => (
+                <div key={index} className="col-12 lg:col-6">
+                  <Card>
+                    <div className="flex flex-column gap-3">
+                      <div className="flex justify-content-between align-items-start">
+                        <div>
+                          <h4 className="m-0">
+                            Report #{filteredReports.length - index}
+                          </h4>
+                          <small className="text-color-secondary">
+                            Generated:{' '}
+                            {formatDateTime(
+                              report.created_at || report.start_date,
+                            )}
+                          </small>
+                        </div>
+                        <div className="flex gap-1">
+                          <Tag
+                            value={`${report.current_progress}%`}
+                            severity="info"
+                            className="mr-2"
+                          />
+                          <Button
+                            icon="pi pi-ellipsis-v"
+                            className="p-button-rounded p-button-text p-button-sm"
+                            onClick={(e) => {
+                              if (!menuRefs.current[index]) {
+                                menuRefs.current[index] = React.createRef();
+                              }
+                              menuRefs.current[index].current.toggle(e);
+                            }}
+                            aria-label="Actions"
+                          />
+                          <Menu
+                            model={getMenuItems(report)}
+                            popup
+                            ref={
+                              menuRefs.current[index] ||
+                              (menuRefs.current[index] = React.createRef())
+                            }
+                            id={`menu_${index}`}
+                          />
+                        </div>
+                      </div>
+
+                      <Divider className="my-2" />
+
+                      <div className="grid">
+                        <div className="col-6">
+                          <span className="font-bold">Period:</span>
+                          <p className="m-0 text-sm">
+                            {formatDate(report.start_date)} -{' '}
+                            {formatDate(report.end_date)}
+                          </p>
+                        </div>
+                        <div className="col-6">
+                          <span className="font-bold">Payment:</span>
+                          <p className="m-0 text-sm">
+                            {formatCurrency(report.payment_requested)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {report.report_description && (
+                        <div>
+                          <span className="font-bold">Notes:</span>
+                          <p className="m-0 text-sm line-height-3">
+                            {report.report_description.length > 120
+                              ? `${report.report_description.substring(0, 120)}...`
+                              : report.report_description}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          label="Download PDF"
+                          icon="pi pi-file-pdf"
+                          className="p-button-outlined p-button-sm p-button-danger"
+                          onClick={() => downloadReportPDF(report)}
+                        />
+                        <Button
+                          label="Download CSV"
+                          icon="pi pi-file-excel"
+                          className="p-button-outlined p-button-sm p-button-success"
+                          onClick={() => downloadReportCSV(report)}
+                        />
+                        <Button
+                          label="Regenerate"
+                          icon="pi pi-refresh"
+                          className="p-button-outlined p-button-sm"
+                          onClick={() => {
+                            setCompletionRate(report.current_progress || 0);
+                            setReleasedAmount(report.payment_requested || 0);
+                            setReportValue(report.report_description || '');
+                            setReportStartDate(
+                              report.start_date
+                                ? new Date(report.start_date)
+                                : null,
+                            );
+                            setReportEndDate(
+                              report.end_date
+                                ? new Date(report.end_date)
+                                : null,
+                            );
+                            setShowReportModal(true);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
+              <h3>No Reports Yet</h3>
+              <p className="text-color-secondary mb-4">
+                Generate the first report for this project
+              </p>
+              <Button
+                label="Generate First Report"
+                icon="pi pi-file"
+                onClick={handleGenerateClick}
+              />
+            </div>
+          )}
+        </TabPanel>
+
+        <TabPanel header="Project Info">
+          <Card>
+            <div className="grid">
+              <div className="col-12 md:col-6">
+                <h4>Project Details</h4>
+                <div className="space-y-3">
+                  <div>
+                    <span className="font-bold">Project Name:</span>
+                    <p className="m-0">{selectedProject.project_name}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Description:</span>
+                    <p className="m-0">
+                      {selectedProject.project_description || 'No description'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Status:</span>
+                    <Tag
+                      value={selectedProject.project_status || 'Active'}
+                      severity={
+                        selectedProject.project_status === 'Completed'
+                          ? 'success'
+                          : 'info'
+                      }
+                      className="ml-2"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-12 md:col-6">
+                <h4>Financial Information</h4>
+                <div className="space-y-3">
+                  <div>
+                    <span className="font-bold">Total Budget:</span>
+                    <p className="m-0 text-xl font-bold">
+                      {formatCurrency(selectedProject.total_amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Start Date:</span>
+                    <p className="m-0">
+                      {formatDate(selectedProject.project_start_date)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Deadline:</span>
+                    <p className="m-0">
+                      {formatDate(selectedProject.project_deadline)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </TabPanel>
+      </TabView>
+    </div>
+  );
+
+  return (
+    <div className="p-4">
+      <Toast ref={toast} />
+
+      {!selectedProject ? <ProjectListView /> : <ProjectDetailView />}
+
+      {/* Report Generation Modal */}
+      <Dialog
+        header={`Generate Report - ${selectedProject?.project_name || ''}`}
+        visible={showReportModal}
+        style={{ width: '50vw' }}
+        onHide={() => setShowReportModal(false)}
+        footer={
+          <div>
+            <Button
+              label="Cancel"
+              icon="pi pi-times"
+              className="p-button-text"
+              onClick={() => setShowReportModal(false)}
+            />
+            <Button
+              label={isGenerating ? 'Generating...' : 'Generate Report'}
+              icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
+              onClick={handleSubmitReport}
+              disabled={isGenerating || !reportStartDate || !reportEndDate}
+            />
+          </div>
+        }
+      >
+        {selectedProject && (
+          <div className="space-y-4">
+            <div className="p-3 surface-50 border-round">
+              <p className="font-bold m-0">
+                Project: {selectedProject.project_name}
+              </p>
+              <p className="m-0 text-sm">Fill in the report details below</p>
+            </div>
+
+            <div className="grid">
+              <div className="col-6">
+                <label
+                  htmlFor="report-start-date"
+                  className="font-bold block mb-2"
+                >
+                  Report Start Date *
+                </label>
+                <Calendar
+                  id="report-start-date"
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.value)}
+                  dateFormat="mm/dd/yy"
+                  showIcon
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="col-6">
+                <label
+                  htmlFor="report-end-date"
+                  className="font-bold block mb-2"
+                >
+                  Report End Date *
+                </label>
+                <Calendar
+                  id="report-end-date"
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.value)}
+                  dateFormat="mm/dd/yy"
+                  showIcon
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="col-12">
+                <label
+                  htmlFor="completion-rate"
+                  className="font-bold block mb-2"
+                >
+                  Completion Rate: {completionRate}%
+                </label>
+                <Slider
+                  value={completionRate}
+                  onChange={(e) => setCompletionRate(e.value)}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="col-12">
+                <label
+                  htmlFor="released-amount"
+                  className="font-bold block mb-2"
+                >
+                  Amount to be Released
+                </label>
+                <InputNumber
+                  id="released-amount"
+                  value={releasedAmount}
+                  onValueChange={(e) => setReleasedAmount(e.value)}
+                  prefix="₱"
+                  min={0}
+                  mode="currency"
+                  currency="PHP"
+                  locale="en-PH"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="col-12">
+                <label
+                  htmlFor="report-description"
+                  className="font-bold block mb-2"
+                >
+                  Report Description / Notes
+                </label>
+                <InputTextarea
+                  id="report-description"
+                  value={reportValue}
+                  onChange={(e) => setReportValue(e.target.value)}
+                  rows={4}
+                  className="w-full"
+                  placeholder="Enter accomplishments, challenges, next steps..."
+                />
+              </div>
+            </div>
+
+            {reportStartDate && reportEndDate && (
+              <div className="p-3 border-1 surface-border border-round">
+                <h4 className="mt-0">Preview</h4>
+                <div className="grid">
+                  <div className="col-6">
+                    <p className="m-0">
+                      <strong>Period:</strong> {formatDate(reportStartDate)} -{' '}
+                      {formatDate(reportEndDate)}
+                    </p>
+                    <p className="m-0">
+                      <strong>Completion:</strong> {completionRate}%
+                    </p>
+                  </div>
+                  <div className="col-6">
+                    <p className="m-0">
+                      <strong>Payment:</strong> {formatCurrency(releasedAmount)}
+                    </p>
+                  </div>
+                </div>
+                <ProgressBar value={completionRate} className="mt-3" />
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
+    </div>
+  );
+};
 
 export default StaffReportsPanel;

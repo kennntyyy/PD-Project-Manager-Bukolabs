@@ -143,6 +143,8 @@ const StaffReportsPanel = () => {
         const handleDownloadCSV = () => {
             if(!selectedProject) return;
 
+            await logReportGeneration();
+            
             const rows = [
                 ["Field", "Value"],
                 ["Client", getClientName(selectedProject.client_id)],
@@ -461,6 +463,7 @@ const StaffReportsPanel = () => {
                             ></Button>
                             <Button 
                                 label = "Save as CSV"
+                                 onClick={handleDownloadCSV}
                             ></Button>
                         </div>
                     )}

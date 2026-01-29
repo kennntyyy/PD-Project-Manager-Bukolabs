@@ -162,15 +162,8 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
 
-    console.log('Login attempt with username:', {
-      username,
-      password,
-      rememberMe,
-    });
-
     try {
       const response = await AuthService.login(username, password, rememberMe);
-      console.log('Login successful:', response);
 
       setUser(response.user);
 

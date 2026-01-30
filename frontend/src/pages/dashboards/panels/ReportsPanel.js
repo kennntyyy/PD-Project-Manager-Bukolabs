@@ -458,7 +458,7 @@ const StaffReportsPanel = () => {
   // Project List View
   const ProjectListView = () => (
     <div>
-      <div className="mb-4">
+      <div className="mb-6">
         <h2 className="m-0">Select a Project</h2>
         <p className="text-color-secondary m-0">
           Click on a project to view reports and generate new ones
@@ -469,10 +469,10 @@ const StaffReportsPanel = () => {
         {projects.map((project) => (
           <div key={project.project_id} className="col-12 md:col-6 lg:col-4">
             <Card
-              className="cursor-pointer hover:shadow-2 transition-duration-150"
+              className="cursor-pointer hover:shadow-lg transition duration-150 p-4 h-full"
               onClick={() => handleProjectClick(project)}
             >
-              <div className="flex flex-column gap-3">
+              <div className="flex flex-column gap-3 h-full">
                 <div className="flex justify-content-between align-items-start">
                   <h3 className="m-0 text-lg">{project.project_name}</h3>
                   <Badge
@@ -497,6 +497,7 @@ const StaffReportsPanel = () => {
                   <div className="flex justify-content-between">
                     <span className="font-bold">Status:</span>
                     <Tag
+                      className="p-2"
                       value={project.project_status || 'Active'}
                       severity={
                         project.project_status === 'Completed'
@@ -507,7 +508,7 @@ const StaffReportsPanel = () => {
                   </div>
                 </div>
 
-                <div className="mt-2 pt-2 border-top-1">
+                <div className="mt-2 pt-2 border-t">
                   <div className="flex justify-content-between text-sm">
                     <span>Start: {formatDate(project.project_start_date)}</span>
                     <span>End: {formatDate(project.project_deadline)}</span>
@@ -524,7 +525,7 @@ const StaffReportsPanel = () => {
   // Project Detail View (when project is selected)
   const ProjectDetailView = () => (
     <div>
-      <div className="mb-4">
+      <div className="mb-6">
         <Button
           label="Back to Projects"
           icon="pi pi-arrow-left"
@@ -532,7 +533,7 @@ const StaffReportsPanel = () => {
           onClick={handleBackToList}
         />
 
-        <div className="flex justify-content-between align-items-center">
+        <div className="flex justify-between items-center">
           <div>
             <h2 className="m-0">{selectedProject.project_name}</h2>
             <p className="text-color-secondary m-0">
@@ -544,19 +545,20 @@ const StaffReportsPanel = () => {
             label="Generate New Report"
             icon="pi pi-plus"
             onClick={handleGenerateClick}
+            className="ml-4"
           />
         </div>
       </div>
 
       <TabView>
-        <TabPanel header={`Recent Reports (${filteredReports.length})`}>
+        <TabPanel header={`Recent Reports (${filteredReports.length})`} className="p-2">
           {filteredReports.length > 0 ? (
             <div className="grid">
               {filteredReports.map((report, index) => (
                 <div key={index} className="col-12 lg:col-6">
-                  <Card>
-                    <div className="flex flex-column gap-3">
-                      <div className="flex justify-content-between align-items-start">
+                  <Card className="p-4">
+                    <div className="flex flex-column gap-3 h-full">
+                      <div className="flex justify-between items-start">
                         <div>
                           <h4 className="m-0">
                             Report #{filteredReports.length - index}
@@ -568,7 +570,7 @@ const StaffReportsPanel = () => {
                             )}
                           </small>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 items-center">
                           <Tag
                             value={`${report.current_progress}%`}
                             severity="info"
@@ -598,7 +600,7 @@ const StaffReportsPanel = () => {
                       </div>
 
                       {report.image_urls && report.image_urls.length > 0 && (
-                        <div className="flex align-items-center gap-2 p-2 surface-100 border-round">
+                        <div className="flex items-center gap-2 p-3 surface-100 border-round">
                           <i className="pi pi-paperclip text-lg" />
                           <span className="font-bold">
                             Attachments: {report.image_urls.length} image{report.image_urls.length !== 1 ? 's' : ''}
@@ -684,7 +686,7 @@ const StaffReportsPanel = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6">
+            <div className="text-center py-8">
               <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
               <h3>No Reports Yet</h3>
               <p className="text-color-secondary mb-4">
@@ -699,7 +701,7 @@ const StaffReportsPanel = () => {
           )}
         </TabPanel>
 
-        <TabPanel header="Project Info">
+        <TabPanel header="Project Info" className="p-2">
           <Card>
             <div className="grid">
               <div className="col-12 md:col-6">
@@ -761,7 +763,7 @@ const StaffReportsPanel = () => {
   );
 
   return (
-    <div className="p-4">
+    <div className="p-6 space-y-6">
       <Toast ref={toast} />
 
       {!selectedProject ? <ProjectListView /> : <ProjectDetailView />}

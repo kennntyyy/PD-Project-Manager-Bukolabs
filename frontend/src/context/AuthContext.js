@@ -243,12 +243,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      console.log('[AuthContext] refreshUser called');
+      const currentUser = AuthService.getCurrentUser();
+      if (currentUser) {
+        console.log('[AuthContext] Current user from storage:', currentUser);
+        // Fetch updated user data from backend
+        const response = await AuthService.getCurrentUserProfile();
+        const updatedUser = response.data || response;
+        console.log(
+          '[AuthContext] Fetched updated user from backend:',
+          updatedUser,
+        );
+
+        // Update both state and storage (check which storage is being used)
+        setUser(updatedUser);
+
+        // Update the same storage that's currently in use
+        if (localStorage.getItem('user')) {
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          console.log('[AuthContext] Updated user in localStorage');
+        }
+        if (sessionStorage.getItem('user')) {
+          sessionStorage.setItem('user', JSON.stringify(updatedUser));
+          console.log('[AuthContext] Updated user in sessionStorage');
+        }
+
+        console.log('[AuthContext] User refresh complete');
+        return updatedUser;
+      }
+    } catch (err) {
+      console.error('[AuthContext] Failed to refresh user:', err);
+      throw err;
+    }
+  };
+
   const value = {
     user,
     loading,
     error,
     login,
     logout,
+    refreshUser,
   };
 
   return (

@@ -7,10 +7,15 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   HttpCode,
   HttpStatus,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Express } from 'express';
 import { UsersService } from './users.service';
 import { User, UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -55,12 +60,49 @@ export class UsersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createUserDto: CreateUserDto): Promise<User> {
+  @UseInterceptors(FileInterceptor('profile_pic'))
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<User> {
     console.log(
       '[UsersController] POST /users - create with body:',
       createUserDto,
+      'file:',
+      file?.filename,
     );
     try {
+      // Handle profile picture file if provided
+      if (file) {
+        // Validate file type
+        const allowedMimetypes = [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+        ];
+        if (!allowedMimetypes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.',
+          );
+        }
+
+        // Validate file size (5MB max)
+        const maxSizeInBytes = 5 * 1024 * 1024;
+        if (file.size > maxSizeInBytes) {
+          throw new BadRequestException('File size must not exceed 5MB.');
+        }
+
+        // Convert file to base64 for storage
+        createUserDto.profile_pic = file.buffer.toString('base64');
+        console.log(
+          '[UsersController] Converted profile_pic to base64, length:',
+          createUserDto.profile_pic.length,
+          'first 50 chars:',
+          createUserDto.profile_pic.substring(0, 50),
+        );
+      }
+
       const result = await this.usersService.createUser(createUserDto);
       console.log('[UsersController] Create success:', result);
       return result;
@@ -113,17 +155,52 @@ export class UsersController {
   }
 
   @Put(':id')
+  @UseInterceptors(FileInterceptor('profile_pic'))
   async update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
   ): Promise<User> {
     console.log(
       '[UsersController] PUT /users/:id - update:',
       id,
       'body:',
       updateUserDto,
+      'file:',
+      file?.filename,
     );
     try {
+      // Handle profile picture file if provided
+      if (file) {
+        // Validate file type
+        const allowedMimetypes = [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+        ];
+        if (!allowedMimetypes.includes(file.mimetype)) {
+          throw new BadRequestException(
+            'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.',
+          );
+        }
+
+        // Validate file size (5MB max)
+        const maxSizeInBytes = 5 * 1024 * 1024;
+        if (file.size > maxSizeInBytes) {
+          throw new BadRequestException('File size must not exceed 5MB.');
+        }
+
+        // Convert file to base64 for storage
+        updateUserDto.profile_pic = file.buffer.toString('base64');
+        console.log(
+          '[UsersController] Converted profile_pic to base64, length:',
+          updateUserDto.profile_pic.length,
+          'first 50 chars:',
+          updateUserDto.profile_pic.substring(0, 50),
+        );
+      }
+
       const result = await this.usersService.update(id, updateUserDto);
       console.log('[UsersController] Update success:', result);
       return result;

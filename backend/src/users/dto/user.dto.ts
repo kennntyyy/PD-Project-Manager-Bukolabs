@@ -27,6 +27,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   user_role?: UserRole;
+
+  @IsOptional()
+  @IsString()
+  profile_pic?: string;
 }
 
 export class UpdateUserDto {
@@ -58,6 +62,10 @@ export class UpdateUserDto {
 
   @IsOptional()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  profile_pic?: string;
 }
 
 export class ChangePasswordDto {

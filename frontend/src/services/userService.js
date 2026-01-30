@@ -1,6 +1,6 @@
-import api from "./api";
+import api from './api';
 
-const USERS_API = "/users";
+const USERS_API = '/users';
 
 export const userService = {
   // Get all users
@@ -23,15 +23,20 @@ export const userService = {
 
   // Create new user
   createUser: async (userData) => {
-    console.log("[userService] createUser called with data:", userData);
-    console.log("[userService] POST endpoint:", USERS_API);
+    console.log('[userService] createUser called with data:', userData);
+    console.log('[userService] POST endpoint:', USERS_API);
     try {
-      const response = await api.post(USERS_API, userData);
-      console.log("[userService] createUser response:", response.data);
+      const config = {};
+      // Let axios set headers automatically for FormData
+      if (!(userData instanceof FormData)) {
+        config.headers = { 'Content-Type': 'application/json' };
+      }
+      const response = await api.post(USERS_API, userData, config);
+      console.log('[userService] createUser response:', response.data);
       return response.data;
     } catch (error) {
       console.error(
-        "[userService] createUser error:",
+        '[userService] createUser error:',
         error.response?.data || error.message,
       );
       throw error;
@@ -41,19 +46,24 @@ export const userService = {
   // Update user
   updateUser: async (id, updateData) => {
     console.log(
-      "[userService] updateUser called for id:",
+      '[userService] updateUser called for id:',
       id,
-      "with data:",
+      'with data:',
       updateData,
     );
-    console.log("[userService] PUT endpoint:", `${USERS_API}/${id}`);
+    console.log('[userService] PUT endpoint:', `${USERS_API}/${id}`);
     try {
-      const response = await api.put(`${USERS_API}/${id}`, updateData);
-      console.log("[userService] updateUser response:", response.data);
+      const config = {};
+      // Let axios set headers automatically for FormData
+      if (!(updateData instanceof FormData)) {
+        config.headers = { 'Content-Type': 'application/json' };
+      }
+      const response = await api.put(`${USERS_API}/${id}`, updateData, config);
+      console.log('[userService] updateUser response:', response.data);
       return response.data;
     } catch (error) {
       console.error(
-        "[userService] updateUser error:",
+        '[userService] updateUser error:',
         error.response?.data || error.message,
       );
       throw error;

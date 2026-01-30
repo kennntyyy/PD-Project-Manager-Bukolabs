@@ -20,14 +20,58 @@ export class UsersService {
     const users = await this.usersRepository.find({
       order: { created_at: 'DESC' },
     });
-    return users;
+    // Ensure profile_pic is always a string
+    return users.map((user) => {
+      let profilePic = null;
+      if (user.profile_pic) {
+        console.log(
+          '[findAll] RAW profile_pic type:',
+          typeof user.profile_pic,
+          'isBuffer:',
+          Buffer.isBuffer(user.profile_pic),
+          'value:',
+          user.profile_pic,
+        );
+        if (Buffer.isBuffer(user.profile_pic)) {
+          profilePic = user.profile_pic.toString('utf-8');
+          console.log(
+            '[findAll] Converted from Buffer, result:',
+            profilePic?.substring(0, 50),
+          );
+        } else if (typeof user.profile_pic === 'string') {
+          profilePic = user.profile_pic;
+          console.log(
+            '[findAll] Already string, value:',
+            profilePic?.substring(0, 50),
+          );
+        }
+      }
+      return {
+        ...user,
+        profile_pic: profilePic,
+      };
+    });
   }
 
   async findByEmail(email: string): Promise<User | null> {
     const user = await this.usersRepository.findOne({
       where: { email },
     });
-    return user || null;
+    if (!user) return null;
+
+    // Ensure profile_pic is always a string
+    let profilePic = null;
+    if (user.profile_pic) {
+      if (Buffer.isBuffer(user.profile_pic)) {
+        profilePic = user.profile_pic.toString('utf-8');
+      } else if (typeof user.profile_pic === 'string') {
+        profilePic = user.profile_pic;
+      }
+    }
+    return {
+      ...user,
+      profile_pic: profilePic,
+    };
   }
 
   async findById(id: string): Promise<User> {
@@ -39,7 +83,28 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    return user;
+    // Ensure profile_pic is always a string
+    let profilePic = null;
+    if (user.profile_pic) {
+      if (Buffer.isBuffer(user.profile_pic)) {
+        // Buffer should be converted to utf-8 string (data is already base64 encoded)
+        profilePic = user.profile_pic.toString('utf-8');
+        console.log(
+          '[UsersService findById] Converted Buffer to string, length:',
+          profilePic?.length,
+        );
+      } else if (typeof user.profile_pic === 'string') {
+        profilePic = user.profile_pic;
+        console.log(
+          '[UsersService findById] Already string, length:',
+          profilePic?.length,
+        );
+      }
+    }
+    return {
+      ...user,
+      profile_pic: profilePic,
+    };
   }
 
   async findByUsername(username: string): Promise<User | null> {
@@ -50,7 +115,7 @@ export class UsersService {
   }
 
   async findByRole(role: UserRole): Promise<User[]> {
-    return this.usersRepository.find({
+    const users = await this.usersRepository.find({
       where: { user_role: role },
       select: [
         'user_id',
@@ -63,6 +128,21 @@ export class UsersService {
         'is_active',
       ],
       order: { created_at: 'DESC' },
+    });
+    // Ensure profile_pic is always a string
+    return users.map((user) => {
+      let profilePic = null;
+      if (user.profile_pic) {
+        if (Buffer.isBuffer(user.profile_pic)) {
+          profilePic = user.profile_pic.toString('utf-8');
+        } else if (typeof user.profile_pic === 'string') {
+          profilePic = user.profile_pic;
+        }
+      }
+      return {
+        ...user,
+        profile_pic: profilePic,
+      };
     });
   }
 
@@ -132,6 +212,12 @@ export class UsersService {
       if (existingUser) {
         throw new ConflictException('Username already in use');
       }
+    }
+
+    // Handle profile_pic removal - if empty string is sent, set to null
+    if (updateData.profile_pic === '') {
+      updateData.profile_pic = null;
+      console.log('[UsersService.update] Clearing profile_pic');
     }
 
     Object.assign(user, updateData);

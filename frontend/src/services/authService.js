@@ -128,6 +128,16 @@ const AuthService = {
       return false;
     }
   },
+
+  async getCurrentUserProfile() {
+    try {
+      const response = await api.get('/users/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get user profile:', error);
+      throw error;
+    }
+  },
 };
 
 export default AuthService;

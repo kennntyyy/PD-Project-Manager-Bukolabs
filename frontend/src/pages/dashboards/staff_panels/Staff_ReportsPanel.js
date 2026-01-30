@@ -50,8 +50,23 @@ const StaffReportsPanel = () => {
   const [recentReports, setRecentReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportImages, setReportImages] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imageComments, setImageComments] = useState([]);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedReportImages, setSelectedReportImages] = useState([]);
+  const [selectedImageComments, setSelectedImageComments] = useState([]);
   const toast = useRef(null);
   const menuRefs = useRef({});
+
+  // Get base URL for images
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+    const baseUrl = apiBaseUrl.replace('/api', '');
+    if (imagePath.startsWith('http')) return imagePath;
+    return `${baseUrl}${imagePath}`;
+  };
 
   // FETCH DATA FROM BACKEND
   const fetchProjects = async () => {
@@ -148,6 +163,61 @@ const StaffReportsPanel = () => {
     setReportValue('');
     setReportStartDate(null);
     setReportEndDate(null);
+    setReportImages([]);
+    setImagePreviews([]);
+    setImageComments([]);
+  };
+
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    
+    files.forEach((file) => {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showToast('error', 'Invalid File', 'Please select only image files');
+        return;
+      }
+
+      // Validate file size (max 5MB per file)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('error', 'File Too Large', `${file.name} must be less than 5MB`);
+        return;
+      }
+
+      // Check if not already added
+      if (!reportImages.some(f => f.name === file.name && f.size === file.size)) {
+        setReportImages((prev) => [...prev, file]);
+        setImageComments((prev) => [...prev, '']);
+
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews((prev) => [...prev, reader.result]);
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const removeImage = (index) => {
+    setReportImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+    setImageComments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateImageComment = (index, comment) => {
+    setImageComments((prev) => {
+      const updated = [...prev];
+      updated[index] = comment;
+      return updated;
+    });
+  };
+
+  const handleViewImages = (imageUrls, imageComments) => {
+    setSelectedReportImages(imageUrls.map(url => getImageUrl(url)));
+    const parsedComments = imageComments ? JSON.parse(imageComments) : [];
+    setSelectedImageComments(parsedComments);
+    setShowImageModal(true);
   };
 
   const handleSubmitReport = async () => {
@@ -200,6 +270,9 @@ const StaffReportsPanel = () => {
           : '',
       };
 
+      // Convert relative image URLs to absolute URLs for PDF
+      const absoluteImageUrls = (report.image_urls || []).map(url => getImageUrl(url));
+
       const doc = (
         <ProjectReportPDF
           data={project}
@@ -207,6 +280,8 @@ const StaffReportsPanel = () => {
           contractorName={getContractorName(project.contractor_id)}
           completionRate={report.current_progress || 0}
           reportDates={reportDates}
+          imageUrls={absoluteImageUrls}
+          imageComments={report.image_comments}
         />
       );
 
@@ -274,16 +349,27 @@ const StaffReportsPanel = () => {
 
   const logReportGeneration = async () => {
     try {
-      const reportRecord = {
-        project_id: selectedProject.project_id,
-        start_date: reportStartDate,
-        end_date: reportEndDate,
-        current_progress: completionRate,
-        payment_requested: releasedAmount,
-        report_description: reportValue,
-      };
+      const formData = new FormData();
+      formData.append('project_id', selectedProject.project_id);
+      formData.append('start_date', reportStartDate);
+      formData.append('end_date', reportEndDate);
+      formData.append('current_progress', completionRate);
+      formData.append('payment_requested', releasedAmount);
+      formData.append('report_description', reportValue);
+      
+      // Append multiple images with their comments
+      reportImages.forEach((image, index) => {
+        formData.append(`images`, image);
+      });
+      
+      // Append image comments as JSON
+      formData.append('image_comments', JSON.stringify(imageComments));
 
-      await api.post('/reports', reportRecord);
+      await api.post('/reports', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       fetchRecentReports();
     } catch (error) {
       console.error('Error logging report generation:', error);
@@ -350,6 +436,8 @@ const StaffReportsPanel = () => {
           report.start_date ? new Date(report.start_date) : null,
         );
         setReportEndDate(report.end_date ? new Date(report.end_date) : null);
+        setReportImages([]);
+        setImagePreviews([]);
         setShowReportModal(true);
       },
     },
@@ -509,6 +597,21 @@ const StaffReportsPanel = () => {
                         </div>
                       </div>
 
+                      {report.image_urls && report.image_urls.length > 0 && (
+                        <div className="flex align-items-center gap-2 p-2 surface-100 border-round">
+                          <i className="pi pi-paperclip text-lg" />
+                          <span className="font-bold">
+                            Attachments: {report.image_urls.length} image{report.image_urls.length !== 1 ? 's' : ''}
+                          </span>
+                          <Button
+                            label="View Images"
+                            icon="pi pi-eye"
+                            className="p-button-sm p-button-text"
+                            onClick={() => handleViewImages(report.image_urls, report.image_comments)}
+                          />
+                        </div>
+                      )}
+
                       <Divider className="my-2" />
 
                       <div className="grid">
@@ -551,7 +654,7 @@ const StaffReportsPanel = () => {
                           className="p-button-outlined p-button-sm p-button-success"
                           onClick={() => downloadReportCSV(report)}
                         />
-                        <Button
+                        {/* <Button
                           label="Regenerate"
                           icon="pi pi-refresh"
                           className="p-button-outlined p-button-sm"
@@ -569,9 +672,11 @@ const StaffReportsPanel = () => {
                                 ? new Date(report.end_date)
                                 : null,
                             );
+                            setReportImages([]);
+                            setImagePreviews([]);
                             setShowReportModal(true);
                           }}
-                        />
+                        /> */}
                       </div>
                     </div>
                   </Card>
@@ -780,6 +885,69 @@ const StaffReportsPanel = () => {
                   placeholder="Enter accomplishments, challenges, next steps..."
                 />
               </div>
+
+              <div className="col-12">
+                <label htmlFor="report-images" className="font-bold block mb-2">
+                  Upload Report Images
+                </label>
+                <input
+                  id="report-images"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageSelect}
+                  className="w-full"
+                />
+                <small className="text-color-secondary block mt-1">
+                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image). You can select multiple images.
+                </small>
+              </div>
+
+              {imagePreviews.length > 0 && (
+                <div className="col-12">
+                  <h5 className="m-0 mb-3">Image Previews ({imagePreviews.length})</h5>
+                  <div className="grid">
+                    {imagePreviews.map((preview, index) => (
+                      <div key={index} className="col-12 md:col-6 lg:col-4">
+                        <div className="border-1 surface-border border-round p-2">
+                          <div style={{ position: 'relative', marginBottom: '8px' }}>
+                            <img
+                              src={preview}
+                              alt={`Report preview ${index + 1}`}
+                              style={{
+                                width: '100%',
+                                height: '180px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                              }}
+                            />
+                            <Button
+                              icon="pi pi-times"
+                              className="p-button-rounded p-button-text p-button-sm"
+                              style={{
+                                position: 'absolute',
+                                top: '5px',
+                                right: '5px',
+                                backgroundColor: 'rgba(255,255,255,0.8)',
+                              }}
+                              onClick={() => removeImage(index)}
+                            />
+                          </div>
+                          <small className="text-color-secondary block mb-2">Image {index + 1}</small>
+                          <InputTextarea
+                            placeholder="Add a comment for this image..."
+                            value={imageComments[index] || ''}
+                            onChange={(e) => updateImageComment(index, e.target.value)}
+                            rows={2}
+                            className="w-full"
+                            style={{ fontSize: '12px' }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {reportStartDate && reportEndDate && (
@@ -804,6 +972,52 @@ const StaffReportsPanel = () => {
                 <ProgressBar value={completionRate} className="mt-3" />
               </div>
             )}
+          </div>
+        )}
+      </Dialog>
+
+      {/* Image Viewer Modal */}
+      <Dialog
+        header="Report Images"
+        visible={showImageModal}
+        style={{ width: '80vw' }}
+        modal
+        onHide={() => setShowImageModal(false)}
+      >
+        {selectedReportImages.length > 0 ? (
+          <div className="grid gap-3">
+            {selectedReportImages.map((imageUrl, index) => (
+              <div key={index} className="col-12 md:col-6 lg:col-4">
+                <div className="border-1 surface-border border-round overflow-hidden">
+                  <img
+                    src={imageUrl}
+                    alt={`Report image ${index + 1}`}
+                    style={{
+                      width: '100%',
+                      height: '300px',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <div className="p-3 surface-50">
+                    <div className="mb-2 text-center">
+                      <small className="text-color-secondary font-bold">Image {index + 1}</small>
+                    </div>
+                    {selectedImageComments[index] && (
+                      <div className="p-2 surface-100 border-round-sm">
+                        <small className="text-color-secondary">
+                          <strong>Comment:</strong> {selectedImageComments[index]}
+                        </small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center p-4">
+            <i className="pi pi-image text-4xl text-color-secondary mb-3 block" />
+            <p>No images to display</p>
           </div>
         )}
       </Dialog>

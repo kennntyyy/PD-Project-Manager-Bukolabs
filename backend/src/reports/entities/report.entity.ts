@@ -48,6 +48,13 @@ export class Report {
     @Column({ default: false })
     isDeleted: boolean;
 
+    //images
+    @Column({type: 'simple-array', nullable: true})
+    image_urls: string[];
+
+    @Column({type: 'text', nullable: true})
+    image_comments: string;
+
     //reference keys / foreign keys
 
     @Column({ type: 'uuid' })

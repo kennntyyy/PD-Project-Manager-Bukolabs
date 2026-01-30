@@ -34,6 +34,14 @@ export class CreateReportDto {
     @IsBoolean()
     payment_triggered: boolean;
 
+    //images
+    @IsOptional()
+    image_urls: string[];
+
+    @IsOptional()
+    @IsString()
+    image_comments: string;
+
     //reference keys / foreign keys
     @IsOptional()
     @IsString()

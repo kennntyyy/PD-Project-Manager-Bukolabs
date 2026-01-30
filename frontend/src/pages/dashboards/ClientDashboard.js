@@ -1,36 +1,36 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
-import { Button } from "primereact/button";
-import { Toast } from "primereact/toast";
-import "./Dashboard.css";
+import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { Button } from 'primereact/button';
+import { Toast } from 'primereact/toast';
+import './Dashboard.css';
 
 const ClientDashboard = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
-    () => localStorage.getItem("clientActiveTab") || "overview",
+    () => localStorage.getItem('clientActiveTab') || 'overview',
   );
   const [activeNav, setActiveNav] = useState(
-    () => localStorage.getItem("clientActiveNav") || "overview",
+    () => localStorage.getItem('clientActiveNav') || 'overview',
   );
   const toast = useRef(null);
 
   const projects = [
-    { id: 1, name: "Website Redesign", status: "Active", due: "2024-06-30" },
-    { id: 2, name: "Mobile App", status: "Pending", due: "2024-07-15" },
+    { id: 1, name: 'Website Redesign', status: 'Active', due: '2024-06-30' },
+    { id: 2, name: 'Mobile App', status: 'Pending', due: '2024-07-15' },
   ];
 
   const navItems = [
-    { key: "overview", icon: "pi pi-home", label: "Overview" },
-    { key: "projects", icon: "pi pi-folder", label: "Projects" },
-    { key: "invoices", icon: "pi pi-dollar", label: "Invoices" },
-    { key: "communications", icon: "pi pi-comments", label: "Communications" },
-    { key: "support", icon: "pi pi-question-circle", label: "Support" },
-    { key: "settings", icon: "pi pi-cog", label: "Settings" },
+    { key: 'overview', icon: 'pi pi-home', label: 'Overview' },
+    { key: 'projects', icon: 'pi pi-folder', label: 'Projects' },
+    { key: 'invoices', icon: 'pi pi-dollar', label: 'Invoices' },
+    { key: 'communications', icon: 'pi pi-comments', label: 'Communications' },
+    { key: 'support', icon: 'pi pi-question-circle', label: 'Support' },
+    { key: 'settings', icon: 'pi pi-cog', label: 'Settings' },
   ];
 
   useEffect(() => {
-    localStorage.setItem("clientActiveTab", activeTab);
-    localStorage.setItem("clientActiveNav", activeNav);
+    localStorage.setItem('clientActiveTab', activeTab);
+    localStorage.setItem('clientActiveNav', activeNav);
   }, [activeTab, activeNav]);
 
   return (
@@ -50,7 +50,7 @@ const ClientDashboard = () => {
           {navItems.map((item) => (
             <div
               key={item.key}
-              className={`nav-item ${activeNav === item.key ? "active" : ""}`}
+              className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
               onClick={() => {
                 setActiveNav(item.key);
                 setActiveTab(item.key);
@@ -75,27 +75,40 @@ const ClientDashboard = () => {
           <div className="header-left">
             <div>
               <h2 className="header-title">
-                {activeTab === "overview" && "Overview"}
-                {activeTab === "projects" && "Projects"}
-                {activeTab === "invoices" && "Invoices"}
-                {activeTab === "communications" && "Communications"}
-                {activeTab === "support" && "Support"}
-                {activeTab === "settings" && "Settings"}
+                {activeTab === 'overview' && 'Overview'}
+                {activeTab === 'projects' && 'Projects'}
+                {activeTab === 'invoices' && 'Invoices'}
+                {activeTab === 'communications' && 'Communications'}
+                {activeTab === 'support' && 'Support'}
+                {activeTab === 'settings' && 'Settings'}
               </h2>
               <p className="header-subtitle">
-                {activeTab === "overview" && "Welcome back, Client!"}
-                {activeTab === "projects" && "View your projects"}
-                {activeTab === "invoices" && "Manage invoices and payments"}
-                {activeTab === "communications" && "Messages and meetings"}
-                {activeTab === "support" && "Get help and support"}
-                {activeTab === "settings" && "Configure your settings"}
+                {activeTab === 'overview' && 'Welcome back, Client!'}
+                {activeTab === 'projects' && 'View your projects'}
+                {activeTab === 'invoices' && 'Manage invoices and payments'}
+                {activeTab === 'communications' && 'Messages and meetings'}
+                {activeTab === 'support' && 'Get help and support'}
+                {activeTab === 'settings' && 'Configure your settings'}
               </p>
             </div>
           </div>
           <div className="header-right">
             <div className="user-profile">
               <div className="user-avatar">
-                {user?.username?.charAt(0).toUpperCase()}
+                {user?.profile_pic ? (
+                  <img
+                    src={`data:image/jpeg;base64,${user.profile_pic}`}
+                    alt={user?.username}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  user?.username?.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="user-info">
                 <h4>
@@ -107,13 +120,13 @@ const ClientDashboard = () => {
           </div>
         </div>
         <div className="dashboard-body">
-          {activeTab === "overview" && (
+          {activeTab === 'overview' && (
             <div>
               <h3>Quick Stats</h3>
               {/* Add client overview widgets here */}
             </div>
           )}
-          {activeTab === "projects" && (
+          {activeTab === 'projects' && (
             <div>
               <h3>Projects</h3>
               <table className="p-datatable-table">
@@ -136,25 +149,25 @@ const ClientDashboard = () => {
               </table>
             </div>
           )}
-          {activeTab === "invoices" && (
+          {activeTab === 'invoices' && (
             <div>
               <h3>Invoices</h3>
               {/* Add client invoices panel here */}
             </div>
           )}
-          {activeTab === "communications" && (
+          {activeTab === 'communications' && (
             <div>
               <h3>Communications</h3>
               {/* Add client communications panel here */}
             </div>
           )}
-          {activeTab === "support" && (
+          {activeTab === 'support' && (
             <div>
               <h3>Support</h3>
               {/* Add client support panel here */}
             </div>
           )}
-          {activeTab === "settings" && (
+          {activeTab === 'settings' && (
             <div>
               <h3>Settings</h3>
               {/* Add client settings panel here */}

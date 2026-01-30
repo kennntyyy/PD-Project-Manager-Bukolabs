@@ -43,8 +43,8 @@ export class User {
   @Column({ length: 20, nullable: true })
   phone: string;
 
-  @Column({ type: 'text', nullable: true })
-  profile_pic: string;
+  @Column({ type: 'longtext', nullable: true })
+  profile_pic: string | null;
 
   @Column({ default: true })
   is_active: boolean;

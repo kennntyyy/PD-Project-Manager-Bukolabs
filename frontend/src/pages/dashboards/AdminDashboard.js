@@ -172,7 +172,28 @@ const AdminDashboard = () => {
           <div className="header-right">
             <div className="user-profile">
               <div className="user-avatar">
-                {user?.username?.charAt(0).toUpperCase()}
+                {(() => {
+                  console.log(
+                    '[AdminDashboard] user.profile_pic:',
+                    typeof user?.profile_pic,
+                    user?.profile_pic?.substring?.(0, 50),
+                  );
+                  return user?.profile_pic &&
+                    typeof user.profile_pic === 'string' ? (
+                    <img
+                      src={`data:image/jpeg;base64,${user.profile_pic}`}
+                      alt={user?.username}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                  ) : (
+                    user?.username?.charAt(0).toUpperCase()
+                  );
+                })()}
               </div>
               <div className="user-info">
                 <h4>

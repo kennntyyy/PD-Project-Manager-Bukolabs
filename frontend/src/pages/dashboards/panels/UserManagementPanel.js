@@ -9,6 +9,7 @@ import { Toast } from 'primereact/toast';
 import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { userService } from '../../../services/userService';
+import { useAuth } from '../../../context/AuthContext';
 
 // ============================================
 // USER MANAGEMENT PANEL
@@ -19,6 +20,7 @@ const UserManagementPanel = () => {
   // ============================================
   // STATE
   // ============================================
+  const { user: currentUser, refreshUser } = useAuth();
   const [visible, setVisible] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -37,10 +39,13 @@ const UserManagementPanel = () => {
     last_name: '',
     phone: '',
     user_role: 'client',
+    profile_pic: null,
   });
 
+  const [profilePicPreview, setProfilePicPreview] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const fileInputRef = useRef(null);
 
   const roles = [
     { label: 'Admin', value: 'admin' },
@@ -168,7 +173,9 @@ const UserManagementPanel = () => {
       last_name: '',
       phone: '',
       user_role: 'client',
+      profile_pic: null,
     });
+    setProfilePicPreview(null);
     setVisible(true);
   };
 
@@ -184,13 +191,68 @@ const UserManagementPanel = () => {
       last_name: usr.last_name,
       phone: usr.phone || '',
       user_role: usr.user_role,
+      profile_pic: usr.profile_pic || null, // Keep existing profile_pic reference
     });
+    // Set profile picture preview if available
+    if (usr.profile_pic) {
+      setProfilePicPreview(`data:image/jpeg;base64,${usr.profile_pic}`);
+    } else {
+      setProfilePicPreview(null);
+    }
     setVisible(true);
   };
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const handleProfilePicChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Invalid File Type',
+          detail: 'Only JPEG, PNG, GIF, and WebP images are allowed.',
+        });
+        return;
+      }
+
+      // Validate file size (5MB max)
+      const maxSizeInBytes = 5 * 1024 * 1024;
+      if (file.size > maxSizeInBytes) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'File Too Large',
+          detail: 'File size must not exceed 5MB.',
+        });
+        return;
+      }
+
+      // Read file and create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePicPreview(reader.result);
+        setFormData({ ...formData, profile_pic: file });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeProfilePic = () => {
+    setProfilePicPreview(null);
+    setFormData({ ...formData, profile_pic: null });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleRoleChange = (e) => {
@@ -241,19 +303,93 @@ const UserManagementPanel = () => {
     try {
       setLoading(true);
 
+      let requestData;
+
+      // Only use FormData if there's a profile picture FILE to upload
+      if (formData.profile_pic && formData.profile_pic instanceof File) {
+        // Create FormData for file upload
+        requestData = new FormData();
+        requestData.append('username', formData.username);
+        requestData.append('email', formData.email);
+        requestData.append('first_name', formData.first_name);
+        requestData.append('last_name', formData.last_name);
+        requestData.append('phone', formData.phone || '');
+        requestData.append('user_role', formData.user_role);
+
+        // Add password only for new users
+        if (!isEditing) {
+          requestData.append('password', formData.password);
+        }
+
+        // Add profile picture file
+        requestData.append('profile_pic', formData.profile_pic);
+        console.log(
+          '[UserManagementPanel] Sending FormData with file:',
+          formData.profile_pic.name,
+          'size:',
+          formData.profile_pic.size,
+        );
+      } else {
+        // Use regular JSON for regular form submission
+        requestData = {
+          username: formData.username,
+          email: formData.email,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone || '',
+          user_role: formData.user_role,
+        };
+
+        // Add password only for new users
+        if (!isEditing) {
+          requestData.password = formData.password;
+        }
+
+        // Only modify profile_pic if it was explicitly changed
+        // If profile_pic is null and we're editing, it means user clicked Remove
+        // If profile_pic is a string (existing base64), don't include it (no change)
+        if (
+          isEditing &&
+          formData.profile_pic === null &&
+          profilePicPreview === null
+        ) {
+          // User removed the profile picture
+          requestData.profile_pic = '';
+        }
+        // If formData.profile_pic is a string (existing data), don't send it - no change
+      }
+
       if (isEditing) {
-        const updateData = { ...formData };
-        delete updateData.password;
-        console.log('Updating user:', selectedUser.user_id, updateData);
-        await userService.updateUser(selectedUser.user_id, updateData);
+        console.log('Updating user:', selectedUser.user_id, requestData);
+        await userService.updateUser(selectedUser.user_id, requestData);
+
+        // If the updated user is the current logged-in user, refresh their profile
+        if (currentUser && selectedUser.user_id === currentUser.user_id) {
+          console.log(
+            '[UserManagementPanel] Refreshing current user profile...',
+          );
+          try {
+            const updatedUser = await refreshUser();
+            console.log(
+              '[UserManagementPanel] User profile refreshed:',
+              updatedUser,
+            );
+          } catch (error) {
+            console.error(
+              '[UserManagementPanel] Failed to refresh user:',
+              error,
+            );
+          }
+        }
+
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
           detail: 'User updated successfully',
         });
       } else {
-        console.log('Creating user:', formData);
-        await userService.createUser(formData);
+        console.log('Creating user:', requestData);
+        await userService.createUser(requestData);
         toast.current?.show({
           severity: 'success',
           summary: 'Success',
@@ -564,6 +700,44 @@ const UserManagementPanel = () => {
           responsiveLayout="scroll"
         >
           <Column field="username" header="Username" sortable />
+          <Column
+            header="Profile Picture"
+            body={(rowData) => (
+              <div style={{ textAlign: 'center' }}>
+                {rowData.profile_pic ? (
+                  <img
+                    src={`data:image/jpeg;base64,${rowData.profile_pic}`}
+                    alt={rowData.username}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '2px solid #e0e0e0',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      backgroundColor: '#e0e0e0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto',
+                    }}
+                  >
+                    <i
+                      className="pi pi-user"
+                      style={{ fontSize: '20px', color: '#999' }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          />
           <Column field="email" header="Email" sortable />
           <Column field="first_name" header="First Name" />
           <Column field="last_name" header="Last Name" />
@@ -711,6 +885,85 @@ const UserManagementPanel = () => {
             optionValue="value"
             placeholder="Select role"
           />
+        </div>
+
+        {/* Profile Picture Section */}
+        <div className="field mt-4">
+          <label>Profile Picture</label>
+          <div
+            style={{
+              border: '2px dashed #ccc',
+              borderRadius: '8px',
+              padding: '16px',
+              textAlign: 'center',
+              backgroundColor: '#f9f9f9',
+            }}
+          >
+            {profilePicPreview ? (
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={profilePicPreview}
+                  alt="Profile Preview"
+                  style={{
+                    width: '150px',
+                    height: '150px',
+                    borderRadius: '8px',
+                    objectFit: 'cover',
+                    display: 'block',
+                    margin: '0 auto',
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: '12px',
+                    display: 'flex',
+                    gap: '8px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Button
+                    label="Change"
+                    icon="pi pi-pencil"
+                    className="p-button-sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                  <Button
+                    label="Remove"
+                    icon="pi pi-trash"
+                    className="p-button-sm p-button-danger p-button-outlined"
+                    onClick={removeProfilePic}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{ cursor: 'pointer' }}
+              >
+                <i
+                  className="pi pi-image"
+                  style={{
+                    fontSize: '32px',
+                    color: '#999',
+                    marginBottom: '8px',
+                  }}
+                />
+                <p style={{ margin: '8px 0', color: '#666' }}>
+                  Click to upload or drag and drop
+                </p>
+                <small style={{ color: '#999' }}>
+                  PNG, JPG, GIF, WebP (max 5MB)
+                </small>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleProfilePicChange}
+              style={{ display: 'none' }}
+            />
+          </div>
         </div>
 
         {!isEditing && (

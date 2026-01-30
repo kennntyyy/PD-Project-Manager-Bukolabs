@@ -13,7 +13,7 @@ export class ReportsService {
   ) {}
 
   //save data to db table = reports
-  async create(createReportDto: CreateReportDto): Promise<Report> {
+  async create(createReportDto: CreateReportDto, files?: Express.Multer.File[]): Promise<Report> {
     const {
       project_id,
       report_date,
@@ -24,8 +24,12 @@ export class ReportsService {
       next_steps,
       payment_requested,
       payment_triggered,
-      
+      image_urls,
+      image_comments,
     } = createReportDto;
+
+    // Generate image URLs from uploaded files
+    const imageUrlsArray = files ? files.map(file => `/uploads/reports/${file.filename}`) : image_urls || [];
 
     const report = this.reportRepository.create({
       project_id,
@@ -37,7 +41,8 @@ export class ReportsService {
       next_steps,
       payment_requested,
       payment_triggered,
-      
+      image_urls: imageUrlsArray,
+      image_comments: image_comments,
     });
 
     return await this.reportRepository.save(report);

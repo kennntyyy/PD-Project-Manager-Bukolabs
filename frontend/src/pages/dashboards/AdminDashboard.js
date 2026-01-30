@@ -30,6 +30,7 @@ const AdminDashboard = () => {
     () => localStorage.getItem('adminActiveNav') || 'overview',
   );
   const toast = useRef(null);
+  const logoUrl = `${process.env.PUBLIC_URL}/logo.png`;
 
   // ============================================
   // LOAD USERS ON COMPONENT MOUNT
@@ -65,6 +66,15 @@ const AdminDashboard = () => {
   };
 
   // ============================================
+  // NAV HANDLERS
+  // ============================================
+  const handleNavClick = (navName) => {
+    console.log('Navigating to:', navName);
+    setActiveNav(navName);
+    setActiveTab(navName);
+  };
+
+  // ============================================
   // RENDER: MAIN LAYOUT
   // ============================================
 
@@ -76,20 +86,20 @@ const AdminDashboard = () => {
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <i className="pi pi-shield"></i>
-          </div>
-          <div className="sidebar-title">
-            <h3>Admin</h3>
-            <p>Control Panel</p>
+            <img className="sidebar-logo-img" src={logoUrl} alt="Logo" />
           </div>
         </div>
 
         <div className="sidebar-nav">
           <div
             className={`nav-item ${activeNav === 'overview' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav('overview');
-              setActiveTab('overview');
+            onClick={() => handleNavClick('overview')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('overview');
+              }
             }}
           >
             <i className="pi pi-home"></i>
@@ -97,9 +107,13 @@ const AdminDashboard = () => {
           </div>
           <div
             className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav('users');
-              setActiveTab('users');
+            onClick={() => handleNavClick('users')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('users');
+              }
             }}
           >
             <i className="pi pi-users"></i>
@@ -107,9 +121,13 @@ const AdminDashboard = () => {
           </div>
           <div
             className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav('reports');
-              setActiveTab('reports');
+            onClick={() => handleNavClick('reports')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('reports');
+              }
             }}
           >
             <i className="pi pi-chart-bar"></i>
@@ -117,9 +135,13 @@ const AdminDashboard = () => {
           </div>
           <div
             className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav('settings');
-              setActiveTab('settings');
+            onClick={() => handleNavClick('settings')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('settings');
+              }
             }}
           >
             <i className="pi pi-cog"></i>
@@ -127,9 +149,13 @@ const AdminDashboard = () => {
           </div>
           <div
             className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav('projects');
-              setActiveTab('projects');
+            onClick={() => handleNavClick('projects')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('projects');
+              }
             }}
           >
             <i className="pi pi-folder"></i>
@@ -138,6 +164,33 @@ const AdminDashboard = () => {
         </div>
 
         <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="user-avatar">
+              {(() => {
+                return user?.profile_pic &&
+                  typeof user.profile_pic === 'string' ? (
+                  <img
+                    src={`data:image/jpeg;base64,${user.profile_pic}`}
+                    alt={user?.username}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  user?.username?.charAt(0).toUpperCase()
+                );
+              })()}
+            </div>
+            <div className="user-info">
+              <h4>
+                {user?.first_name} {user?.last_name}
+              </h4>
+              <p>{user?.user_role?.toUpperCase()}</p>
+            </div>
+          </div>
           <Button
             className="logout-btn"
             label="Logout"
@@ -149,62 +202,6 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       <div className="dashboard-content">
-        {/* Header */}
-        <div className="dashboard-header">
-          <div className="header-left">
-            <div>
-              <h2 className="header-title">
-                {activeTab === 'overview' && 'Overview'}
-                {activeTab === 'users' && 'User Management'}
-                {activeTab === 'reports' && 'Reports'}
-                {activeTab === 'settings' && 'Settings'}
-                {activeTab === 'projects' && 'Projects'}
-              </h2>
-              <p className="header-subtitle">
-                {activeTab === 'overview' && 'Welcome back, Admin!'}
-                {activeTab === 'users' && 'Manage system users'}
-                {activeTab === 'reports' && 'View analytics and reports'}
-                {activeTab === 'settings' && 'Configure system settings'}
-                {activeTab === 'projects' && 'Manage all projects'}
-              </p>
-            </div>
-          </div>
-          <div className="header-right">
-            <div className="user-profile">
-              <div className="user-avatar">
-                {(() => {
-                  console.log(
-                    '[AdminDashboard] user.profile_pic:',
-                    typeof user?.profile_pic,
-                    user?.profile_pic?.substring?.(0, 50),
-                  );
-                  return user?.profile_pic &&
-                    typeof user.profile_pic === 'string' ? (
-                    <img
-                      src={`data:image/jpeg;base64,${user.profile_pic}`}
-                      alt={user?.username}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  ) : (
-                    user?.username?.charAt(0).toUpperCase()
-                  );
-                })()}
-              </div>
-              <div className="user-info">
-                <h4>
-                  {user?.first_name} {user?.last_name}
-                </h4>
-                <p>{user?.user_role?.toUpperCase()}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Body - Render appropriate panel based on activeTab */}
         <div className="dashboard-body">
           {activeTab === 'overview' && <OverviewPanel users={users} />}

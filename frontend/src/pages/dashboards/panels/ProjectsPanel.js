@@ -76,7 +76,9 @@ const ProjectsPanel = () => {
   const getClientName = (clientId) => {
     if (!clientId) return '';
     const client = clients.find((c) => c.user_id === clientId);
-    return client ? `${client.first_name} ${client.last_name}`.toLowerCase() : '';
+    return client
+      ? `${client.first_name} ${client.last_name}`.toLowerCase()
+      : '';
   };
 
   // Filter projects based on search query
@@ -180,7 +182,9 @@ const ProjectsPanel = () => {
         (user) => user.user_role === 'contractor',
       );
       setContractors(contractorsList);
-      const clientsList = response.data.filter((user) => user.user_role === 'client');
+      const clientsList = response.data.filter(
+        (user) => user.user_role === 'client',
+      );
       setClients(clientsList);
     } catch (error) {
       console.error('Failed to fetch contractors:', error);
@@ -312,6 +316,7 @@ const ProjectsPanel = () => {
         total_amount: editingProject.amount,
         project_deadline: editingProject.dueDate,
         client_id: editingProject.client_id,
+        contractor_id: editingProject.contractor_id,
       });
 
       setDisplayEditDialog(false);
@@ -620,11 +625,7 @@ const ProjectsPanel = () => {
             body={dateTemplate}
             sortable
           />
-          <Column
-            field="client_id"
-            header="Client"
-            body={clientTemplate}
-          />
+          <Column field="client_id" header="Client" body={clientTemplate} />
           <Column
             field="contractor_id"
             header="Contractor"
@@ -790,7 +791,9 @@ const ProjectsPanel = () => {
           <Dropdown
             id="project-client"
             value={newProject.client_id}
-            onChange={(e) => setNewProject({ ...newProject, client_id: e.value })}
+            onChange={(e) =>
+              setNewProject({ ...newProject, client_id: e.value })
+            }
             options={clients}
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"
@@ -936,7 +939,9 @@ const ProjectsPanel = () => {
           <Dropdown
             id="edit-project-client"
             value={editingProject.client_id}
-            onChange={(e) => setEditingProject({ ...editingProject, client_id: e.value })}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, client_id: e.value })
+            }
             options={clients}
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"

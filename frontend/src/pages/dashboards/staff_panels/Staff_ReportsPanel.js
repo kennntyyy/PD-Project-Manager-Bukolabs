@@ -35,6 +35,7 @@ import { jsPDF } from 'jspdf';
 import { pdf } from '@react-pdf/renderer';
 import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF';
 import api from '../../../services/api';
+import '../panels/ReportsPanel.css';
 
 const StaffReportsPanel = () => {
   const [projects, setProjects] = useState([]);
@@ -56,13 +57,15 @@ const StaffReportsPanel = () => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedReportImages, setSelectedReportImages] = useState([]);
   const [selectedImageComments, setSelectedImageComments] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const toast = useRef(null);
   const menuRefs = useRef({});
 
   // Get base URL for images
   const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
-    const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+    const apiBaseUrl =
+      process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
     const baseUrl = apiBaseUrl.replace('/api', '');
     if (imagePath.startsWith('http')) return imagePath;
     return `${baseUrl}${imagePath}`;
@@ -170,7 +173,7 @@ const StaffReportsPanel = () => {
 
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
-    
+
     files.forEach((file) => {
       // Validate file type
       if (!file.type.startsWith('image/')) {
@@ -180,12 +183,18 @@ const StaffReportsPanel = () => {
 
       // Validate file size (max 5MB per file)
       if (file.size > 5 * 1024 * 1024) {
-        showToast('error', 'File Too Large', `${file.name} must be less than 5MB`);
+        showToast(
+          'error',
+          'File Too Large',
+          `${file.name} must be less than 5MB`,
+        );
         return;
       }
 
       // Check if not already added
-      if (!reportImages.some(f => f.name === file.name && f.size === file.size)) {
+      if (
+        !reportImages.some((f) => f.name === file.name && f.size === file.size)
+      ) {
         setReportImages((prev) => [...prev, file]);
         setImageComments((prev) => [...prev, '']);
 
@@ -214,7 +223,7 @@ const StaffReportsPanel = () => {
   };
 
   const handleViewImages = (imageUrls, imageComments) => {
-    setSelectedReportImages(imageUrls.map(url => getImageUrl(url)));
+    setSelectedReportImages(imageUrls.map((url) => getImageUrl(url)));
     const parsedComments = imageComments ? JSON.parse(imageComments) : [];
     setSelectedImageComments(parsedComments);
     setShowImageModal(true);
@@ -271,7 +280,9 @@ const StaffReportsPanel = () => {
       };
 
       // Convert relative image URLs to absolute URLs for PDF
-      const absoluteImageUrls = (report.image_urls || []).map(url => getImageUrl(url));
+      const absoluteImageUrls = (report.image_urls || []).map((url) =>
+        getImageUrl(url),
+      );
 
       const doc = (
         <ProjectReportPDF
@@ -356,12 +367,12 @@ const StaffReportsPanel = () => {
       formData.append('current_progress', completionRate);
       formData.append('payment_requested', releasedAmount);
       formData.append('report_description', reportValue);
-      
+
       // Append multiple images with their comments
       reportImages.forEach((image, index) => {
         formData.append(`images`, image);
       });
-      
+
       // Append image comments as JSON
       formData.append('image_comments', JSON.stringify(imageComments));
 
@@ -456,46 +467,71 @@ const StaffReportsPanel = () => {
   ];
 
   // Project List View
-  const ProjectListView = () => (
-    <div>
-      <div className="mb-4">
-        <h2 className="m-0">Select a Project</h2>
-        <p className="text-color-secondary m-0">
-          Click on a project to view reports and generate new ones
-        </p>
-      </div>
+  const renderProjectListView = () => {
+    const filteredProjects = projects.filter((project) =>
+      project.project_name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
 
-      <div className="grid">
-        {projects.map((project) => (
-          <div key={project.project_id} className="col-12 md:col-6 lg:col-4">
-            <Card
-              className="cursor-pointer hover:shadow-2 transition-duration-150"
+    return (
+      <div>
+        <div className="reports-section-header">
+          <div className="reports-header-content">
+            <div>
+              <h2>PROJECT REPORTS</h2>
+              <p>
+                Select a project to access and generate comprehensive reports
+              </p>
+            </div>
+            <div className="reports-search-box">
+              <i className="pi pi-search"></i>
+              <InputText
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="reports-search-input"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="reports-grid">
+          {filteredProjects.map((project) => (
+            <div
+              key={project.project_id}
+              className="reports-card"
               onClick={() => handleProjectClick(project)}
             >
-              <div className="flex flex-column gap-3">
-                <div className="flex justify-content-between align-items-start">
-                  <h3 className="m-0 text-lg">{project.project_name}</h3>
-                  <Badge
-                    value={
-                      recentReports.filter(
-                        (r) => r.project_id === project.project_id,
-                      ).length
-                    }
-                    severity="info"
-                  />
-                </div>
+              <h3>
+                {project.project_name}
+                <span className="reports-card-report-count">
+                  {
+                    recentReports.filter(
+                      (r) => r.project_id === project.project_id,
+                    ).length
+                  }{' '}
+                  times generated
+                </span>
+              </h3>
 
-                <div className="flex flex-column gap-2">
-                  <div className="flex justify-content-between">
-                    <span className="font-bold">Client:</span>
-                    <span>{getClientName(project.client_id)}</span>
-                  </div>
-                  <div className="flex justify-content-between">
-                    <span className="font-bold">Budget:</span>
-                    <span>{formatCurrency(project.total_amount)}</span>
-                  </div>
-                  <div className="flex justify-content-between">
-                    <span className="font-bold">Status:</span>
+              <div className="reports-card-section">
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Client:</span>
+                  <span className="reports-card-value">
+                    {getClientName(project.client_id)}
+                  </span>
+                </div>
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Budget:</span>
+                  <span className="reports-card-value">
+                    {formatCurrency(project.total_amount)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="reports-card-section">
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Status:</span>
+                  <span className="reports-card-value">
                     <Tag
                       value={project.project_status || 'Active'}
                       severity={
@@ -504,22 +540,30 @@ const StaffReportsPanel = () => {
                           : 'info'
                       }
                     />
-                  </div>
-                </div>
-
-                <div className="mt-2 pt-2 border-top-1">
-                  <div className="flex justify-content-between text-sm">
-                    <span>Start: {formatDate(project.project_start_date)}</span>
-                    <span>End: {formatDate(project.project_deadline)}</span>
-                  </div>
+                  </span>
                 </div>
               </div>
-            </Card>
-          </div>
-        ))}
+
+              <div className="reports-card-section">
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Start Date:</span>
+                  <span className="reports-card-value">
+                    {formatDate(project.project_start_date)}
+                  </span>
+                </div>
+                <div className="reports-card-item">
+                  <span className="reports-card-label">End Date:</span>
+                  <span className="reports-card-value">
+                    {formatDate(project.project_deadline)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Project Detail View (when project is selected)
   const ProjectDetailView = () => (
@@ -601,13 +645,19 @@ const StaffReportsPanel = () => {
                         <div className="flex align-items-center gap-2 p-2 surface-100 border-round">
                           <i className="pi pi-paperclip text-lg" />
                           <span className="font-bold">
-                            Attachments: {report.image_urls.length} image{report.image_urls.length !== 1 ? 's' : ''}
+                            Attachments: {report.image_urls.length} image
+                            {report.image_urls.length !== 1 ? 's' : ''}
                           </span>
                           <Button
                             label="View Images"
                             icon="pi pi-eye"
                             className="p-button-sm p-button-text"
-                            onClick={() => handleViewImages(report.image_urls, report.image_comments)}
+                            onClick={() =>
+                              handleViewImages(
+                                report.image_urls,
+                                report.image_comments,
+                              )
+                            }
                           />
                         </div>
                       )}
@@ -761,10 +811,10 @@ const StaffReportsPanel = () => {
   );
 
   return (
-    <div className="p-4">
+    <div className="reports-container">
       <Toast ref={toast} />
 
-      {!selectedProject ? <ProjectListView /> : <ProjectDetailView />}
+      {!selectedProject ? renderProjectListView() : <ProjectDetailView />}
 
       {/* Report Generation Modal */}
       <Dialog
@@ -899,18 +949,26 @@ const StaffReportsPanel = () => {
                   className="w-full"
                 />
                 <small className="text-color-secondary block mt-1">
-                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image). You can select multiple images.
+                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image).
+                  You can select multiple images.
                 </small>
               </div>
 
               {imagePreviews.length > 0 && (
                 <div className="col-12">
-                  <h5 className="m-0 mb-3">Image Previews ({imagePreviews.length})</h5>
+                  <h5 className="m-0 mb-3">
+                    Image Previews ({imagePreviews.length})
+                  </h5>
                   <div className="grid">
                     {imagePreviews.map((preview, index) => (
                       <div key={index} className="col-12 md:col-6 lg:col-4">
                         <div className="border-1 surface-border border-round p-2">
-                          <div style={{ position: 'relative', marginBottom: '8px' }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              marginBottom: '8px',
+                            }}
+                          >
                             <img
                               src={preview}
                               alt={`Report preview ${index + 1}`}
@@ -933,11 +991,15 @@ const StaffReportsPanel = () => {
                               onClick={() => removeImage(index)}
                             />
                           </div>
-                          <small className="text-color-secondary block mb-2">Image {index + 1}</small>
+                          <small className="text-color-secondary block mb-2">
+                            Image {index + 1}
+                          </small>
                           <InputTextarea
                             placeholder="Add a comment for this image..."
                             value={imageComments[index] || ''}
-                            onChange={(e) => updateImageComment(index, e.target.value)}
+                            onChange={(e) =>
+                              updateImageComment(index, e.target.value)
+                            }
                             rows={2}
                             className="w-full"
                             style={{ fontSize: '12px' }}
@@ -1000,12 +1062,15 @@ const StaffReportsPanel = () => {
                   />
                   <div className="p-3 surface-50">
                     <div className="mb-2 text-center">
-                      <small className="text-color-secondary font-bold">Image {index + 1}</small>
+                      <small className="text-color-secondary font-bold">
+                        Image {index + 1}
+                      </small>
                     </div>
                     {selectedImageComments[index] && (
                       <div className="p-2 surface-100 border-round-sm">
                         <small className="text-color-secondary">
-                          <strong>Comment:</strong> {selectedImageComments[index]}
+                          <strong>Comment:</strong>{' '}
+                          {selectedImageComments[index]}
                         </small>
                       </div>
                     )}

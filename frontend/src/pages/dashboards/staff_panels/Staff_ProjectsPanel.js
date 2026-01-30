@@ -75,7 +75,9 @@ const ProjectsPanel = () => {
   const getClientName = (clientId) => {
     if (!clientId) return '';
     const client = clients.find((c) => c.user_id === clientId);
-    return client ? `${client.first_name} ${client.last_name}`.toLowerCase() : '';
+    return client
+      ? `${client.first_name} ${client.last_name}`.toLowerCase()
+      : '';
   };
 
   // Filter projects based on search query
@@ -179,7 +181,9 @@ const ProjectsPanel = () => {
         (user) => user.user_role === 'contractor',
       );
       setContractors(contractorsList);
-      const clientsList = response.data.filter((user) => user.user_role === 'client');
+      const clientsList = response.data.filter(
+        (user) => user.user_role === 'client',
+      );
       setClients(clientsList);
     } catch (error) {
       console.error('Failed to fetch contractors:', error);
@@ -311,6 +315,7 @@ const ProjectsPanel = () => {
         total_amount: editingProject.amount,
         project_deadline: editingProject.dueDate,
         client_id: editingProject.client_id,
+        contractor_id: editingProject.contractor_id,
       });
 
       setDisplayEditDialog(false);
@@ -368,7 +373,6 @@ const ProjectsPanel = () => {
       },
     });
   };
-
 
   // Contractor name template
   const contractorTemplate = (rowData) => {
@@ -428,50 +432,8 @@ const ProjectsPanel = () => {
             }}
           >
             <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
-              {viewMode === 'active' ? 'Active Projects' : 'Recycle Bin'}
+              Projects
             </h3>
-            <div
-              className="project-panel-switch"
-              style={{
-                marginBottom: '12px',
-                paddingLeft: '16px',
-                paddingRight: '16px',
-                paddingTop: '12px',
-              }}
-            >
-              {/* <Button
-                label="Active Projects"
-                icon="pi pi-folder"
-                severity={viewMode === 'active' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('active');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'active'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'active'}
-                outlined={viewMode !== 'active'}
-              /> */}
-              {/* <Button
-                label={`Recycle Bin (${projects.filter((p) => p.isDeleted).length})`}
-                icon="pi pi-trash"
-                severity={viewMode === 'deleted' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('deleted');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'deleted'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'deleted'}
-                outlined={viewMode !== 'deleted'}
-              /> */}
-            </div>
           </div>
         </div>
 
@@ -497,11 +459,7 @@ const ProjectsPanel = () => {
               <i className="pi pi-search" />
             </span>
             <InputText
-              placeholder={
-                viewMode === 'active'
-                  ? 'Search projects by name, description, contractor, amount...'
-                  : 'Search deleted projects...'
-              }
+              placeholder="Search projects by name, description, contractor, amount..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ flex: '1' }}
@@ -518,15 +476,6 @@ const ProjectsPanel = () => {
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: '8px' }}>
-            {viewMode === 'active' && (
-              <Button
-                label="Add New Project"
-                icon="pi pi-plus"
-                severity="info"
-                onClick={() => setDisplayDialog(true)}
-                className="add-user-btn"
-              />
-            )}
             {searchQuery && (
               <Button
                 label={`${filteredProjects.length} result${filteredProjects.length !== 1 ? 's' : ''} found`}
@@ -546,13 +495,7 @@ const ProjectsPanel = () => {
           rows={10}
           rowsPerPageOptions={[5, 10, 20, 50]}
           tableStyle={{ minWidth: '50rem' }}
-          emptyMessage={
-            searchQuery
-              ? 'No projects match your search criteria.'
-              : viewMode === 'active'
-                ? 'No projects found.'
-                : 'Recycle bin is empty.'
-          }
+          emptyMessage="No projects found."
           responsiveLayout="scroll"
           style={{
             border: '1px solid #e5e7eb',
@@ -588,11 +531,7 @@ const ProjectsPanel = () => {
             body={dateTemplate}
             sortable
           />
-          <Column
-            field="client_id"
-            header="Client"
-            body={clientTemplate}
-          />
+          <Column field="client_id" header="Client" body={clientTemplate} />
           <Column
             field="contractor_id"
             header="Contractor"
@@ -603,33 +542,11 @@ const ProjectsPanel = () => {
             header="Actions"
             body={(rowData) => (
               <div style={{ display: 'flex', gap: '8px' }}>
-                {viewMode === 'active' ? (
-                  <>
-                    <Button
-                      icon="pi pi-pencil"
-                      className="p-button-rounded p-button-sm p-button-warning user-action-btn"
-                      onClick={() => openEditDialog(rowData)}
-                    />
-                    {/* <Button
-                      icon="pi pi-trash"
-                      className="p-button-rounded p-button-sm p-button-danger user-action-btn"
-                      onClick={() => handleDeleteProject(rowData)}
-                    /> */}
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      icon="pi pi-refresh"
-                      className="p-button-rounded p-button-sm p-button-success user-action-btn"
-                      onClick={() => handleRestoreProject(rowData)}
-                    />
-                    {/* <Button
-                      icon="pi pi-times"
-                      className="p-button-rounded p-button-sm p-button-danger user-action-btn"
-                      onClick={() => handlePermanentDeleteProject(rowData)}
-                    /> */}
-                  </>
-                )}
+                <Button
+                  icon="pi pi-pencil"
+                  className="p-button-rounded p-button-sm p-button-warning user-action-btn"
+                  onClick={() => openEditDialog(rowData)}
+                />
               </div>
             )}
           />
@@ -737,7 +654,9 @@ const ProjectsPanel = () => {
           <Dropdown
             id="project-client"
             value={newProject.client_id}
-            onChange={(e) => setNewProject({ ...newProject, client_id: e.value })}
+            onChange={(e) =>
+              setNewProject({ ...newProject, client_id: e.value })
+            }
             options={clients}
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"

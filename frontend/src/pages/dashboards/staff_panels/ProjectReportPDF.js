@@ -1,4 +1,12 @@
-import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Font,
+  Image,
+} from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
   page: { padding: 40, backgroundColor: '#fff', fontFamily: 'Helvetica' },
@@ -7,10 +15,15 @@ const styles = StyleSheet.create({
     padding: 15,
     display: 'flex',
     flexDirection: 'column',
-    gap: 10
+    gap: 10,
   },
   title: { fontSize: 16, marginBottom: 10, fontWeight: 'bold' },
-  sectionTitle: { fontSize: 12, marginTop: 10, fontWeight: 'bold', textDecoration: 'underline' },
+  sectionTitle: {
+    fontSize: 12,
+    marginTop: 10,
+    fontWeight: 'bold',
+    textDecoration: 'underline',
+  },
   text: { fontSize: 11, marginBottom: 5 },
   progressBarContainer: {
     height: 12,
@@ -44,34 +57,75 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: '#007ad9',
     marginBottom: 10,
-  }
+  },
 });
 
-export const ProjectReportPDF = ({ data, clientName, contractorName, completionRate, reportDates, imageUrls, imageComments }) => {
-  const parsedComments = imageComments ? JSON.parse(imageComments) : [];
+export const ProjectReportPDF = ({
+  data,
+  clientName,
+  contractorName,
+  completionRate,
+  reportDates,
+  imageUrls,
+  imageComments,
+  reportDescription,
+}) => {
+  const parsedComments = imageComments
+    ? typeof imageComments === 'string'
+      ? JSON.parse(imageComments)
+      : imageComments
+    : [];
+  const formatAmount = (value) => {
+    const num = Number(value || 0);
+    const fixed = num.toFixed(2);
+    const [intPart, decPart] = fixed.split('.');
+    const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${withCommas}.${decPart}`;
+  };
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.container}>
           <Text style={styles.title}>Report Preview</Text>
-          
+
           <Text style={styles.text}>Client: {clientName}</Text>
           <Text style={styles.text}>PN: {data?.project_name}</Text>
           <Text style={styles.text}>Contractor: {contractorName}</Text>
           <Text style={styles.text}>
-            Allocated Budget: ₱{Number(data?.total_amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            {'Contract Amount: PHP ' +
+              formatAmount(data?.contract_amount ?? data?.total_amount ?? 0)}
           </Text>
-          <Text style={styles.text}>Project Start: {reportDates.projectStart}</Text>
-          <Text style={styles.text}>Project End: {reportDates.projectEnd}</Text>
+          <Text style={styles.text}>
+            {'Total Spent: PHP ' +
+              formatAmount(data?.total_amount_released ?? 0)}
+          </Text>
+          <Text style={styles.text}>
+            {'Remaining Balance: PHP ' +
+              formatAmount(
+                (data?.contract_amount ?? data?.total_amount ?? 0) -
+                  (data?.total_amount_released ?? 0),
+              )}
+          </Text>
+          <Text style={styles.text}>
+            Report Start: {reportDates.reportStart}
+          </Text>
+          <Text style={styles.text}>Report End: {reportDates.reportEnd}</Text>
 
-          <Text style={styles.sectionTitle}>Report Generation for the Month/s of:</Text>
-          <Text style={styles.text}>Report Start Date: {reportDates.reportStart}</Text>
-          <Text style={styles.text}>Report End Date: {reportDates.reportEnd}</Text>
-          
-          <Text style={[styles.text, { marginTop: 10 }]}>Completion Rate: {completionRate}%</Text>
+          <Text style={styles.sectionTitle}>Report Period</Text>
+
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.text}>
+            {reportDescription || 'No description'}
+          </Text>
+
+          <Text style={[styles.text, { marginTop: 10 }]}>
+            Completion Rate: {completionRate}%
+          </Text>
           <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBarFill, { width: `${completionRate}%` }]} />
+            <View
+              style={[styles.progressBarFill, { width: `${completionRate}%` }]}
+            />
           </View>
 
           {imageUrls && imageUrls.length > 0 && (

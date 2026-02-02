@@ -6,6 +6,7 @@ import {
   View,
   StyleSheet,
   PDFDownloadLink,
+  pdf,
 } from '@react-pdf/renderer';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -24,30 +25,25 @@ import { Slider } from 'primereact/slider';
 import { Divider } from 'primereact/divider';
 import { ProgressBar } from 'primereact/progressbar';
 import { Card } from 'primereact/card';
-import { Toolbar } from 'primereact/toolbar';
 import { TabView, TabPanel } from 'primereact/tabview';
-import { Badge } from 'primereact/badge';
-import { Skeleton } from 'primereact/skeleton';
 import { Menu } from 'primereact/menu';
-import { SplitButton } from 'primereact/splitbutton';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { pdf } from '@react-pdf/renderer';
 import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF';
 import api from '../../../services/api';
 import './ReportsPanel.css';
 
-const StaffReportsPanel = () => {
+const ReportsPanel = () => {
   const [projects, setProjects] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [clients, setClients] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [completionRate, setCompletionRate] = useState(0);
+  const [minCompletionRate, setMinCompletionRate] = useState(0);
   const [releasedAmount, setReleasedAmount] = useState(0);
   const [reportValue, setReportValue] = useState('');
   const [reportStartDate, setReportStartDate] = useState(null);
   const [reportEndDate, setReportEndDate] = useState(null);
+  const [isPaymentTriggered, setIsPaymentTriggered] = useState(false);
   const [recentReports, setRecentReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -60,6 +56,7 @@ const StaffReportsPanel = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const toast = useRef(null);
   const menuRefs = useRef({});
+  const statusSyncRef = useRef(new Set());
 
   // Get base URL for images
   const getImageUrl = (imagePath) => {
@@ -128,6 +125,48 @@ const StaffReportsPanel = () => {
   }, []);
 
   useEffect(() => {
+    if (!projects.length || !recentReports.length) return;
+
+    const maxProgressByProject = recentReports.reduce((acc, report) => {
+      const projectId = report.project_id;
+      const progress = Number(report.current_progress || 0);
+      const currentMax = acc.get(projectId) || 0;
+      if (progress > currentMax) acc.set(projectId, progress);
+      return acc;
+    }, new Map());
+
+    const toUpdate = projects.filter((project) => {
+      const maxProgress = maxProgressByProject.get(project.project_id) || 0;
+      return (
+        maxProgress >= 100 &&
+        project.project_status !== 'Done' &&
+        !statusSyncRef.current.has(project.project_id)
+      );
+    });
+
+    if (!toUpdate.length) return;
+
+    toUpdate.forEach((project) =>
+      statusSyncRef.current.add(project.project_id),
+    );
+
+    Promise.all(
+      toUpdate.map((project) =>
+        api.patch(`/projects/${project.project_id}`, {
+          project_status: 'Done',
+        }),
+      ),
+    )
+      .then(() => fetchProjects())
+      .catch((error) => {
+        console.error('Error syncing completed projects:', error);
+        toUpdate.forEach((project) =>
+          statusSyncRef.current.delete(project.project_id),
+        );
+      });
+  }, [projects, recentReports]);
+
+  useEffect(() => {
     if (selectedProject) {
       const filtered = recentReports.filter(
         (report) => report.project_id === selectedProject.project_id,
@@ -142,12 +181,87 @@ const StaffReportsPanel = () => {
     }
   }, [selectedProject, recentReports]);
 
+  useEffect(() => {
+    if (!selectedProject) return;
+
+    const projectReports = recentReports.filter(
+      (report) => report.project_id === selectedProject.project_id,
+    );
+    const totalAmountReleased = projectReports.reduce(
+      (sum, report) => sum + (Number(report.payment_requested) || 0),
+      0,
+    );
+
+    const currentTotalReleased = Number(
+      selectedProject?.total_amount_released || 0,
+    );
+
+    if (currentTotalReleased !== totalAmountReleased) {
+      setSelectedProject((prev) => ({
+        ...prev,
+        total_amount_released: totalAmountReleased,
+      }));
+    }
+  }, [selectedProject?.project_id, recentReports]);
+
+  useEffect(() => {
+    // Force progress bar color override - PrimeReact applies inline styles
+    const forceColorOverride = () => {
+      const progressBars = document.querySelectorAll(
+        '.report-progress-bar .p-progressbar-value',
+      );
+      progressBars.forEach((bar) => {
+        bar.style.setProperty('background-color', '#4f4d36', 'important');
+      });
+    };
+
+    // Apply immediately
+    forceColorOverride();
+
+    // Apply after short delay for newly rendered bars
+    const timer1 = setTimeout(forceColorOverride, 50);
+    const timer2 = setTimeout(forceColorOverride, 100);
+    const timer3 = setTimeout(forceColorOverride, 200);
+
+    // Watch for new DOM nodes being added and apply color
+    const observer = new MutationObserver(() => {
+      forceColorOverride();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      observer.disconnect();
+    };
+  }, [filteredReports]);
+
   const showToast = (severity, summary, detail) => {
     toast.current.show({ severity, summary, detail, life: 3000 });
   };
 
   const handleProjectClick = (project) => {
-    setSelectedProject(project);
+    // Calculate total amount released from all reports for this project
+    const projectReports = recentReports.filter(
+      (report) => report.project_id === project.project_id,
+    );
+    const totalAmountReleased = projectReports.reduce(
+      (sum, report) => sum + (Number(report.payment_requested) || 0),
+      0,
+    );
+
+    // Enrich project with calculated field
+    const enrichedProject = {
+      ...project,
+      total_amount_released: totalAmountReleased,
+    };
+
+    setSelectedProject(enrichedProject);
   };
 
   const handleBackToList = () => {
@@ -155,8 +269,38 @@ const StaffReportsPanel = () => {
     setFilteredReports([]);
   };
 
+  const isProjectLocked = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    return (
+      normalized === 'hold' ||
+      normalized === 'on_hold' ||
+      normalized === 'done' ||
+      normalized === 'completed' ||
+      normalized === 'cancelled'
+    );
+  };
+
   const handleGenerateClick = () => {
+    if (isProjectLocked(selectedProject?.project_status)) {
+      showToast(
+        'warn',
+        'Not Allowed',
+        'Reports cannot be generated for projects on Hold or Done.',
+      );
+      return;
+    }
     resetForm();
+    // Get the highest completion rate from previous reports for this project
+    const projectReports = recentReports.filter(
+      (report) => report.project_id === selectedProject.project_id,
+    );
+    const maxPreviousCompletion =
+      projectReports.length > 0
+        ? Math.max(...projectReports.map((r) => r.current_progress || 0))
+        : 0;
+
+    setMinCompletionRate(maxPreviousCompletion);
+    setCompletionRate(maxPreviousCompletion);
     setShowReportModal(true);
   };
 
@@ -166,6 +310,7 @@ const StaffReportsPanel = () => {
     setReportValue('');
     setReportStartDate(null);
     setReportEndDate(null);
+    setIsPaymentTriggered(false);
     setReportImages([]);
     setImagePreviews([]);
     setImageComments([]);
@@ -229,9 +374,90 @@ const StaffReportsPanel = () => {
     setShowImageModal(true);
   };
 
+  const handlePaymentToggle = async (reportId, checked) => {
+    try {
+      await api.patch(`/reports/${reportId}`, {
+        payment_triggered: checked,
+      });
+
+      setRecentReports((prev) =>
+        prev.map((report) =>
+          report.report_id === reportId
+            ? { ...report, payment_triggered: checked }
+            : report,
+        ),
+      );
+
+      showToast(
+        'success',
+        'Updated',
+        checked ? 'Marked as Paid' : 'Marked as Pending',
+      );
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      showToast('error', 'Error', 'Failed to update payment status');
+    }
+  };
+
   const handleSubmitReport = async () => {
+    if (isProjectLocked(selectedProject?.project_status)) {
+      showToast(
+        'warn',
+        'Not Allowed',
+        'Reports cannot be generated for projects on Hold or Done.',
+      );
+      return;
+    }
+    // Validate dates are selected
     if (!reportStartDate || !reportEndDate) {
-      showToast('warn', 'Warning', 'Please select report start and end dates');
+      showToast('warn', 'Warning', 'Please select both start and end dates');
+      return;
+    }
+
+    // Validate start date is before end date
+    if (new Date(reportStartDate) > new Date(reportEndDate)) {
+      showToast('error', 'Error', 'Start date must be before end date');
+      return;
+    }
+
+    // Validate completion rate is set and valid
+    if (completionRate === null || completionRate === undefined) {
+      showToast('warn', 'Warning', 'Please set a completion rate');
+      return;
+    }
+
+    if (completionRate < 0 || completionRate > 100) {
+      showToast('error', 'Error', 'Completion rate must be between 0 and 100');
+      return;
+    }
+
+    // Validate report description is not empty
+    if (!reportValue || reportValue.trim() === '') {
+      showToast('warn', 'Warning', 'Please enter a report description');
+      return;
+    }
+
+    // Validate payment amount is required
+    if (!releasedAmount || releasedAmount <= 0) {
+      showToast(
+        'warn',
+        'Warning',
+        'Please enter a payment amount greater than 0',
+      );
+      return;
+    }
+
+    // Validate payment amount doesn't exceed remaining balance
+    const contractAmount = Number(selectedProject?.total_amount) || 0;
+    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+    const amountToRelease = Number(releasedAmount) || 0;
+    const remainingBalance = contractAmount - totalReleased;
+    if (amountToRelease > remainingBalance) {
+      showToast(
+        'error',
+        'Error',
+        `Payment exceeds remaining balance of ${formatCurrency(remainingBalance)}`,
+      );
       return;
     }
 
@@ -258,6 +484,7 @@ const StaffReportsPanel = () => {
 
   const downloadReportPDF = async (report) => {
     try {
+      console.log('Report object:', report); // Debug log
       const project = projects.find((p) => p.project_id === report.project_id);
       if (!project) {
         showToast('error', 'Error', 'Project not found');
@@ -273,10 +500,14 @@ const StaffReportsPanel = () => {
           : '',
         reportStart: report.start_date
           ? new Date(report.start_date).toLocaleDateString()
-          : '',
+          : report.report_date
+            ? new Date(report.report_date).toLocaleDateString()
+            : 'N/A',
         reportEnd: report.end_date
           ? new Date(report.end_date).toLocaleDateString()
-          : '',
+          : report.report_date
+            ? new Date(report.report_date).toLocaleDateString()
+            : 'N/A',
       };
 
       // Convert relative image URLs to absolute URLs for PDF
@@ -284,15 +515,32 @@ const StaffReportsPanel = () => {
         getImageUrl(url),
       );
 
+      // Calculate total spent only for reports up to and including this report
+      const reportDate = new Date(report.created_at || report.start_date);
+      const projectReports = recentReports.filter(
+        (r) =>
+          r.project_id === report.project_id &&
+          new Date(r.created_at || r.start_date) <= reportDate,
+      );
+      const totalSpent = projectReports.reduce(
+        (sum, r) => sum + (Number(r.payment_requested) || 0),
+        0,
+      );
+      const enrichedProject = {
+        ...project,
+        total_amount_released: totalSpent,
+      };
+
       const doc = (
         <ProjectReportPDF
-          data={project}
+          data={enrichedProject}
           clientName={getClientName(project.client_id)}
           contractorName={getContractorName(project.contractor_id)}
           completionRate={report.current_progress || 0}
           reportDates={reportDates}
           imageUrls={absoluteImageUrls}
           imageComments={report.image_comments}
+          reportDescription={report.report_description}
         />
       );
 
@@ -320,14 +568,24 @@ const StaffReportsPanel = () => {
         return;
       }
 
+      const projectReports = recentReports.filter(
+        (r) => r.project_id === report.project_id,
+      );
+      const totalSpent = projectReports.reduce(
+        (sum, r) => sum + (Number(r.payment_requested) || 0),
+        0,
+      );
+      const contractAmount = Number(project.total_amount) || 0;
+      const remainingBalance = contractAmount - totalSpent;
+
       const rows = [
         ['Field', 'Value'],
         ['Project Name', project.project_name],
         ['Client', getClientName(project.client_id)],
         ['Contractor', getContractorName(project.contractor_id)],
-        ['Allocated Budget', `₱${project.total_amount}`],
-        ['Project Start Date', formatDate(project.project_start_date)],
-        ['Project End Date', formatDate(project.project_deadline)],
+        ['Contract Amount', `₱${contractAmount}`],
+        ['Total Spent', `₱${totalSpent}`],
+        ['Remaining Balance', `₱${remainingBalance}`],
         ['Report Start Date', formatDate(report.start_date)],
         ['Report End Date', formatDate(report.end_date)],
         ['Completion Rate', `${report.current_progress || 0}%`],
@@ -362,10 +620,21 @@ const StaffReportsPanel = () => {
     try {
       const formData = new FormData();
       formData.append('project_id', selectedProject.project_id);
-      formData.append('start_date', reportStartDate);
-      formData.append('end_date', reportEndDate);
+
+      // Format dates properly for database
+      if (reportStartDate) {
+        const startDateStr = reportStartDate.toISOString().split('T')[0];
+        formData.append('start_date', startDateStr);
+      }
+
+      if (reportEndDate) {
+        const endDateStr = reportEndDate.toISOString().split('T')[0];
+        formData.append('end_date', endDateStr);
+      }
+
       formData.append('current_progress', completionRate);
       formData.append('payment_requested', releasedAmount);
+      formData.append('payment_triggered', isPaymentTriggered);
       formData.append('report_description', reportValue);
 
       // Append multiple images with their comments
@@ -376,11 +645,27 @@ const StaffReportsPanel = () => {
       // Append image comments as JSON
       formData.append('image_comments', JSON.stringify(imageComments));
 
-      await api.post('/reports', formData, {
+      const response = await api.post('/reports', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+
+      // If completion rate is 100%, automatically set project status to Done
+      if (Number(completionRate) >= 100) {
+        try {
+          await api.patch(`/projects/${selectedProject.project_id}`, {
+            project_status: 'Done',
+          });
+          setSelectedProject((prev) =>
+            prev ? { ...prev, project_status: 'Done' } : prev,
+          );
+          fetchProjects();
+        } catch (error) {
+          console.error('Error updating project status:', error);
+        }
+      }
+
       fetchRecentReports();
     } catch (error) {
       console.error('Error logging report generation:', error);
@@ -439,7 +724,16 @@ const StaffReportsPanel = () => {
     {
       label: 'Regenerate',
       icon: 'pi pi-refresh',
+      disabled: isProjectLocked(selectedProject?.project_status),
       command: () => {
+        if (isProjectLocked(selectedProject?.project_status)) {
+          showToast(
+            'warn',
+            'Not Allowed',
+            'Reports cannot be generated for projects on Hold or Done.',
+          );
+          return;
+        }
         setCompletionRate(report.current_progress || 0);
         setReleasedAmount(report.payment_requested || 0);
         setReportValue(report.report_description || '');
@@ -447,6 +741,7 @@ const StaffReportsPanel = () => {
           report.start_date ? new Date(report.start_date) : null,
         );
         setReportEndDate(report.end_date ? new Date(report.end_date) : null);
+        setIsPaymentTriggered(!!report.payment_triggered);
         setReportImages([]);
         setImagePreviews([]);
         setShowReportModal(true);
@@ -515,31 +810,34 @@ const StaffReportsPanel = () => {
 
               <div className="reports-card-section">
                 <div className="reports-card-item">
-                  <span className="reports-card-label">Client:</span>
+                  <span className="reports-card-label">Status:</span>
                   <span className="reports-card-value">
-                    {getClientName(project.client_id)}
-                  </span>
-                </div>
-                <div className="reports-card-item">
-                  <span className="reports-card-label">Budget:</span>
-                  <span className="reports-card-value">
-                    {formatCurrency(project.total_amount)}
+                    <Tag
+                      value={project.project_status || 'Ongoing'}
+                      severity={
+                        project.project_status === 'Done'
+                          ? 'success'
+                          : project.project_status === 'Hold'
+                            ? 'warning'
+                            : 'info'
+                      }
+                      style={{ fontSize: '12px', fontWeight: 'bold' }}
+                    />
                   </span>
                 </div>
               </div>
 
               <div className="reports-card-section">
                 <div className="reports-card-item">
-                  <span className="reports-card-label">Status:</span>
+                  <span className="reports-card-label">Client:</span>
                   <span className="reports-card-value">
-                    <Tag
-                      value={project.project_status || 'Active'}
-                      severity={
-                        project.project_status === 'Completed'
-                          ? 'success'
-                          : 'info'
-                      }
-                    />
+                    {getClientName(project.client_id)}
+                  </span>
+                </div>
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Contractor:</span>
+                  <span className="reports-card-value">
+                    {getContractorName(project.contractor_id)}
                   </span>
                 </div>
               </div>
@@ -555,6 +853,15 @@ const StaffReportsPanel = () => {
                   <span className="reports-card-label">End Date:</span>
                   <span className="reports-card-value">
                     {formatDate(project.project_deadline)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="reports-card-section">
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Budget:</span>
+                  <span className="reports-card-value">
+                    {formatCurrency(project.total_amount)}
                   </span>
                 </div>
               </div>
@@ -584,11 +891,13 @@ const StaffReportsPanel = () => {
               {getContractorName(selectedProject.contractor_id)}
             </p>
           </div>
-          <Button
-            label="Generate New Report"
-            onClick={handleGenerateClick}
-            className="ml-4 p-button-primary"
-          />
+          {!isProjectLocked(selectedProject?.project_status) && (
+            <Button
+              label="Generate New Report"
+              onClick={handleGenerateClick}
+              className="ml-4 p-button-primary"
+            />
+          )}
         </div>
       </div>
 
@@ -615,33 +924,38 @@ const StaffReportsPanel = () => {
                             )}
                           </small>
                         </div>
-                        <div className="flex gap-1 items-center">
-                          <Tag
-                            value={`${report.current_progress}%`}
-                            severity="info"
-                            className="mr-2"
-                          />
-                          <Button
-                            icon="pi pi-ellipsis-v"
-                            className="p-button-rounded p-button-text p-button-sm"
-                            onClick={(e) => {
-                              if (!menuRefs.current[index]) {
-                                menuRefs.current[index] = React.createRef();
-                              }
-                              menuRefs.current[index].current.toggle(e);
-                            }}
-                            aria-label="Actions"
-                          />
-                          <Menu
-                            model={getMenuItems(report)}
-                            popup
-                            ref={
-                              menuRefs.current[index] ||
-                              (menuRefs.current[index] = React.createRef())
+                        <Button
+                          icon="pi pi-ellipsis-v"
+                          className="p-button-rounded p-button-text p-button-sm"
+                          onClick={(e) => {
+                            if (!menuRefs.current[index]) {
+                              menuRefs.current[index] = React.createRef();
                             }
-                            id={`menu_${index}`}
-                          />
+                            menuRefs.current[index].current.toggle(e);
+                          }}
+                          aria-label="Actions"
+                        />
+                        <Menu
+                          model={getMenuItems(report)}
+                          popup
+                          ref={
+                            menuRefs.current[index] ||
+                            (menuRefs.current[index] = React.createRef())
+                          }
+                          id={`menu_${index}`}
+                        />
+                      </div>
+
+                      <div className="completion-progress-section">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-bold text-sm">
+                            Completion Progress
+                          </span>
                         </div>
+                        <ProgressBar
+                          value={report.current_progress}
+                          className="report-progress-bar"
+                        />
                       </div>
 
                       {report.image_urls && report.image_urls.length > 0 && (
@@ -671,8 +985,11 @@ const StaffReportsPanel = () => {
                         <div className="col-6">
                           <span className="font-bold">Period:</span>
                           <p className="m-0 text-sm">
-                            {formatDate(report.start_date)} -{' '}
-                            {formatDate(report.end_date)}
+                            {formatDate(
+                              report.start_date || report.report_date,
+                            )}{' '}
+                            -{' '}
+                            {formatDate(report.end_date || report.report_date)}
                           </p>
                         </div>
                         <div className="col-6">
@@ -680,6 +997,25 @@ const StaffReportsPanel = () => {
                           <p className="m-0 text-sm">
                             {formatCurrency(report.payment_requested)}
                           </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <input
+                              id={`paid-${report.report_id}`}
+                              type="checkbox"
+                              checked={!!report.payment_triggered}
+                              onChange={(e) =>
+                                handlePaymentToggle(
+                                  report.report_id,
+                                  e.target.checked,
+                                )
+                              }
+                            />
+                            <label
+                              htmlFor={`paid-${report.report_id}`}
+                              className="text-sm"
+                            >
+                              Paid
+                            </label>
+                          </div>
                         </div>
                       </div>
 
@@ -743,12 +1079,14 @@ const StaffReportsPanel = () => {
               <p className="text-color-secondary mb-4">
                 Generate the first report for this project
               </p>
-              <Button
-                label="Generate First Report"
-                icon="pi pi-file"
-                onClick={handleGenerateClick}
-                className="p-button-primary"
-              />
+              {!isProjectLocked(selectedProject?.project_status) && (
+                <Button
+                  label="Generate First Report"
+                  icon="pi pi-file"
+                  onClick={handleGenerateClick}
+                  className="p-button-primary"
+                />
+              )}
             </div>
           )}
         </TabPanel>
@@ -772,11 +1110,13 @@ const StaffReportsPanel = () => {
                   <div>
                     <span className="font-bold">Status:</span>
                     <Tag
-                      value={selectedProject.project_status || 'Active'}
+                      value={selectedProject.project_status || 'Ongoing'}
                       severity={
-                        selectedProject.project_status === 'Completed'
+                        selectedProject.project_status === 'Done'
                           ? 'success'
-                          : 'info'
+                          : selectedProject.project_status === 'Hold'
+                            ? 'warning'
+                            : 'info'
                       }
                       className="ml-2"
                     />
@@ -822,160 +1162,429 @@ const StaffReportsPanel = () => {
 
       {/* Report Generation Modal */}
       <Dialog
-        header={`Generate Report - ${selectedProject?.project_name || ''}`}
+        header={null}
         visible={showReportModal}
-        style={{ width: '50vw' }}
+        style={{ width: '70vw', maxHeight: '90vh' }}
         onHide={() => setShowReportModal(false)}
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              className="p-button-text"
-              onClick={() => setShowReportModal(false)}
-            />
-            <Button
-              label={isGenerating ? 'Generating...' : 'Generate Report'}
-              icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
-              onClick={handleSubmitReport}
-              disabled={isGenerating || !reportStartDate || !reportEndDate}
-            />
-          </div>
-        }
       >
         {selectedProject && (
-          <div className="space-y-4">
-            <div className="p-3 surface-50 border-round">
-              <p className="font-bold m-0">
-                Project: {selectedProject.project_name}
-              </p>
-              <p className="m-0 text-sm">Fill in the report details below</p>
-            </div>
+          <div
+            className="report-modal-scroll"
+            style={{
+              maxHeight: 'calc(90vh - 200px)',
+              overflowY: 'auto',
+              padding: '1.5rem 2rem',
+            }}
+          >
+            {/* Project Period Header */}
+            <h3
+              style={{
+                textAlign: 'center',
+                marginBottom: '1.5rem',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+              }}
+            >
+              ACCOMPLISHMENT REPORT
+            </h3>
+            <div style={{ height: '1.5rem' }} />
 
-            <div className="grid">
-              <div className="col-6">
+            {/* Main Two Column Layout */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                columnGap: '2rem',
+                rowGap: '1rem',
+                alignItems: 'start',
+              }}
+            >
+              {/* Row 1 */}
+              <div>
                 <label
-                  htmlFor="report-start-date"
-                  className="font-bold block mb-2"
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Project Name:
+                </label>
+                <InputText
+                  value={selectedProject?.project_name || ''}
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    height: '42px',
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Contract Amount
+                </label>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    border: '1px solid #e5e7eb',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {formatCurrency(selectedProject?.total_amount)}
+                </div>
+              </div>
+
+              {/* Row 2 */}
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Client Name:
+                </label>
+                <InputText
+                  value={getClientName(selectedProject?.client_id) || ''}
+                  disabled
+                  style={{ width: '100%', padding: '0.75rem', height: '42px' }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Total Spent:
+                </label>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    border: '1px solid #e5e7eb',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {formatCurrency(selectedProject?.total_amount_released || 0)}
+                </div>
+              </div>
+
+              {/* Row 3 */}
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Contractor:
+                </label>
+                <InputText
+                  value={
+                    getContractorName(selectedProject?.contractor_id) || ''
+                  }
+                  disabled
+                  style={{ width: '100%', padding: '0.75rem', height: '42px' }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Remaining Balance:
+                </label>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#065f46',
+                    border: '1px solid #86efac',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {formatCurrency(
+                    (Number(selectedProject?.total_amount) || 0) -
+                      (selectedProject?.total_amount_released || 0),
+                  )}
+                </div>
+              </div>
+
+              {/* Row 4 - Report Period */}
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
                 >
                   Report Start Date *
                 </label>
                 <Calendar
-                  id="report-start-date"
                   value={reportStartDate}
                   onChange={(e) => setReportStartDate(e.value)}
+                  placeholder="Start Date"
                   dateFormat="mm/dd/yy"
                   showIcon
-                  className="w-full"
-                  required
+                  style={{ width: '100%' }}
                 />
               </div>
-
-              <div className="col-6">
+              <div>
                 <label
-                  htmlFor="report-end-date"
-                  className="font-bold block mb-2"
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
                 >
                   Report End Date *
                 </label>
                 <Calendar
-                  id="report-end-date"
                   value={reportEndDate}
                   onChange={(e) => setReportEndDate(e.value)}
+                  placeholder="End Date"
                   dateFormat="mm/dd/yy"
                   showIcon
-                  className="w-full"
-                  required
+                  style={{ width: '100%' }}
                 />
               </div>
 
-              <div className="col-12">
+              {/* Row 5 - Amount to Release */}
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                  htmlFor="completion-rate"
-                  className="font-bold block mb-2"
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
                 >
-                  Completion Rate: {completionRate}%
-                </label>
-                <Slider
-                  value={completionRate}
-                  onChange={(e) => setCompletionRate(e.value)}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="col-12">
-                <label
-                  htmlFor="released-amount"
-                  className="font-bold block mb-2"
-                >
-                  Amount to be Released
+                  Amount to be Released *
                 </label>
                 <InputNumber
-                  id="released-amount"
                   value={releasedAmount}
                   onValueChange={(e) => setReleasedAmount(e.value)}
                   prefix="₱"
                   min={0}
-                  mode="currency"
-                  currency="PHP"
+                  mode="decimal"
                   locale="en-PH"
-                  className="w-full"
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                  }}
                 />
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <input
+                    id="payment-triggered"
+                    type="checkbox"
+                    checked={isPaymentTriggered}
+                    onChange={(e) => setIsPaymentTriggered(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="payment-triggered"
+                    style={{ fontSize: '12px' }}
+                  >
+                    Paid
+                  </label>
+                </div>
               </div>
 
-              <div className="col-12">
+              {/* Row 6 - Description */}
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                  htmlFor="report-description"
-                  className="font-bold block mb-2"
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
                 >
-                  Report Description / Notes
+                  Description *
                 </label>
                 <InputTextarea
-                  id="report-description"
                   value={reportValue}
                   onChange={(e) => setReportValue(e.target.value)}
                   rows={4}
-                  className="w-full"
-                  placeholder="Enter accomplishments, challenges, next steps..."
+                  style={{ width: '100%', padding: '0.75rem' }}
+                  placeholder="Enter report description..."
+                />
+              </div>
+            </div>
+
+            {/* Full Width Sections Below */}
+            <div style={{ marginTop: '1.5rem' }}>
+              {/* Completion Rate */}
+              <div
+                style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '4px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  <label style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                    Completion Rate
+                  </label>
+                  <div
+                    style={{
+                      backgroundColor: '#4f4d36',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '4px',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                    }}
+                  >
+                    {completionRate}%
+                  </div>
+                </div>
+                <Slider
+                  value={completionRate}
+                  onChange={(e) =>
+                    setCompletionRate(Math.max(e.value, minCompletionRate))
+                  }
+                  min={minCompletionRate}
+                  max={100}
+                  step={1}
+                  className="completion-rate-slider"
+                  style={{ height: '6px' }}
                 />
               </div>
 
-              <div className="col-12">
-                <label htmlFor="report-images" className="font-bold block mb-2">
-                  Upload Report Images
+              {/* Photo Section */}
+              <div
+                style={{
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '4px',
+                }}
+              >
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.75rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Photo
                 </label>
                 <input
-                  id="report-images"
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={handleImageSelect}
-                  className="w-full"
+                  style={{ width: '100%' }}
                 />
-                <small className="text-color-secondary block mt-1">
-                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image).
-                  You can select multiple images.
+                <small
+                  style={{
+                    color: '#6b7280',
+                    display: 'block',
+                    marginTop: '0.5rem',
+                  }}
+                >
+                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image)
                 </small>
               </div>
 
+              {/* Image Previews */}
               {imagePreviews.length > 0 && (
-                <div className="col-12">
-                  <h5 className="m-0 mb-3">
+                <div
+                  style={{
+                    marginBottom: '1.5rem',
+                    padding: '1rem',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '4px',
+                  }}
+                >
+                  <h5
+                    style={{
+                      marginTop: 0,
+                      marginBottom: '1rem',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                    }}
+                  >
                     Image Previews ({imagePreviews.length})
                   </h5>
                   <div className="grid">
                     {imagePreviews.map((preview, index) => (
                       <div key={index} className="col-12 md:col-6 lg:col-4">
-                        <div className="border-1 surface-border border-round p-2">
+                        <div
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '4px',
+                            padding: '0.75rem',
+                          }}
+                        >
                           <div
                             style={{
                               position: 'relative',
-                              marginBottom: '8px',
+                              marginBottom: '0.5rem',
                             }}
                           >
                             <img
                               src={preview}
-                              alt={`Report preview ${index + 1}`}
+                              alt={`Preview ${index + 1}`}
                               style={{
                                 width: '100%',
                                 height: '180px',
@@ -990,23 +1599,29 @@ const StaffReportsPanel = () => {
                                 position: 'absolute',
                                 top: '5px',
                                 right: '5px',
-                                backgroundColor: 'rgba(255,255,255,0.8)',
+                                backgroundColor: 'rgba(255,255,255,0.9)',
                               }}
                               onClick={() => removeImage(index)}
                             />
                           </div>
-                          <small className="text-color-secondary block mb-2">
+                          <small
+                            style={{
+                              color: '#6b7280',
+                              display: 'block',
+                              marginBottom: '0.5rem',
+                              fontWeight: 'bold',
+                            }}
+                          >
                             Image {index + 1}
                           </small>
                           <InputTextarea
-                            placeholder="Add a comment for this image..."
+                            placeholder="Add a comment..."
                             value={imageComments[index] || ''}
                             onChange={(e) =>
                               updateImageComment(index, e.target.value)
                             }
                             rows={2}
-                            className="w-full"
-                            style={{ fontSize: '12px' }}
+                            style={{ width: '100%', fontSize: '12px' }}
                           />
                         </div>
                       </div>
@@ -1016,28 +1631,29 @@ const StaffReportsPanel = () => {
               )}
             </div>
 
-            {reportStartDate && reportEndDate && (
-              <div className="p-3 border-1 surface-border border-round">
-                <h4 className="mt-0">Preview</h4>
-                <div className="grid">
-                  <div className="col-6">
-                    <p className="m-0">
-                      <strong>Period:</strong> {formatDate(reportStartDate)} -{' '}
-                      {formatDate(reportEndDate)}
-                    </p>
-                    <p className="m-0">
-                      <strong>Completion:</strong> {completionRate}%
-                    </p>
-                  </div>
-                  <div className="col-6">
-                    <p className="m-0">
-                      <strong>Payment:</strong> {formatCurrency(releasedAmount)}
-                    </p>
-                  </div>
-                </div>
-                <ProgressBar value={completionRate} className="mt-3" />
-              </div>
-            )}
+            {/* Generate Button */}
+            <div
+              style={{
+                textAlign: 'center',
+                marginTop: '2rem',
+                paddingBottom: '1rem',
+              }}
+            >
+              <Button
+                label={isGenerating ? 'Generating...' : 'Generate Report'}
+                icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
+                onClick={handleSubmitReport}
+                disabled={isGenerating}
+                style={{
+                  backgroundColor: '#4f4d36',
+                  borderColor: '#4f4d36',
+                  color: 'white',
+                  padding: '0.75rem 2rem',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              />
+            </div>
           </div>
         )}
       </Dialog>
@@ -1094,4 +1710,4 @@ const StaffReportsPanel = () => {
   );
 };
 
-export default StaffReportsPanel;
+export default ReportsPanel;

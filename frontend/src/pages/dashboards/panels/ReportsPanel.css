@@ -343,3 +343,158 @@
 .reports-search-input::placeholder {
   color: #9ca3af;
 }
+
+/* Completion Progress Section in Recent Reports */
+.completion-progress-section {
+  background: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 3px solid #6b7280;
+}
+
+.completion-progress-section .font-bold {
+  font-family: 'Bebas Neue', sans-serif;
+  color: #1f2937;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.875rem;
+}
+
+.report-progress-bar {
+  width: 100%;
+  --progress-color: #4f4d36;
+  --blue-500: #4f4d36 !important;
+  --primary-color: #4f4d36 !important;
+}
+
+.report-progress-bar :deep(.p-progressbar) {
+  height: 8px;
+  background: #e5e7eb !important;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.report-progress-bar :deep(.p-progressbar-value) {
+  background: #4f4d36 !important;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  box-shadow: none;
+  color: #4f4d36 !important;
+  caret-color: #4f4d36 !important;
+}
+
+.report-progress-bar :deep(.p-progressbar span) {
+  background: #4f4d36 !important;
+}
+
+.report-progress-bar :deep(div[style*='width']) {
+  background: #4f4d36 !important;
+}
+
+/* Override PrimeReact theme colors */
+.report-progress-bar :deep(.p-component) {
+  --primary-color: #4f4d36 !important;
+  --blue-500: #4f4d36 !important;
+}
+
+.report-progress-bar :deep(.p-progressbar-value[style]) {
+  background: #4f4d36 !important;
+}
+
+/* Completion Rate Slider - Professional Styling */
+.completion-rate-display {
+  background: #6b7280;
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  min-width: 70px;
+  text-align: center;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+.completion-rate-slider :deep(.p-slider-handle) {
+  background: #4f4d36 !important;
+  border: none !important;
+  width: 24px;
+  height: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 6px rgba(79, 77, 54, 0.3) !important;
+  transition: all 0.3s ease;
+}
+
+.completion-rate-slider :deep(.p-slider-handle:hover) {
+  background: #3d3a2a !important;
+  box-shadow: 0 4px 12px rgba(79, 77, 54, 0.4) !important;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.completion-rate-slider :deep(.p-slider-handle:focus) {
+  outline: 2px solid #4f4d36 !important;
+  outline-offset: 2px;
+}
+
+.completion-rate-slider :deep(.p-slider-bg) {
+  background: #e5e7eb !important;
+  border-radius: 3px !important;
+  height: 6px !important;
+}
+
+.completion-rate-slider :deep(.p-slider-range) {
+  background: #4f4d36 !important;
+  border-radius: 3px !important;
+}
+
+/* Override PrimeReact Slider Theme Color */
+:root {
+  --primary-color: #4f4d36 !important;
+}
+
+.completion-rate-slider .p-slider-handle {
+  background-color: #4f4d36 !important;
+}
+
+.p-slider:not(.p-disabled) .p-slider-handle:hover {
+  background-color: #3d3a2a !important;
+}
+
+.completion-rate-slider .p-slider-range {
+  background: #4f4d36 !important;
+}
+
+/* Custom Scrollbar for Report Modal */
+.report-modal-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.report-modal-scroll::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 5px;
+}
+
+.report-modal-scroll::-webkit-scrollbar-thumb {
+  background: #4f4d36;
+  border-radius: 5px;
+}
+
+.report-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3d3a2a;
+}
+
+/* Calendar Icon Color */
+.p-calendar .p-datepicker-trigger {
+  background-color: #4f4d36;
+  border-color: #4f4d36;
+  color: white;
+}
+
+.p-calendar .p-datepicker-trigger:hover {
+  background-color: #3d3a2a;
+  border-color: #3d3a2a;
+  color: white;
+}

@@ -38,6 +38,7 @@ const ProjectsPanel = () => {
     dueDate: null,
     contractor_id: null,
     client_id: null,
+    project_status: 'Ongoing',
   });
 
   const [editingProject, setEditingProject] = useState({
@@ -48,6 +49,7 @@ const ProjectsPanel = () => {
     dueDate: null,
     contractor_id: null,
     client_id: null,
+    project_status: 'Ongoing',
   });
 
   // ============================================
@@ -216,6 +218,7 @@ const ProjectsPanel = () => {
         project_deadline: newProject.dueDate,
         contractor_id: newProject.contractor_id,
         client_id: newProject.client_id,
+        project_status: 'Ongoing',
       });
 
       setDisplayDialog(false);
@@ -226,6 +229,7 @@ const ProjectsPanel = () => {
         dueDate: null,
         contractor_id: null,
         client_id: null,
+        project_status: 'Ongoing',
       });
 
       toast.current?.show({
@@ -293,6 +297,7 @@ const ProjectsPanel = () => {
         : null,
       contractor_id: project.contractor_id,
       client_id: project.client_id || null,
+      project_status: project.project_status || 'Ongoing',
     });
     setDisplayEditDialog(true);
   };
@@ -317,6 +322,7 @@ const ProjectsPanel = () => {
         project_deadline: editingProject.dueDate,
         client_id: editingProject.client_id,
         contractor_id: editingProject.contractor_id,
+        project_status: editingProject.project_status,
       });
 
       setDisplayEditDialog(false);
@@ -444,6 +450,23 @@ const ProjectsPanel = () => {
 
   // Get filtered projects
   const filteredProjects = getFilteredProjects();
+
+  // Status template
+  const statusTemplate = (rowData) => {
+    return (
+      <Tag
+        value={rowData.project_status || 'Ongoing'}
+        severity={
+          rowData.project_status === 'Done'
+            ? 'success'
+            : rowData.project_status === 'Hold'
+              ? 'warning'
+              : 'info'
+        }
+        style={{ fontSize: '12px', fontWeight: 'bold' }}
+      />
+    );
+  };
 
   // ============================================
   // RENDER
@@ -598,6 +621,18 @@ const ProjectsPanel = () => {
         >
           <Column field="project_name" header="Project Name" sortable />
           <Column
+            field="project_status"
+            header="Status"
+            body={statusTemplate}
+            sortable
+          />
+          <Column field="client_id" header="Client" body={clientTemplate} />
+          <Column
+            field="contractor_id"
+            header="Contractor"
+            body={contractorTemplate}
+          />
+          <Column
             field="project_description"
             header="Description"
             body={(rowData) => (
@@ -624,12 +659,6 @@ const ProjectsPanel = () => {
             header="Due Date"
             body={dateTemplate}
             sortable
-          />
-          <Column field="client_id" header="Client" body={clientTemplate} />
-          <Column
-            field="contractor_id"
-            header="Contractor"
-            body={contractorTemplate}
           />
 
           <Column
@@ -925,6 +954,31 @@ const ProjectsPanel = () => {
             optionLabel={(option) => `${option.first_name} ${option.last_name}`}
             optionValue="user_id"
             placeholder="Select a contractor"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="edit-project-status"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Status
+          </label>
+          <Dropdown
+            id="edit-project-status"
+            value={editingProject.project_status}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, project_status: e.value })
+            }
+            options={[
+              { label: 'Ongoing', value: 'Ongoing' },
+              { label: 'Hold', value: 'Hold' },
+              { label: 'Done', value: 'Done' },
+            ]}
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select status"
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>

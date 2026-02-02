@@ -7,6 +7,10 @@ import {
 } from 'typeorm';
 
 export enum ProjectStatus {
+  ONGOING = 'ongoing',
+  HOLD = 'hold',
+  DONE = 'done',
+  // Legacy values for backward compatibility
   PLANNING = 'planning',
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
@@ -49,7 +53,7 @@ export class Project {
   @Column({
     type: 'enum',
     enum: ProjectStatus,
-    default: ProjectStatus.PLANNING,
+    default: ProjectStatus.ONGOING,
   })
   project_status: ProjectStatus;
 
@@ -77,7 +81,7 @@ export class Project {
   @Column({ type: 'uuid', nullable: true })
   client_id: string;
 
-  @Column({ type: 'uuid',nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   staff_id: string;
 
   @Column({ type: 'uuid', nullable: true })

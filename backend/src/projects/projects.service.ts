@@ -60,6 +60,7 @@ export class ProjectsService {
       project_deadline: UpdateProjectDto.project_deadline,
       contractor_id: UpdateProjectDto.contractor_id,
       client_id: UpdateProjectDto.client_id,
+      project_status: UpdateProjectDto.project_status,
     };
     // If restoring, clear deleted_at and isDeleted
     if (UpdateProjectDto.isDeleted === false) {

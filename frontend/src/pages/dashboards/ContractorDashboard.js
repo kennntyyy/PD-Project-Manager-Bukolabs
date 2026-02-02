@@ -33,8 +33,8 @@ const ContractorDashboard = () => {
 
   const navItems = [
     { key: 'projects', icon: 'pi pi-folder', label: 'My Projects' },
-    { key: 'deliverables', icon: 'pi pi-check-square', label: 'Deliverables' },
-    { key: 'timesheets', icon: 'pi pi-clock', label: 'Timesheets' },
+    // { key: 'deliverables', icon: 'pi pi-check-square', label: 'Deliverables' },
+    // { key: 'timesheets', icon: 'pi pi-clock', label: 'Timesheets' },
     { key: 'settings', icon: 'pi pi-cog', label: 'Settings' },
   ];
 
@@ -188,12 +188,14 @@ const ContractorDashboard = () => {
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <i className="pi pi-briefcase"></i>
+            <img src="/logo.png" alt="Logo" style={{
+              width: '150%', height: '150%',
+            }}/>
           </div>
-          <div className="sidebar-title">
+          {/* <div className="sidebar-title">
             <h3>Contractor</h3>
             <p>Control Panel</p>
-          </div>
+          </div> */}
         </div>
         <div className="sidebar-nav">
           {navItems.map((item) => (
@@ -211,6 +213,24 @@ const ContractorDashboard = () => {
           ))}
         </div>
         <div className="sidebar-footer">
+          <div className="sidebar-user-profile">
+            <div className="sidebar-user-avatar">
+              {user?.profile_pic ? (
+                <img
+                  src={`data:image/jpeg;base64,${user.profile_pic}`}
+                  alt={user?.username}
+                />
+              ) : (
+                <span>{user?.username?.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <div className="sidebar-user-info">
+              <p className="sidebar-user-name">
+                {user?.first_name} {user?.last_name}
+              </p>
+              <p className="sidebar-user-role">{user?.user_role?.toUpperCase()}</p>
+            </div>
+          </div>
           <Button
             className="logout-btn"
             label="Logout"
@@ -226,16 +246,16 @@ const ContractorDashboard = () => {
             <div>
               <h2 className="header-title">
                 {activeTab === 'projects' && 'My Projects'}
-                {activeTab === 'deliverables' && 'Deliverables'}
-                {activeTab === 'timesheets' && 'Timesheets'}
+                {/* {activeTab === 'deliverables' && 'Deliverables'}
+                {activeTab === 'timesheets' && 'Timesheets'} */}
                 {activeTab === 'settings' && 'Settings'}
               </h2>
               <p className="header-subtitle">
                 {activeTab === 'projects' &&
                   'View and manage your assigned projects'}
-                {activeTab === 'deliverables' &&
+                {/* {activeTab === 'deliverables' &&
                   'View and manage your deliverables'}
-                {activeTab === 'timesheets' && 'Track your timesheets'}
+                {activeTab === 'timesheets' && 'Track your timesheets'} */}
                 {activeTab === 'settings' && 'Configure your settings'}
               </p>
             </div>
@@ -424,7 +444,7 @@ const ContractorDashboard = () => {
             </div>
           )}
 
-          {activeTab === 'deliverables' && (
+          {/* {activeTab === 'deliverables' && (
             <div className="coming-soon">
               <i
                 className="pi pi-clock"
@@ -444,7 +464,7 @@ const ContractorDashboard = () => {
               <h3>Timesheets Panel</h3>
               <p>Coming soon! This feature is under development.</p>
             </div>
-          )}
+          )} */}
 
           {activeTab === 'settings' && (
             <div className="coming-soon">
@@ -462,8 +482,9 @@ const ContractorDashboard = () => {
       {/* Project Details Dialog */}
       <Dialog
         visible={displayDetailsDialog}
-        style={{ width: '90vw', maxWidth: '600px' }}
+        style={{ width: '90vw', maxWidth: '600px',}}
         header="Project Details"
+        headerStyle={{paddingTop: '1rem', paddingLeft: '1rem'}}
         modal
         onHide={() => setDisplayDetailsDialog(false)}
       >
@@ -563,6 +584,7 @@ const ContractorDashboard = () => {
 
         <div className="flex justify-content-end mt-4">
           <Button
+            style={{marginBottom: '1rem', marginRight: '1rem', padding: '0.5rem'}}
             label="Close"
             severity="secondary"
             onClick={() => setDisplayDetailsDialog(false)}

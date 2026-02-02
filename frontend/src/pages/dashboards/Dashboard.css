@@ -44,13 +44,11 @@
   overflow: hidden;
 }
 
-.sidebar-logo-img {
-  width: 300px;
-  height: 300px;
+.sidebar-logo img {
+
   object-fit: contain;
   filter: brightness(0) invert(1);
-  margin-right: 20px;
-  margin-top: 40px;
+  margin: 0;
 }
 
 .sidebar-title {
@@ -137,10 +135,69 @@
   background: transparent;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: auto;
   pointer-events: none;
   z-index: 1;
+}
+
+.sidebar-user-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  pointer-events: auto;
+}
+
+.sidebar-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  /* border: 2px solid rgba(255, 255, 255, 0.3); */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-user-avatar span {
+  color: white;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.sidebar-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-user-name {
+  margin: 0;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-family: 'Source Serif Pro', serif;
+}
+
+.sidebar-user-role {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  font-family: 'Source Serif Pro', serif;
 }
 
 .logout-btn {
@@ -155,6 +212,7 @@
   transition: all 0.3s ease !important;
   white-space: nowrap;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
 .logout-btn:hover {
@@ -791,57 +849,64 @@
 
 /* Project Details Styles */
 .project-details {
-  padding: 1rem 0;
+  padding: 1.5rem;
 }
 
 .detail-section {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .detail-section:last-child {
   border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .detail-section h4 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 1.25rem 0;
   color: #374151;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .detail-item {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
 }
 
 .detail-item label {
   font-weight: 500;
   color: #6b7280;
   font-size: 0.875rem;
-  margin-bottom: 0.25rem;
 }
 
 .detail-item span {
   color: #111827;
+  font-size: 0.95rem;
 }
 
 .detail-item .amount {
   color: #059669;
   font-weight: 600;
+  font-size: 1rem;
 }
 
 .description-box {
   background: #f9fafb;
   border-radius: 6px;
-  padding: 1rem;
+  padding: 1.25rem;
   border: 1px solid #e5e7eb;
-  min-height: 80px;
+  min-height: 100px;
+  line-height: 1.6;
 }
 
 .coming-soon {

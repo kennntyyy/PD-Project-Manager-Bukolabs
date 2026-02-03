@@ -862,10 +862,23 @@
 }
 
 /* Project Details Styles */
-.project-details {
-  padding: 1.5rem;
+.p-dialog-header {
+  background: #404a17 !important;
+  color: white !important;
+  border-radius: 8px 8px 0 0 !important;
+  padding: 1.25rem !important;
 }
 
+.project-details {
+  padding: 1.5rem;
+
+}
+.detail-section{
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid #4F4D36;
+
+}
 .project-details-modal {
   font-family: 'Source Serif Pro', serif;
 }

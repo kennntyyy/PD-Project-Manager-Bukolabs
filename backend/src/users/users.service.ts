@@ -8,12 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from './entities/user.entity';
 import * as bcrypt from 'bcryptjs';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(): Promise<User[]> {
@@ -151,7 +153,7 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
-  async createUser(userData: any): Promise<User> {
+  async createUser(userData: any, currentUser?: any): Promise<User> {
     console.log('[UsersService.createUser] Received data:', userData);
 
     // Check if user already exists
@@ -179,13 +181,29 @@ export class UsersService {
     });
 
     console.log('[UsersService.createUser] Creating user:', user);
-    const savedUser = await this.usersRepository.save(user);
+    const savedUser = (await this.usersRepository.save(
+      user,
+    )) as unknown as User;
     console.log('[UsersService.createUser] User saved:', savedUser);
 
-    return savedUser as unknown as Promise<User>;
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'CREATE',
+      resource: 'USER',
+      resourceId: savedUser.user_id,
+      details: {
+        username: savedUser.username,
+        email: savedUser.email,
+        role: savedUser.user_role,
+      },
+    });
+
+    return savedUser;
   }
 
-  async update(id: string, updateData: any): Promise<User> {
+  async update(id: string, updateData: any, currentUser?: any): Promise<User> {
     console.log(
       '[UsersService.update] Updating user:',
       id,
@@ -223,25 +241,86 @@ export class UsersService {
     Object.assign(user, updateData);
     console.log('[UsersService.update] Saving updated user:', user);
 
-    const savedUser = await this.usersRepository.save(user);
+    // Store original values before save to detect actual changes
+    const originalUser = await this.usersRepository.findOne({
+      where: { user_id: id },
+    });
+
+    const savedUser = (await this.usersRepository.save(
+      user,
+    )) as unknown as User;
     console.log('[UsersService.update] User saved:', savedUser);
 
-    return savedUser as unknown as Promise<User>;
+    // Log audit event - only log fields that actually changed
+    const actualChanges: Record<string, any> = {};
+    Object.keys(updateData).forEach((key) => {
+      if (
+        updateData[key] !== undefined &&
+        originalUser &&
+        (originalUser as any)[key] !== updateData[key]
+      ) {
+        if (key !== 'password') {
+          // Don't log password values
+          actualChanges[key] = updateData[key];
+        } else {
+          actualChanges[key] = '[CHANGED]';
+        }
+      }
+    });
+
+    // Only log if there were actual changes
+    if (Object.keys(actualChanges).length > 0) {
+      await this.auditLogsService.create({
+        userId: currentUser?.userId,
+        userName: currentUser?.username,
+        action: 'UPDATE',
+        resource: 'USER',
+        resourceId: id,
+        details: {
+          updatedFields: Object.keys(actualChanges),
+          changes: actualChanges,
+        },
+      });
+    }
+
+    return savedUser;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, currentUser?: any): Promise<void> {
     const user = await this.findById(id);
     await this.usersRepository.remove(user);
+
+    // Log audit event for permanent deletion
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'DELETE',
+      resource: 'USER',
+      resourceId: id,
+      details: { username: user.username, permanentDelete: true },
+    });
   }
 
-  async softDelete(id: string): Promise<User> {
+  async softDelete(id: string, currentUser?: any): Promise<User> {
     const user = await this.findById(id);
     user.is_deleted = true;
     user.deleted_at = new Date();
-    return this.usersRepository.save(user) as unknown as Promise<User>;
+    const result = (await this.usersRepository.save(user)) as User;
+
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'DELETE',
+      resource: 'USER',
+      resourceId: id,
+      details: { username: user.username },
+    });
+
+    return result;
   }
 
-  async restore(id: string): Promise<User> {
+  async restore(id: string, currentUser?: any): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { user_id: id },
     });
@@ -252,7 +331,19 @@ export class UsersService {
 
     user.is_deleted = false;
     user.deleted_at = null;
-    return this.usersRepository.save(user) as unknown as Promise<User>;
+    const result = (await this.usersRepository.save(user)) as User;
+
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'RESTORE',
+      resource: 'USER',
+      resourceId: id,
+      details: { username: user.username },
+    });
+
+    return result;
   }
 
   async changePassword(id: string, passwordData: any): Promise<void> {

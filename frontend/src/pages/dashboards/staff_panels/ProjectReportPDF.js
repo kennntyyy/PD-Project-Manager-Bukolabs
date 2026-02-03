@@ -9,7 +9,11 @@ import {
 } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
-  page: { padding: 40, backgroundColor: '#fff', fontFamily: 'Helvetica' },
+  page: {
+    padding: 40,
+    backgroundColor: '#fff',
+    fontFamily: 'Source Serif Pro',
+  },
   container: {
     border: '1pt solid #808080',
     padding: 15,

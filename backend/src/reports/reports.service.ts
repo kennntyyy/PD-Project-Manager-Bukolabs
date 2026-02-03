@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Report } from './entities/report.entity';
 import { Project } from '../projects/entities/project.entity';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ReportsService {
@@ -13,12 +14,14 @@ export class ReportsService {
     private reportRepository: Repository<Report>,
     @InjectRepository(Project)
     private projectRepository: Repository<Project>,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   //save data to db table = reports
   async create(
     createReportDto: CreateReportDto,
     files?: Express.Multer.File[],
+    currentUser?: any,
   ): Promise<Report> {
     const {
       project_id,
@@ -78,6 +81,20 @@ export class ReportsService {
       }
     }
 
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'CREATE',
+      resource: 'REPORT',
+      resourceId: savedReport.report_id,
+      details: {
+        project_id,
+        payment_requested,
+        current_progress,
+      },
+    });
+
     return savedReport;
   }
 
@@ -97,7 +114,16 @@ export class ReportsService {
   }
 
   //update report data in db table = reports
-  async update(id: string, UpdateReportDto: any): Promise<void> {
+  async update(
+    id: string,
+    UpdateReportDto: any,
+    currentUser?: any,
+  ): Promise<void> {
+    // Get existing report to compare changes
+    const existingReport = await this.reportRepository.findOne({
+      where: { report_id: id },
+    });
+
     const updateData: any = {
       report_date: UpdateReportDto.report_date,
       start_date: UpdateReportDto.start_date,
@@ -112,10 +138,47 @@ export class ReportsService {
     };
 
     await this.reportRepository.update(id, updateData);
+
+    // Log audit event - only log fields that actually changed
+    const actualChanges: Record<string, any> = {};
+    Object.keys(UpdateReportDto).forEach((key) => {
+      if (existingReport && UpdateReportDto[key] !== undefined) {
+        const oldValue = (existingReport as any)[key];
+        const newValue = UpdateReportDto[key];
+
+        // Handle date comparison
+        let valuesAreDifferent = false;
+        if (oldValue instanceof Date && newValue) {
+          valuesAreDifferent =
+            oldValue.toISOString() !== new Date(newValue).toISOString();
+        } else {
+          valuesAreDifferent = oldValue !== newValue;
+        }
+
+        if (valuesAreDifferent) {
+          actualChanges[key] = UpdateReportDto[key];
+        }
+      }
+    });
+
+    // Only log if there were actual changes
+    if (Object.keys(actualChanges).length > 0) {
+      await this.auditLogsService.create({
+        userId: currentUser?.userId,
+        userName: currentUser?.username,
+        action: 'UPDATE',
+        resource: 'REPORT',
+        resourceId: id,
+        details: {
+          updatedFields: Object.keys(actualChanges),
+          changes: actualChanges,
+        },
+      });
+    }
   }
 
   //soft delete report from db table = reports
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser?: any): Promise<void> {
     const result = await this.reportRepository.update(id, {
       isDeleted: true,
       deleted_at: new Date(),
@@ -124,6 +187,16 @@ export class ReportsService {
     if (result.affected === 0) {
       throw new NotFoundException(`Report with ID ${id} not found`);
     }
+
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: currentUser?.userId,
+      userName: currentUser?.username,
+      action: 'DELETE',
+      resource: 'REPORT',
+      resourceId: id,
+      details: { reportId: id },
+    });
   }
 
   //permanently delete report from db table = reports

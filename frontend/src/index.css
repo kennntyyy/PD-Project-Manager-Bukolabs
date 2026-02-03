@@ -1,7 +1,8 @@
-@import "primereact/resources/themes/lara-light-blue/theme.css";
-@import "primereact/resources/primereact.min.css";
-@import "primeicons/primeicons.css";
-@import "primeflex/primeflex.css";
+@import 'primereact/resources/themes/lara-light-blue/theme.css';
+@import 'primereact/resources/primereact.min.css';
+@import 'primeicons/primeicons.css';
+@import 'primeflex/primeflex.css';
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Serif+Pro:wght@400;600;700&display=swap');
 
 * {
   margin: 0;
@@ -10,7 +11,7 @@
 }
 
 body {
-  font-family: var(--font-family);
+  font-family: 'Source Serif Pro', serif;
   background-color: var(--surface-ground);
   color: var(--text-color);
 }
@@ -32,4 +33,40 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-600);
+}
+
+/* Override PrimeReact and all elements to use custom fonts */
+*:not(.pi),
+*:not(.pi)::before,
+*:not(.pi)::after {
+  font-family: 'Source Serif Pro', serif !important;
+}
+
+/* Preserve icon fonts */
+.pi,
+.pi::before,
+.pi::after {
+  font-family: 'primeicons' !important;
+}
+
+/* Use Bebas Neue for headings and titles */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.p-button,
+.p-dropdown,
+.p-calendar,
+.p-datatable,
+.p-dialog-header,
+.p-tabview-panels .p-tabpanel-header,
+button {
+  font-family: 'Bebas Neue', sans-serif !important;
+}
+
+/* Keep input fields in Source Serif Pro */
+.p-inputtext {
+  font-family: 'Source Serif Pro', serif !important;
 }

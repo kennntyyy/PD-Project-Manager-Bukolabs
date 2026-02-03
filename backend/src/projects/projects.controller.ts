@@ -16,6 +16,7 @@ import { Request } from 'express';
 import { Req } from '@nestjs/common';
 import { Project } from './entities/project.entity';
 import { User } from 'src/users/entities/user.entity';
+import { CurrentUser } from 'src/common/guards/current-user.decorator';
 
 @Controller('projects')
 export class ProjectsController {
@@ -23,10 +24,14 @@ export class ProjectsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() createProjectDto: CreateProjectDto, @Req() req: Request) {
+  create(
+    @Body() createProjectDto: CreateProjectDto,
+    @Req() req: Request,
+    @CurrentUser() currentUser?: any,
+  ) {
     const user = req.user as any;
     const userId = user.userId;
-    return this.projectsService.create(createProjectDto, userId);
+    return this.projectsService.create(createProjectDto, userId, currentUser);
   }
 
   @Get()
@@ -42,20 +47,28 @@ export class ProjectsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  async updateproject(@Param('id') id: string, @Body() updateData: any) {
-    await this.projectsService.update(id, updateData);
+  async updateproject(
+    @Param('id') id: string,
+    @Body() updateData: any,
+    @CurrentUser() currentUser?: any,
+  ) {
+    await this.projectsService.update(id, updateData, currentUser);
     return { updated: true };
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  async deleteProject(@Param('id') id: string, @Req() req: Request) {
+  async deleteProject(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @CurrentUser() currentUser?: any,
+  ) {
     const permanent = req.query['permanent'] === 'true';
     if (permanent) {
-      await this.projectsService.permanentRemove(id);
+      await this.projectsService.permanentRemove(id, currentUser);
       return { deleted: true, permanent: true };
     } else {
-      await this.projectsService.remove(id);
+      await this.projectsService.remove(id, currentUser);
       return { deleted: true, permanent: false };
     }
   }

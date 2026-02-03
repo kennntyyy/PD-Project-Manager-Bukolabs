@@ -19,7 +19,6 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Toast } from 'primereact/toast';
-import { Tag } from 'primereact/tag';
 import { FloatLabel } from 'primereact/floatlabel';
 import { Slider } from 'primereact/slider';
 import { Divider } from 'primereact/divider';
@@ -262,6 +261,34 @@ const ReportsPanel = () => {
     };
 
     setSelectedProject(enrichedProject);
+  };
+
+  const renderStatusBadge = (status) => {
+    const displayStatus = status || 'Ongoing';
+    const normalized = String(displayStatus).toLowerCase().trim();
+
+    const statusClass =
+      normalized === 'done' || normalized === 'completed'
+        ? 'status-done'
+        : normalized === 'hold' || normalized === 'on hold'
+          ? 'status-hold'
+          : 'status-ongoing';
+
+    const bgColor =
+      statusClass === 'status-done'
+        ? '#10b981'
+        : statusClass === 'status-hold'
+          ? '#f59e0b'
+          : '#0284c7';
+
+    return (
+      <span
+        className={`project-status-badge ${statusClass}`}
+        style={{ backgroundColor: bgColor, color: '#ffffff' }}
+      >
+        {displayStatus}
+      </span>
+    );
   };
 
   const handleBackToList = () => {
@@ -812,17 +839,7 @@ const ReportsPanel = () => {
                 <div className="reports-card-item">
                   <span className="reports-card-label">Status:</span>
                   <span className="reports-card-value">
-                    <Tag
-                      value={project.project_status || 'Ongoing'}
-                      severity={
-                        project.project_status === 'Done'
-                          ? 'success'
-                          : project.project_status === 'Hold'
-                            ? 'warning'
-                            : 'info'
-                      }
-                      style={{ fontSize: '12px', fontWeight: 'bold' }}
-                    />
+                    {renderStatusBadge(project.project_status)}
                   </span>
                 </div>
               </div>
@@ -1109,17 +1126,9 @@ const ReportsPanel = () => {
                   </div>
                   <div>
                     <span className="font-bold">Status:</span>
-                    <Tag
-                      value={selectedProject.project_status || 'Ongoing'}
-                      severity={
-                        selectedProject.project_status === 'Done'
-                          ? 'success'
-                          : selectedProject.project_status === 'Hold'
-                            ? 'warning'
-                            : 'info'
-                      }
-                      className="ml-2"
-                    />
+                    <span className="ml-2">
+                      {renderStatusBadge(selectedProject.project_status)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1162,10 +1171,16 @@ const ReportsPanel = () => {
 
       {/* Report Generation Modal */}
       <Dialog
-        header={null}
+        header="Generate New Report"
         visible={showReportModal}
         style={{ width: '70vw', maxHeight: '90vh' }}
+        contentStyle={{ padding: '1.5rem 2rem' }}
         onHide={() => setShowReportModal(false)}
+        headerStyle={{
+          backgroundColor: '#404a17',
+          color: 'white',
+          padding: '1rem',
+        }}
       >
         {selectedProject && (
           <div
@@ -1173,7 +1188,7 @@ const ReportsPanel = () => {
             style={{
               maxHeight: 'calc(90vh - 200px)',
               overflowY: 'auto',
-              padding: '1.5rem 2rem',
+              padding: 0,
             }}
           >
             {/* Project Period Header */}

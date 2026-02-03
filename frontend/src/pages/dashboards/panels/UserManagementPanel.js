@@ -10,6 +10,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { userService } from '../../../services/userService';
 import { useAuth } from '../../../context/AuthContext';
+import './UserManagementPanel.css';
 
 // ============================================
 // USER MANAGEMENT PANEL
@@ -417,7 +418,7 @@ const UserManagementPanel = () => {
   const deleteUser = (usr) => {
     confirmDialog({
       message: `Are you sure you want to delete ${usr.username}? This can be restored from the recycle bin.`,
-      header: 'Confirm',
+      header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
@@ -452,7 +453,7 @@ const UserManagementPanel = () => {
   const restoreUser = (usr) => {
     confirmDialog({
       message: `Restore ${usr.username} to active users?`,
-      header: 'Confirm',
+      header: 'Confirm Restore',
       icon: 'pi pi-refresh',
       accept: async () => {
         try {
@@ -557,130 +558,108 @@ const UserManagementPanel = () => {
   // ============================================
 
   return (
-    <div>
+    <div className="panel-container">
       <Toast ref={toast} />
       <ConfirmDialog />
 
-      <div className="dashboard-card">
-        <div className="card-header">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <h3 className="card-title">
-              {viewMode === 'active' ? 'Active Users' : 'Recycle Bin'}
-            </h3>
-            <div
-              className="user-panel-switch"
-              style={{
-                marginBottom: '12px',
-                paddingLeft: '16px',
-                paddingRight: '16px',
-                paddingTop: '12px',
-              }}
-            >
-              <Button
-                label="Active Users"
-                icon="pi pi-users"
-                severity={viewMode === 'active' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('active');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'active'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'active'}
-                outlined={viewMode !== 'active'}
-              />
-              <Button
-                label={`Recycle Bin (${users.filter((u) => u.is_deleted).length})`}
-                icon="pi pi-trash"
-                severity={viewMode === 'deleted' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('deleted');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'deleted'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'deleted'}
-                outlined={viewMode !== 'deleted'}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Search Bar and Action Buttons */}
+      {/* Title Section */}
+      <div className="mb-6">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px',
-            paddingLeft: '16px',
-            paddingRight: '16px',
-            gap: '16px',
-            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            gap: '2rem',
           }}
         >
-          {/* Search Bar */}
+          <div>
+            <h2 className="m-0">User Management</h2>
+            <p className="text-color-secondary m-0">
+              Manage system users and their access levels
+            </p>
+          </div>
           <div
-            className="p-inputgroup"
-            style={{ flex: '1', minWidth: '300px', maxWidth: '500px' }}
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center',
+            }}
           >
-            <span className="p-inputgroup-addon">
-              <i className="pi pi-search" />
-            </span>
-            <InputText
-              placeholder={
+            <Button
+              label="Active Users"
+              icon="pi pi-users"
+              severity={viewMode === 'active' ? 'info' : 'secondary'}
+              onClick={() => {
+                setViewMode('active');
+                setSearchQuery('');
+              }}
+              className={
                 viewMode === 'active'
-                  ? 'Search users by name, username, email, role...'
-                  : 'Search deleted users...'
+                  ? 'p-button-sm user-switch-btn active'
+                  : 'p-button-sm user-switch-btn'
               }
+              text={viewMode !== 'active'}
+              outlined={viewMode !== 'active'}
+            />
+            <Button
+              label={`Recycle Bin (${users.filter((u) => u.is_deleted).length})`}
+              icon="pi pi-trash"
+              severity={viewMode === 'deleted' ? 'info' : 'secondary'}
+              onClick={() => {
+                setViewMode('deleted');
+                setSearchQuery('');
+              }}
+              className={
+                viewMode === 'deleted'
+                  ? 'p-button-sm user-switch-btn active'
+                  : 'p-button-sm user-switch-btn'
+              }
+              text={viewMode !== 'deleted'}
+              outlined={viewMode !== 'deleted'}
+            />
+          </div>
+          <div className="reports-search-box">
+            <i className="pi pi-search"></i>
+            <InputText
+              placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: '1' }}
+              className="reports-search-input"
             />
             {searchQuery && (
-              <Button
-                icon="pi pi-times"
-                className="p-button-text"
-                onClick={handleClearSearch}
-                tooltip="Clear search"
-              />
+              <i
+                className="pi pi-times"
+                style={{ color: '#9ca3af', cursor: 'pointer' }}
+                onClick={() => setSearchQuery('')}
+              ></i>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {viewMode === 'active' && (
-              <Button
-                label="Add New User"
-                icon="pi pi-plus"
-                severity="info"
-                onClick={openNewDialog}
-                className="add-user-btn"
-              />
-            )}
-            {searchQuery && (
-              <Button
-                label={`${filteredUsers.length} result${filteredUsers.length !== 1 ? 's' : ''} found`}
-                icon="pi pi-filter"
-                severity="secondary"
-                className="p-button-outlined"
-                disabled
-              />
-            )}
-          </div>
+      <div className="dashboard-card">
+        <div
+          className="card-header"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+          }}
+        >
+          <h3 className="card-title">
+            {viewMode === 'active' ? 'Active Users' : 'Recycle Bin'}
+          </h3>
+          {viewMode === 'active' && (
+            <Button
+              label="Add New User"
+              icon="pi pi-plus"
+              severity="info"
+              onClick={openNewDialog}
+              className="add-user-btn"
+            />
+          )}
         </div>
 
         <DataTable
@@ -814,9 +793,15 @@ const UserManagementPanel = () => {
         visible={visible}
         style={{ width: '90vw', maxWidth: '500px' }}
         header={isEditing ? 'Edit User' : 'Add New User'}
+        contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setVisible(false)}
         className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#404a17',
+          color: 'white',
+          padding: '1rem',
+        }}
       >
         <div className="field mt-3">
           <label htmlFor="username">Username *</label>
@@ -1033,13 +1018,13 @@ const UserManagementPanel = () => {
           </>
         )}
 
-        <div className="flex justify-content-end gap-2 mt-5">
+        <div className="flex justify-content-center mt-5">
           <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={() => setVisible(false)}
+            label="Save"
+            onClick={saveUser}
+            loading={loading}
+            className="modal-primary-btn"
           />
-          <Button label="Save" onClick={saveUser} loading={loading} />
         </div>
       </Dialog>
     </div>

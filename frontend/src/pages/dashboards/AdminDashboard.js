@@ -8,6 +8,7 @@ import UserManagementPanel from './panels/UserManagementPanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SettingsPanel from './panels/SettingsPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
+import AuditLogsPanel from './panels/AuditLogsPanel';
 import './Dashboard.css';
 
 // ============================================
@@ -161,6 +162,20 @@ const AdminDashboard = () => {
             <i className="pi pi-folder"></i>
             <span>Projects</span>
           </div>
+          <div
+            className={`nav-item ${activeNav === 'audit-logs' ? 'active' : ''}`}
+            onClick={() => handleNavClick('audit-logs')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('audit-logs');
+              }
+            }}
+          >
+            <i className="pi pi-history"></i>
+            <span>Audit Logs</span>
+          </div>
         </div>
 
         <div className="sidebar-footer">
@@ -209,6 +224,7 @@ const AdminDashboard = () => {
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'settings' && <SettingsPanel />}
           {activeTab === 'projects' && <ProjectsPanel />}
+          {activeTab === 'audit-logs' && <AuditLogsPanel />}
         </div>
       </div>
     </div>

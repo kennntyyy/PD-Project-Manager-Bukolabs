@@ -19,6 +19,7 @@ import { Express } from 'express';
 import { UsersService } from './users.service';
 import { User, UserRole } from './entities/user.entity';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/guards/current-user.decorator';
 import {
   CreateUserDto,
   UpdateUserDto,
@@ -64,6 +65,7 @@ export class UsersController {
   async create(
     @Body() createUserDto: CreateUserDto,
     @UploadedFile() file?: Express.Multer.File,
+    @CurrentUser() currentUser?: any,
   ): Promise<User> {
     console.log(
       '[UsersController] POST /users - create with body:',
@@ -103,7 +105,10 @@ export class UsersController {
         );
       }
 
-      const result = await this.usersService.createUser(createUserDto);
+      const result = await this.usersService.createUser(
+        createUserDto,
+        currentUser,
+      );
       console.log('[UsersController] Create success:', result);
       return result;
     } catch (error) {
@@ -143,15 +148,21 @@ export class UsersController {
   }
 
   @Put(':id/soft-delete')
-  async softDelete(@Param('id') id: string): Promise<User> {
+  async softDelete(
+    @Param('id') id: string,
+    @CurrentUser() currentUser?: any,
+  ): Promise<User> {
     console.log('[UsersController] PUT /users/:id/soft-delete:', id);
-    return this.usersService.softDelete(id);
+    return this.usersService.softDelete(id, currentUser);
   }
 
   @Put(':id/restore')
-  async restore(@Param('id') id: string): Promise<User> {
+  async restore(
+    @Param('id') id: string,
+    @CurrentUser() currentUser?: any,
+  ): Promise<User> {
     console.log('[UsersController] PUT /users/:id/restore:', id);
-    return this.usersService.restore(id);
+    return this.usersService.restore(id, currentUser);
   }
 
   @Put(':id')
@@ -160,6 +171,7 @@ export class UsersController {
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
     @UploadedFile() file?: Express.Multer.File,
+    @CurrentUser() currentUser?: any,
   ): Promise<User> {
     console.log(
       '[UsersController] PUT /users/:id - update:',
@@ -201,7 +213,11 @@ export class UsersController {
         );
       }
 
-      const result = await this.usersService.update(id, updateUserDto);
+      const result = await this.usersService.update(
+        id,
+        updateUserDto,
+        currentUser,
+      );
       console.log('[UsersController] Update success:', result);
       return result;
     } catch (error) {
@@ -212,8 +228,12 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id') id: string): Promise<void> {
+  @UseGuards(JwtAuthGuard)
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser() currentUser?: any,
+  ): Promise<void> {
     console.log('[UsersController] DELETE /users/:id:', id);
-    await this.usersService.delete(id);
+    await this.usersService.delete(id, currentUser);
   }
 }

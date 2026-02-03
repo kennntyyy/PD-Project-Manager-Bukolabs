@@ -14,6 +14,7 @@ import api from '../../services/api';
 import './Dashboard.css';
 
 const ContractorDashboard = () => {
+  const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('contractorActiveTab') || 'projects',

@@ -866,6 +866,10 @@
   padding: 1.5rem;
 }
 
+.project-details-modal {
+  font-family: 'Source Serif Pro', serif;
+}
+
 .detail-section {
   margin-bottom: 2rem;
   padding-bottom: 2rem;
@@ -921,6 +925,30 @@
   border: 1px solid #e5e7eb;
   min-height: 100px;
   line-height: 1.6;
+}
+
+/* Project Details Modal Scroll Styling */
+.project-details-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.project-details-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.project-details-modal::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.project-details-modal::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.project-details-modal::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .coming-soon {

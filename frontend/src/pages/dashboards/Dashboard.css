@@ -1057,3 +1057,36 @@
   background-color: #4f5a1f !important;
   border-color: #4f5a1f !important;
 }
+
+.reports-search-input {
+  width: 280px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: 'Source Serif Pro', serif;
+  font-size: 0.9rem;
+  color: #374151;
+  padding: 0 !important;
+  background: transparent;
+}
+
+.reports-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.reports-search-box i {
+  color: #9ca3af;
+  font-size: 1rem;
+}
+
+.reports-search-box .p-button.p-button-text {
+  color: #4f4d36 !important;
+  font-size: small;
+}

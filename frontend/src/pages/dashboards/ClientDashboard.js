@@ -12,9 +12,17 @@ import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Slider } from 'primereact/slider';
 import api from '../../services/api';
-import { pdf } from '@react-pdf/renderer';
+import { pdf, Font } from '@react-pdf/renderer';
 import './Dashboard.css';
 import { ProjectReportPDF } from '../dashboards/staff_panels/ProjectReportPDF';
+
+// Font.register({
+//   family: 'Source Serif Pro',
+//   fonts: [
+//     { src: 'https://fonts.gstatic.com/s/sourceserifpro/v15/ne6v77u_ls8ax40_n68_9y-A-X77D34.ttf' }, // Regular
+//     { src: 'https://fonts.gstatic.com/s/sourceserifpro/v15/ne6z77u_ls8ax40_n68_9y-A-X77D34.ttf', fontWeight: 'bold' } // Bold
+//   ]
+// });
 
 const ClientDashboard = () => {
   const [recentReports, setRecentReports] = useState([]);
@@ -172,12 +180,12 @@ const ClientDashboard = () => {
   const [reportsLoading, setReportsLoading] = useState(false);
 
   // Project status options
-  const statusOptions = [
-    { label: 'All Status', value: 'all' },
-    { label: 'Completed', value: 'completed' },
-    { label: 'Ongoing', value: 'ongoing' },
-    { label: 'Hold', value: 'hold' },
-  ];
+  // const statusOptions = [
+  //   { label: 'All Status', value: 'all' },
+  //   { label: 'Completed', value: 'completed' },
+  //   { label: 'Ongoing', value: 'ongoing' },
+  //   { label: 'Hold', value: 'hold' },
+  // ];
 
   const navItems = [
     { key: 'projects', icon: 'pi pi-folder', label: 'Projects' },
@@ -296,14 +304,14 @@ const ClientDashboard = () => {
     let status = 'Pending';
     let severity = 'warning';
 
-    if (rowData.project_status === 'completed') {
+    if (rowData.project_status === 'done') {
       status = 'Completed';
       severity = 'success';
-    } else if (rowData.project_status === 'active') {
-      status = 'Active';
+    } else if (rowData.project_status === 'ongoing') {
+      status = 'Ongoing';
       severity = 'info';
-    } else if (rowData.project_status === 'cancelled') {
-      status = 'Cancelled';
+    } else if (rowData.project_status === 'hold') {
+      status = 'On Hold';
       severity = 'danger';
     }
 
@@ -339,12 +347,12 @@ const ClientDashboard = () => {
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter((project) => {
-        if (statusFilter === 'active')
-          return project.project_status === 'active';
+        if (statusFilter === 'ongoing')
+          return project.project_status === 'ongoing';
         if (statusFilter === 'completed')
           return project.project_status === 'completed';
-        if (statusFilter === 'pending')
-          return project.project_status === 'pending';
+        if (statusFilter === 'hold')
+          return project.project_status === 'hold';
         return true;
       });
     }
@@ -498,7 +506,7 @@ const ClientDashboard = () => {
                     )}
                   </div>
 
-                  <Dropdown
+                  {/* <Dropdown
                     value={statusFilter}
                     options={statusOptions}
                     onChange={(e) => setStatusFilter(e.value)}
@@ -506,7 +514,7 @@ const ClientDashboard = () => {
                     optionValue="value"
                     placeholder="Filter by status"
                     style={{ minWidth: '200px' }}
-                  />
+                  /> */}
                 </div>
 
                 <div className="projects-stats">
@@ -526,7 +534,7 @@ const ClientDashboard = () => {
                       <h3>
                         {
                           projects.filter(
-                            (p) => p.project_status === 'completed',
+                            (p) => p.project_status === 'done',
                           ).length
                         }
                       </h3>
@@ -534,15 +542,27 @@ const ClientDashboard = () => {
                     </div>
                   </div>
                   <div className="stat-card">
-                    <i className="pi pi-clock" style={{ color: '#F59E0B' }} />
+                    <i className="pi pi-clock" style={{ color: 'blue' }} />
                     <div>
                       <h3>
                         {
-                          projects.filter((p) => p.project_status === 'active')
+                          projects.filter((p) => p.project_status === 'ongoing')
                             .length
                         }
                       </h3>
-                      <p>Active</p>
+                      <p>Ongoing</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <i className="pi pi-pause-circle" style={{ color: 'red' }} />
+                    <div>
+                      <h3>
+                        {
+                          projects.filter((p) => p.project_status === 'hold')
+                            .length
+                        }
+                      </h3>
+                      <p>On Hold</p>
                     </div>
                   </div>
                 </div>
@@ -821,6 +841,7 @@ const ClientDashboard = () => {
                 </div>
               </div>
             </div>
+            {/*PROJECT REPORTS TABLE DISABLED TEMPORARILY*/}
           <div style={{ marginTop: '2rem', 
               background: '#AEAC8C', 
               padding: '1rem',
@@ -855,7 +876,7 @@ const ClientDashboard = () => {
                 <Column
                   header="Project Status"
                   body={() => {
-                    let status = 'Pending';
+                    let status = 'Ongoing';
                     let severity = 'warning';
                     if (selectedProject?.project_status === 'completed') {
                       status = 'Completed';

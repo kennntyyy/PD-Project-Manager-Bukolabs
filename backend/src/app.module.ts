@@ -10,6 +10,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { CronService } from './common/services/cron.service';
 import { User } from './users/entities/user.entity';
 import { ReportsModule } from './reports/reports.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ReportsModule } from './reports/reports.module';
     UsersModule,
     ProjectsModule,
     ReportsModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService, CronService],

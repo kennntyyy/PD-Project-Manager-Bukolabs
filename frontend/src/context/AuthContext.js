@@ -139,9 +139,38 @@ export const AuthProvider = ({ children }) => {
               }
             }
           } else {
-            console.log('[AuthContext] Session expired, clearing auth');
-            AuthService.clearAuth();
-            setUser(null);
+            // If validation fails but token exists and isn't expired, still set user
+            // This handles network errors during page navigation
+            const token = AuthService.getAccessToken();
+            if (token) {
+              const exp = getTokenExpiration(token);
+              const now = Date.now();
+              const timeout = exp - now;
+
+              if (timeout > 0) {
+                // Token is still valid, keep the user logged in
+                console.log(
+                  '[AuthContext] Keeping user logged in despite validation error - token still valid',
+                );
+                setUser(savedUser);
+                if (logoutTimerRef.current)
+                  clearTimeout(logoutTimerRef.current);
+                logoutTimerRef.current = setTimeout(() => {
+                  logout();
+                }, timeout);
+                scheduleTokenRefresh(token);
+              } else {
+                // Token is expired
+                console.log('[AuthContext] Token expired, clearing auth');
+                AuthService.clearAuth();
+                setUser(null);
+              }
+            } else {
+              // No token at all
+              console.log('[AuthContext] No token found, clearing auth');
+              AuthService.clearAuth();
+              setUser(null);
+            }
           }
         } else {
           setUser(null);
@@ -189,16 +218,20 @@ export const AuthProvider = ({ children }) => {
         case 'admin':
           localStorage.setItem('adminActiveTab', 'overview');
           localStorage.setItem('adminActiveNav', 'overview');
-          window.location.href = '/admin';
+          window.history.replaceState(null, '', '/admin');
+          window.location.pathname = '/admin';
           break;
         case 'staff':
-          window.location.href = '/staff';
+          window.history.replaceState(null, '', '/staff');
+          window.location.pathname = '/staff';
           break;
         case 'client':
-          window.location.href = '/client';
+          window.history.replaceState(null, '', '/client');
+          window.location.pathname = '/client';
           break;
         case 'contractor':
-          window.location.href = '/contractor';
+          window.history.replaceState(null, '', '/contractor');
+          window.location.pathname = '/contractor';
           break;
         default:
           window.location.href = '/login';
@@ -239,7 +272,8 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setUser(null);
       AuthService.clearAuth();
-      window.location.href = '/login';
+      window.history.replaceState(null, '', '/login');
+      window.location.pathname = '/login';
     }
   };
 

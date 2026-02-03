@@ -204,9 +204,18 @@ const OverviewPanel = ({ users }) => {
 
   return (
     <div className="overview-container">
-      {/* Welcome Heading */}
+      {/* Dashboard Overview Heading */}
       <div className="welcome-header">
-        <h1>WELCOME, ADMIN!</h1>
+        <h1>DASHBOARD OVERVIEW</h1>
+        <p
+          style={{
+            margin: '0.5rem 0 0 0',
+            fontSize: '0.95rem',
+            color: '#6b7280',
+          }}
+        >
+          System performance metrics and key insights
+        </p>
       </div>
 
       {/* Stats Grid */}

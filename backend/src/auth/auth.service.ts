@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import * as bcrypt from 'bcryptjs'; // Remove this if not using bcrypt
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -15,6 +16,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   async validateUser(username: string, password: string): Promise<any> {
@@ -64,9 +66,19 @@ export class AuthService {
       email: user.email,
       sub: user.user_id,
       role: user.user_role,
+      username: user.username,
     };
 
     console.log(`🎉 Login successful for: ${user.username}`);
+
+    // Log audit event
+    await this.auditLogsService.create({
+      userId: user.user_id,
+      userName: user.username,
+      action: 'LOGIN',
+      resource: 'AUTH',
+      details: { username: user.username },
+    });
 
     return {
       access_token: this.jwtService.sign(payload),
@@ -94,6 +106,7 @@ export class AuthService {
       email: user.email,
       sub: user.user_id,
       role: user.user_role,
+      username: user.username,
     };
 
     return {

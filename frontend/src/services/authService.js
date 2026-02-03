@@ -120,11 +120,18 @@ const AuthService = {
         return false;
       }
       // Call a protected endpoint to verify token is still valid
-      const response = await api.get('/users/profile');
+      // Use a shorter timeout for validation to avoid hanging
+      const response = await Promise.race([
+        api.get('/users/profile'),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Validation timeout')), 5000),
+        ),
+      ]);
       return !!response.data;
     } catch (error) {
       console.error('Session validation failed:', error);
-      this.clearAuth();
+      // Don't clear auth on validation failure, just return false
+      // This prevents accidental logouts due to network issues
       return false;
     }
   },

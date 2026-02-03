@@ -9,8 +9,8 @@ import { InputTextarea } from 'primereact/inputtextarea';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Toast } from 'primereact/toast';
-import { Tag } from 'primereact/tag';
 import api from '../../../services/api';
+import './ProjectsPanel.css';
 
 // ============================================
 // PROJECTS MANAGEMENT PANEL
@@ -257,7 +257,7 @@ const ProjectsPanel = () => {
   const handleDeleteProject = (project) => {
     confirmDialog({
       message: `Are you sure you want to delete "${project.project_name}"? This can be restored from the recycle bin.`,
-      header: 'Confirm',
+      header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
       accept: async () => {
         try {
@@ -350,7 +350,7 @@ const ProjectsPanel = () => {
   const handleRestoreProject = (project) => {
     confirmDialog({
       message: `Restore "${project.project_name}" to active projects?`,
-      header: 'Confirm',
+      header: 'Confirm Restore',
       icon: 'pi pi-refresh',
       accept: async () => {
         try {
@@ -453,18 +453,30 @@ const ProjectsPanel = () => {
 
   // Status template
   const statusTemplate = (rowData) => {
+    const status = rowData.project_status || 'Ongoing';
+    const normalized = String(status).toLowerCase().trim();
+
+    const statusClass =
+      normalized === 'done' || normalized === 'completed'
+        ? 'status-done'
+        : normalized === 'hold' || normalized === 'on hold'
+          ? 'status-hold'
+          : 'status-ongoing';
+
+    const bgColor =
+      statusClass === 'status-done'
+        ? '#10b981'
+        : statusClass === 'status-hold'
+          ? '#f59e0b'
+          : '#0284c7';
+
     return (
-      <Tag
-        value={rowData.project_status || 'Ongoing'}
-        severity={
-          rowData.project_status === 'Done'
-            ? 'success'
-            : rowData.project_status === 'Hold'
-              ? 'warning'
-              : 'info'
-        }
-        style={{ fontSize: '12px', fontWeight: 'bold' }}
-      />
+      <span
+        className={`project-status-badge ${statusClass}`}
+        style={{ backgroundColor: bgColor, color: '#ffffff' }}
+      >
+        {status}
+      </span>
     );
   };
 
@@ -473,130 +485,108 @@ const ProjectsPanel = () => {
   // ============================================
 
   return (
-    <div>
+    <div className="panel-container">
       <Toast ref={toast} />
       <ConfirmDialog />
 
-      <div className="dashboard-card">
-        <div className="card-header">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
-              {viewMode === 'active' ? 'Active Projects' : 'Recycle Bin'}
-            </h3>
-            <div
-              className="project-panel-switch"
-              style={{
-                marginBottom: '12px',
-                paddingLeft: '16px',
-                paddingRight: '16px',
-                paddingTop: '12px',
-              }}
-            >
-              <Button
-                label="Active Projects"
-                icon="pi pi-folder"
-                severity={viewMode === 'active' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('active');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'active'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'active'}
-                outlined={viewMode !== 'active'}
-              />
-              <Button
-                label={`Recycle Bin (${projects.filter((p) => p.isDeleted).length})`}
-                icon="pi pi-trash"
-                severity={viewMode === 'deleted' ? 'info' : 'secondary'}
-                onClick={() => {
-                  setViewMode('deleted');
-                  setSearchQuery('');
-                }}
-                className={
-                  viewMode === 'deleted'
-                    ? 'p-button-sm user-switch-btn active'
-                    : 'p-button-sm user-switch-btn'
-                }
-                text={viewMode !== 'deleted'}
-                outlined={viewMode !== 'deleted'}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Search Bar and Action Buttons */}
+      {/* Title Section */}
+      <div className="mb-6">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px',
-            paddingLeft: '16px',
-            paddingRight: '16px',
-            gap: '16px',
-            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            gap: '2rem',
           }}
         >
-          {/* Search Bar */}
+          <div>
+            <h2 className="m-0">Projects</h2>
+            <p className="text-color-secondary m-0">
+              Manage and track all project activities
+            </p>
+          </div>
           <div
-            className="p-inputgroup"
-            style={{ flex: '1', minWidth: '300px', maxWidth: '500px' }}
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center',
+            }}
           >
-            <span className="p-inputgroup-addon">
-              <i className="pi pi-search" />
-            </span>
-            <InputText
-              placeholder={
+            <Button
+              label="Active Projects"
+              icon="pi pi-folder"
+              severity={viewMode === 'active' ? 'info' : 'secondary'}
+              onClick={() => {
+                setViewMode('active');
+                setSearchQuery('');
+              }}
+              className={
                 viewMode === 'active'
-                  ? 'Search projects by name, description, contractor, amount...'
-                  : 'Search deleted projects...'
+                  ? 'p-button-sm user-switch-btn active'
+                  : 'p-button-sm user-switch-btn'
               }
+              text={viewMode !== 'active'}
+              outlined={viewMode !== 'active'}
+            />
+            <Button
+              label={`Recycle Bin (${projects.filter((p) => p.isDeleted).length})`}
+              icon="pi pi-trash"
+              severity={viewMode === 'deleted' ? 'info' : 'secondary'}
+              onClick={() => {
+                setViewMode('deleted');
+                setSearchQuery('');
+              }}
+              className={
+                viewMode === 'deleted'
+                  ? 'p-button-sm user-switch-btn active'
+                  : 'p-button-sm user-switch-btn'
+              }
+              text={viewMode !== 'deleted'}
+              outlined={viewMode !== 'deleted'}
+            />
+          </div>
+          <div className="reports-search-box">
+            <i className="pi pi-search"></i>
+            <InputText
+              placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: '1' }}
+              className="reports-search-input"
             />
             {searchQuery && (
-              <Button
-                icon="pi pi-times"
-                className="p-button-text"
-                onClick={handleClearSearch}
-                tooltip="Clear search"
-              />
+              <i
+                className="pi pi-times"
+                style={{ color: '#9ca3af', cursor: 'pointer' }}
+                onClick={() => setSearchQuery('')}
+              ></i>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {viewMode === 'active' && (
-              <Button
-                label="Add New Project"
-                icon="pi pi-plus"
-                severity="info"
-                onClick={() => setDisplayDialog(true)}
-                className="add-user-btn"
-              />
-            )}
-            {searchQuery && (
-              <Button
-                label={`${filteredProjects.length} result${filteredProjects.length !== 1 ? 's' : ''} found`}
-                icon="pi pi-filter"
-                severity="secondary"
-                className="p-button-outlined"
-                disabled
-              />
-            )}
-          </div>
+      <div className="dashboard-card">
+        <div
+          className="card-header"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+          }}
+        >
+          <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
+            {viewMode === 'active' ? 'Active Projects' : 'Recycle Bin'}
+          </h3>
+          {viewMode === 'active' && (
+            <Button
+              label="Add New Project"
+              icon="pi pi-plus"
+              severity="info"
+              onClick={() => setDisplayDialog(true)}
+              className="add-user-btn"
+            />
+          )}
         </div>
 
         <DataTable
@@ -697,14 +687,12 @@ const ProjectsPanel = () => {
           />
         </DataTable>
       </div>
-
-      {/* ============================================ */}
-      {/* CREATE PROJECT DIALOG */}
       {/* ============================================ */}
       <Dialog
         visible={displayDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
         header="Add New Project"
+        contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplayDialog(false)}
         className="p-fluid"
@@ -831,13 +819,13 @@ const ProjectsPanel = () => {
           />
         </div>
 
-        <div className="flex justify-content-end gap-2 mt-5">
+        <div className="flex justify-content-center mt-5">
           <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={() => setDisplayDialog(false)}
+            label="Create"
+            onClick={handleAddProject}
+            loading={loading}
+            className="modal-primary-btn"
           />
-          <Button label="Create" onClick={handleAddProject} loading={loading} />
         </div>
       </Dialog>
 
@@ -848,6 +836,7 @@ const ProjectsPanel = () => {
         visible={displayEditDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
         header="Edit Project"
+        contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplayEditDialog(false)}
         className="p-fluid"
@@ -1004,16 +993,12 @@ const ProjectsPanel = () => {
           />
         </div>
 
-        <div className="flex justify-content-end gap-2 mt-5">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={() => setDisplayEditDialog(false)}
-          />
+        <div className="flex justify-content-center mt-5">
           <Button
             label="Update"
             onClick={handleEditProject}
             loading={loading}
+            className="modal-primary-btn"
           />
         </div>
       </Dialog>

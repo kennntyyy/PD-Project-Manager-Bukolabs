@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { InputText } from "primereact/inputtext";
-import { Button } from "primereact/button";
-import { Message } from "primereact/message";
-import "./LoginPage.css";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { InputText } from 'primereact/inputtext';
+import { Button } from 'primereact/button';
+import { Message } from 'primereact/message';
+import './LoginPage.css';
 
 const LoginPage = () => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -16,27 +16,32 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setUsername("");
-    setPassword("");
+    setUsername('');
+    setPassword('');
   }, []);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const user = localStorage.getItem("user");
-    if (user) {
+    // Check if user is already logged in (check both localStorage and sessionStorage)
+    const user = localStorage.getItem('user') || sessionStorage.getItem('user');
+    const token =
+      localStorage.getItem('access_token') ||
+      sessionStorage.getItem('access_token');
+
+    // If user and token exist, redirect to dashboard
+    if (user && token) {
       const parsedUser = JSON.parse(user);
       switch (parsedUser.user_role) {
-        case "admin":
-          navigate("/admin");
+        case 'admin':
+          navigate('/admin', { replace: true });
           break;
-        case "staff":
-          navigate("/staff");
+        case 'staff':
+          navigate('/staff', { replace: true });
           break;
-        case "client":
-          navigate("/client");
+        case 'client':
+          navigate('/client', { replace: true });
           break;
-        case "contractor":
-          navigate("/contractor");
+        case 'contractor':
+          navigate('/contractor', { replace: true });
           break;
         default:
           break;
@@ -54,8 +59,8 @@ const LoginPage = () => {
     setPassword(pass);
   };
   const handleForgotPassword = () => {
-    navigate("/forgot-password");
-};
+    navigate('/forgot-password');
+  };
 
   return (
     <div className="login-container">
@@ -69,12 +74,9 @@ const LoginPage = () => {
       {/* Main content */}
       <div className="login-content">
         <div className="login-card">
-      
           {/* Header */}
           <div className="login-header">
-            <div className="logo-wrapper">
-
-            </div>
+            <div className="logo-wrapper"></div>
             <h1 className="login-title">LOG IN YOUR ACCOUNT </h1>
             <p className="login-subtitle">Welcome back! Please sign in</p>
           </div>
@@ -89,14 +91,14 @@ const LoginPage = () => {
               </label>
               <div
                 className={`input-wrapper ${
-                  focusedField === "username" ? "focused" : ""
+                  focusedField === 'username' ? 'focused' : ''
                 }`}
               >
                 <InputText
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  onFocus={() => setFocusedField("username")}
+                  onFocus={() => setFocusedField('username')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="Enter your username"
                   required
@@ -114,16 +116,16 @@ const LoginPage = () => {
               </label>
               <div
                 className={`input-wrapper ${
-                  focusedField === "password" ? "focused" : ""
+                  focusedField === 'password' ? 'focused' : ''
                 }`}
-                style={{ position: "relative" }}
+                style={{ position: 'relative' }}
               >
                 <InputText
                   id="password"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setFocusedField("password")}
+                  onFocus={() => setFocusedField('password')}
                   onBlur={() => setFocusedField(null)}
                   placeholder="Enter your password"
                   required
@@ -133,13 +135,13 @@ const LoginPage = () => {
                 <span
                   className="custom-eye-icon pi"
                   style={{
-                    position: "absolute",
-                    top: "50%",
-                    right: "14px",
-                    transform: "translateY(-50%)",
-                    cursor: "pointer",
-                    color: "#404a17",
-                    fontSize: "18px",
+                    position: 'absolute',
+                    top: '50%',
+                    right: '14px',
+                    transform: 'translateY(-50%)',
+                    cursor: 'pointer',
+                    color: '#404a17',
+                    fontSize: '18px',
                   }}
                   onClick={() => setShowPassword((prev) => !prev)}
                 >
@@ -179,7 +181,7 @@ const LoginPage = () => {
             {/* Sign In Button */}
             <Button
               type="submit"
-              label={loading ? "Signing in..." : "Sign In"}
+              label={loading ? 'Signing in...' : 'Sign In'}
               icon="pi pi-sign-in"
               loading={loading}
               disabled={loading}
@@ -187,11 +189,10 @@ const LoginPage = () => {
             />
           </form>
           <Button
-            label={loading ? "" : "Forgot password?"}
+            label={loading ? '' : 'Forgot password?'}
             className="forgot-password-button"
-            style={{marginBottom: '4px'}}
+            style={{ marginBottom: '4px' }}
           />
-
 
           {/* <div className="login-footer">
             <p className="footer-text">

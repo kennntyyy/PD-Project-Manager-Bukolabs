@@ -8,10 +8,147 @@ import { Tag } from 'primereact/tag';
 import { Dialog } from 'primereact/dialog';
 import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog } from 'primereact/confirmdialog';
+import { InputText } from 'primereact/inputtext';
+import { InputNumber } from 'primereact/inputnumber';
+import { Slider } from 'primereact/slider';
 import api from '../../services/api';
+import { pdf } from '@react-pdf/renderer';
 import './Dashboard.css';
+import { ProjectReportPDF } from '../dashboards/staff_panels/ProjectReportPDF';
 
 const ClientDashboard = () => {
+  const [recentReports, setRecentReports] = useState([]);
+  const toast = useRef(null);
+  const [clients, setClients] = useState([]);
+
+    const showToast = (severity, summary, detail) => {
+      toast.current.show({ severity, summary, detail, life: 3000 });
+    };
+
+    const formatDateForFilename = (dateString) => {
+      if (!dateString) return 'unknown';
+      const date = new Date(dateString);
+      return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    };
+
+    const getClientName = (clientId) => {
+    if (!clientId) return 'NO CLIENT RECORD';
+    const client = clients.find((c) => c.user_id === clientId);
+    return client ? `${client.first_name} ${client.last_name}` : '';
+    };
+
+    const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    const apiBaseUrl =
+      process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+    const baseUrl = apiBaseUrl.replace('/api', '');
+    if (imagePath.startsWith('http')) return imagePath;
+    return `${baseUrl}${imagePath}`;
+   };
+    
+    const downloadReportPDF = async (report) => {
+        try {
+          console.log('Report object:', report); // Debug log
+          const project = projects.find((p) => p.project_id === report.project_id);
+          if (!project) {
+            showToast('error', 'Error', 'Project not found');
+            return;
+          }
+    
+          const reportDates = {
+            projectStart: project.project_start_date
+              ? new Date(project.project_start_date).toLocaleDateString()
+              : '',
+            projectEnd: project.project_deadline
+              ? new Date(project.project_deadline).toLocaleDateString()
+              : '',
+            reportStart: report.start_date
+              ? new Date(report.start_date).toLocaleDateString()
+              : report.report_date
+                ? new Date(report.report_date).toLocaleDateString()
+                : 'N/A',
+            reportEnd: report.end_date
+              ? new Date(report.end_date).toLocaleDateString()
+              : report.report_date
+                ? new Date(report.report_date).toLocaleDateString()
+                : 'N/A',
+          };
+    
+          // Convert relative image URLs to absolute URLs for PDF
+          const absoluteImageUrls = (report.image_urls || []).map((url) =>
+            getImageUrl(url),
+          );
+    
+          // Calculate total spent only for reports up to and including this report
+          const reportDate = new Date(report.created_at || report.start_date);
+          const projectReports = recentReports.filter(
+            (r) =>
+              r.project_id === report.project_id &&
+              new Date(r.created_at || r.start_date) <= reportDate,
+          );
+          const totalSpent = projectReports.reduce(
+            (sum, r) => sum + (Number(r.payment_requested) || 0),
+            0,
+          );
+          const enrichedProject = {
+            ...project,
+            total_amount_released: totalSpent,
+          };
+    
+          const doc = (
+            <ProjectReportPDF
+              data={enrichedProject}
+              clientName={getClientName(project.client_id)}
+              contractorName={getContractorName(project.contractor_id)}
+              completionRate={report.current_progress || 0}
+              reportDates={reportDates}
+              imageUrls={absoluteImageUrls}
+              imageComments={report.image_comments}
+              reportDescription={report.report_description}
+            />
+          );
+    
+          const blob = await pdf(doc).toBlob();
+          const fileName = `Report_${project.project_name}_${formatDateForFilename(report.start_date)}.pdf`;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(url);
+    
+          showToast('success', 'Success', 'PDF downloaded successfully');
+        } catch (error) {
+          console.error('Error generating PDF:', error);
+          showToast('error', 'Error', 'Failed to generate PDF');
+        }
+      };
+
+    // Save as CSV
+    const handleSaveAsCSV = () => {
+      let csv = 'Project Details\n';
+      if (selectedProject) {
+        Object.entries(selectedProject).forEach(([key, value]) => {
+          csv += `${key},${value}\n`;
+        });
+      }
+      csv += '\nReports\n';
+      if (projectReports.length > 0) {
+        const reportKeys = Object.keys(projectReports[0]);
+        csv += reportKeys.join(',') + '\n';
+        projectReports.forEach(report => {
+          csv += reportKeys.map(key => JSON.stringify(report[key] ?? '')).join(',') + '\n';
+        });
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'project-details.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    };
+  const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('clientActiveTab') || 'projects',
@@ -19,22 +156,27 @@ const ClientDashboard = () => {
   const [activeNav, setActiveNav] = useState(
     () => localStorage.getItem('clientActiveNav') || 'projects',
   );
-  const toast = useRef(null);
+  
 
   // Projects state
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [displayDetailsDialog, setDisplayDetailsDialog] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Reports state for selected project
+  const [projectReports, setProjectReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
 
   // Project status options
   const statusOptions = [
     { label: 'All Status', value: 'all' },
-    { label: 'Active', value: 'active' },
     { label: 'Completed', value: 'completed' },
-    { label: 'Pending', value: 'pending' },
+    { label: 'Ongoing', value: 'ongoing' },
+    { label: 'Hold', value: 'hold' },
   ];
 
   const navItems = [
@@ -65,6 +207,37 @@ const ClientDashboard = () => {
       setLoading(false);
     }
   };
+  const fetchContractors = async () => {
+      try {
+        const response = await api.get('/users');
+        const contractorsList = response.data.filter(
+          (user) => user.user_role === 'contractor',
+        );
+        setContractors(contractorsList);
+      } catch (error) {
+        console.error('Failed to fetch contractors:', error);
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to load contractors',
+        });
+      }
+    };
+
+
+    useEffect(() => {
+      fetchContractors();
+    }, []);
+
+    //get name of contractors
+
+    const getContractorName = (contractorId) => {
+    if (!contractorId) return '';
+    const contractor = contractors.find((c) => c.user_id === contractorId);
+    return contractor
+      ? `${contractor.first_name} ${contractor.last_name}`
+      : 'N/A';
+  };
 
   useEffect(() => {
     localStorage.setItem('clientActiveTab', activeTab);
@@ -76,9 +249,31 @@ const ClientDashboard = () => {
   }, [activeTab, activeNav]);
 
   // Handle opening project details
+
+  // Fetch reports for a specific project
+  const fetchProjectReports = async (projectId) => {
+    setReportsLoading(true);
+    try {
+      const response = await api.get('/reports');
+      // Filter reports for this project
+      const reports = response.data.filter(r => r.project_id === projectId && !r.isDeleted);
+      setProjectReports(reports);
+    } catch (error) {
+      console.error('Failed to fetch reports:', error);
+      setProjectReports([]);
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
   const openProjectDetails = (project) => {
     setSelectedProject(project);
     setDisplayDetailsDialog(true);
+    if (project?.project_id) {
+      fetchProjectReports(project.project_id);
+    } else {
+      setProjectReports([]);
+    }
   };
 
   // Format amount with currency
@@ -382,6 +577,12 @@ const ClientDashboard = () => {
                   )}
                 />
                 <Column
+                  field="contractor_id"
+                  header="Contractor"
+                  body={rowData => getContractorName(rowData.contractor_id)}
+                  sortable
+                />
+                <Column
                   field="project_description"
                   header="Description"
                   body={(rowData) => (
@@ -408,12 +609,7 @@ const ClientDashboard = () => {
                   body={statusTemplate}
                   sortable
                 />
-                <Column
-                  field="priority"
-                  header="Priority"
-                  body={priorityTemplate}
-                  sortable
-                />
+                
                 <Column
                   header="Actions"
                   body={(rowData) => (
@@ -448,112 +644,260 @@ const ClientDashboard = () => {
 
       {/* Project Details Dialog */}
       <Dialog
+        header={null}
         visible={displayDetailsDialog}
-        style={{ width: '90vw', maxWidth: '600px' }}
-        header="Project Details"
-        headerStyle={{ paddingTop: '1rem', paddingLeft: '1rem' }}
-        modal
+        style={{ width: '70vw', maxHeight: '90vh' }}
         onHide={() => setDisplayDetailsDialog(false)}
       >
         {selectedProject && (
-          <div className="project-details">
-            <div className="detail-section">
-              <h4>Basic Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Project Name:</label>
-                  <span>{selectedProject.project_name}</span>
+          <div
+            className="project-details-modal"
+            style={{
+              maxHeight: 'calc(100vh -100px)',
+              overflowY: 'auto',
+              padding: '1.5rem ',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                background: '#4f4d36',
+                color: 'white',
+                borderTopLeftRadius: '4px',
+                borderTopRightRadius: '4px',
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+                padding: '1.5rem 0 1.25rem 0',
+                textAlign: 'left',
+                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.08)',
+                zIndex: 2
+              }}
+            >
+              <button
+                onClick={() => setDisplayDetailsDialog(false)}
+                aria-label="Close"
+                style={{
+                  position: 'absolute',
+                  top: '1.25rem',
+                  right: '1.5rem',
+                  background: 'rgb(0,0,0,0)',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  borderRadius: '50%',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.2s',
+                  zIndex: 10
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.18)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+              >
+                ×
+              </button>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  fontFamily: "'Source Serif Pro', serif",
+                  letterSpacing: '0.5px',
+                  marginLeft: '1rem'
+                }}
+              >
+                Project Details
+              </h3>
+            </div>
+            <div style={{ height: '3rem' }} />
+
+            {/* Two Column Layout */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: '2rem',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              background: '#AEAC8C',
+              padding: '1rem',
+              borderRadius: '1rem'
+            }}>
+              <div className="image-container"
+                style={{
+                  border: '2px solid #404A17',
+                  borderRadius: '1rem',
+                  height: '40%',
+                  width: '40%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#f8f8f8',
+                  overflow: 'hidden'
+                }}>
+                {(() => {
+                 const reportWithImages = projectReports.find(r => r.image_urls && r.image_urls.length > 0);
+
+                 if (reportWithImages) {
+                  const firstRawUrl = reportWithImages.image_urls[0];
+
+                  const formattedUrl = getImageUrl(firstRawUrl);
+                  return (
+                    <img 
+                      src={formattedUrl} 
+                      alt="Project Progress" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '100%', 
+                        objectFit: 'cover' // 'cover' fills the area nicely, 'contain' shows the whole image
+                      }} 
+                      // Error handling in case the URL is broken
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/300?text=Image+Error';
+                      }}
+                    />
+                  );
+                 }
+                })()}
+              </div>
+              <div className="details-container" style={{
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <label htmlFor="project_name">Project Name: </label>
+                <InputText
+                  name="project_name" 
+                  value={selectedProject.project_name}
+                  disabled>
+                </InputText>
+                <label htmlFor="project_name">Contractor: </label>
+                <InputText
+                  name="project_contractor"
+                  value={getContractorName(selectedProject.contractor_id)}
+                  disabled>
+                </InputText>
+                <label htmlFor="project_name">Project Amount: </label>
+                <InputNumber
+                  name="project_amount"
+                  value={selectedProject.total_amount}
+                  disabled
+                  prefix='₱'
+                  type='decimal'
+                  minFractionDigits={2}
+                  maxFractionDigits={2}
+                  locale="en-PH">
+                </InputNumber>
+                <label htmlFor="project_start_date">Project Start Date:</label>
+                <InputText
+                  name="project_start_date"
+                  disabled
+                  value={selectedProject?.project_start_date 
+                    ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })
+                    : ''
+                  }>
+                </InputText>
+                <label htmlFor="project_completion_rate">Completion Rate:</label>
+                <div style={{ display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '1rem',  
+                    backgroundColor: 'rgb(160,160,160)', 
+                    padding: '0.5rem', 
+                    borderRadius: '0.25rem' }}>
+                  <Slider value={selectedProject.completion_rate || 0} min={0} max={100} disabled style={{ width: '150px' }} />
+                  <span style={{ fontWeight: 'bold' }}>{selectedProject.completion_rate || 0}%</span>
                 </div>
-                <div className="detail-item">
-                  <label>Project ID:</label>
-                  <span>{selectedProject.project_id}</span>
-                </div>
-                <div className="detail-item">
-                  <label>Status:</label>
-                  <Tag
-                    value={selectedProject.project_status || 'Pending'}
-                    severity={
-                      selectedProject.project_status === 'completed'
-                        ? 'success'
-                        : selectedProject.project_status === 'active'
-                          ? 'info'
-                          : 'warning'
+              </div>
+            </div>
+          <div style={{ marginTop: '2rem', 
+              background: '#AEAC8C', 
+              padding: '1rem',
+              borderRadius: '1rem' }}>
+              <h2  style={{
+                fontWeight: 'bold',
+                color: '#404A17'
+              }}>ACCOMPLISHMENTS</h2>
+              <DataTable
+                value={projectReports}
+                loading={reportsLoading}
+                emptyMessage="No reports generated for this project."
+                tableStyle={{ minWidth: '40rem' }}
+                responsiveLayout="scroll"
+              >
+                <Column
+                  field="report_date"
+                  header="Date Generated"
+                  body={rowData => rowData.report_date ? new Date(rowData.report_date).toLocaleDateString() : 'N/A'}
+                  sortable
+                />
+                <Column
+                  header="Contractor Name"
+                  body={() => getContractorName(selectedProject?.contractor_id)}
+                />
+                <Column
+                  field="payment_requested"
+                  header="Payment"
+                  body={rowData => rowData.payment_requested ? `₱${parseFloat(rowData.payment_requested).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                  sortable
+                />
+                <Column
+                  header="Project Status"
+                  body={() => {
+                    let status = 'Pending';
+                    let severity = 'warning';
+                    if (selectedProject?.project_status === 'completed') {
+                      status = 'Completed';
+                      severity = 'success';
+                    } else if (selectedProject?.project_status === 'active') {
+                      status = 'Active';
+                      severity = 'info';
+                    } else if (selectedProject?.project_status === 'cancelled') {
+                      status = 'Cancelled';
+                      severity = 'danger';
                     }
-                  />
-                </div>
-                <div className="detail-item">
-                  <label>Priority:</label>
-                  <Tag
-                    value={selectedProject.priority || 'Medium'}
-                    severity={
-                      selectedProject.priority === 'high'
-                        ? 'danger'
-                        : selectedProject.priority === 'medium'
-                          ? 'warning'
-                          : 'success'
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Financial Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Contract Amount:</label>
-                  <span className="amount">
-                    {amountTemplate(selectedProject)}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <label>Deadline:</label>
-                  <span>{dateTemplate(selectedProject)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Description</h4>
-              <div className="description-box">
-                {selectedProject.project_description ||
-                  'No description provided.'}
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Additional Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Created Date:</label>
-                  <span>
-                    {selectedProject.created_at
-                      ? new Date(
-                          selectedProject.created_at,
-                        ).toLocaleDateString()
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <label>Last Updated:</label>
-                  <span>
-                    {selectedProject.updated_at
-                      ? new Date(
-                          selectedProject.updated_at,
-                        ).toLocaleDateString()
-                      : 'N/A'}
-                  </span>
-                </div>
-              </div>
+                    return <Tag value={status} severity={severity} />;
+                  }}
+                />
+                <Column
+                  header="Export"
+                  body={(rowData) => (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <Button  icon="pi pi-file-pdf" className="p-button-sm p-button-danger" onClick={() => downloadReportPDF(rowData)} tooltip="Save as PDF" />
+                      <Button  icon="pi pi-file-excel" className="p-button-sm p-button-success" onClick={handleSaveAsCSV} tooltip="Save as CSV" />
+                    </div>
+                  )}
+                />
+              </DataTable>
             </div>
           </div>
         )}
 
-        <div className="flex justify-content-end mt-4">
+        <div
+          style={{
+            padding: '1rem 2rem',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '0.5rem',
+          }}
+        >
           <Button
-            style={{ marginBottom: '1rem', marginRight: '1rem', padding: '0.5rem' }}
             label="Close"
             severity="secondary"
+            style={{
+              padding: '0.5rem'
+            }}
             onClick={() => setDisplayDetailsDialog(false)}
           />
         </div>

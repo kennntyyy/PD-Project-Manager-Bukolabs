@@ -14,6 +14,7 @@ import api from '../../services/api';
 import './Dashboard.css';
 
 const ContractorDashboard = () => {
+  const [clients, setClients] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('contractorActiveTab') || 'projects',
@@ -41,10 +42,31 @@ const ContractorDashboard = () => {
   // Project status options
   const statusOptions = [
     { label: 'All Status', value: 'all' },
-    { label: 'Active', value: 'active' },
     { label: 'Completed', value: 'completed' },
-    { label: 'Pending', value: 'pending' },
+    { label: 'Ongoing', value: 'ongoing' },
+    { label: 'Hold', value: 'hold' },
   ];
+
+  const fetchClients = async () => {
+    try {
+      const response = await api.get('/users?role=client');
+      setClients(response.data);
+    } catch (error) {
+      console.error('Fetch clients error:', error);
+    }
+  };
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  //get client name
+  const getClientName = (clientId) => {
+    if (!clientId) return '';
+    const client = clients.find((c) => c.user_id === clientId);
+    return client
+      ? `${client.first_name} ${client.last_name}`.toLowerCase()
+      : '';
+  };
 
   // Fetch contractor's projects
   const fetchMyProjects = async () => {
@@ -102,17 +124,17 @@ const ContractorDashboard = () => {
 
   // Status badge template
   const statusTemplate = (rowData) => {
-    let status = 'Pending';
+    let status = 'Hold';
     let severity = 'warning';
 
     if (rowData.project_status === 'completed') {
       status = 'Completed';
       severity = 'success';
-    } else if (rowData.project_status === 'active') {
-      status = 'Active';
+    } else if (rowData.project_status === 'ongoing') {
+      status = 'Ongoing';
       severity = 'info';
-    } else if (rowData.project_status === 'cancelled') {
-      status = 'Cancelled';
+    } else if (rowData.project_status === 'hold') {
+      status = 'on Hold';
       severity = 'danger';
     }
 
@@ -148,12 +170,12 @@ const ContractorDashboard = () => {
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter((project) => {
-        if (statusFilter === 'active')
-          return project.project_status === 'active';
+        if (statusFilter === 'ongoing')
+          return project.project_status === 'ongoing';
         if (statusFilter === 'completed')
           return project.project_status === 'completed';
-        if (statusFilter === 'pending')
-          return project.project_status === 'pending';
+        if (statusFilter === 'hold')
+          return project.project_status === 'hold';
         return true;
       });
     }
@@ -351,15 +373,27 @@ const ContractorDashboard = () => {
                     </div>
                   </div>
                   <div className="stat-card">
-                    <i className="pi pi-clock" style={{ color: '#F59E0B' }} />
+                    <i className="pi pi-clock" style={{ color: '#d4d143' }} />
                     <div>
                       <h3>
                         {
-                          projects.filter((p) => p.project_status === 'active')
+                          projects.filter((p) => p.project_status === 'ongoing')
                             .length
                         }
                       </h3>
-                      <p>Active</p>
+                      <p>hold</p>
+                    </div>
+                    </div>
+                  <div className="stat-card">
+                    <i className="pi pi-pause-circle" style={{ color: '#cc3d24' }} />
+                    <div>
+                      <h3>
+                        {
+                          projects.filter((p) => p.project_status === 'hold')
+                            .length
+                        }
+                      </h3>
+                      <p>On Hold</p>
                     </div>
                   </div>
                 </div>
@@ -394,6 +428,15 @@ const ContractorDashboard = () => {
                   )}
                 />
                 <Column
+                  field="client_name"
+                  header="Client"
+                  body={(rowData) => {
+                    const clientName = getClientName(rowData.client_id);
+                    return <span>{clientName || 'N/A'}</span>;
+                  }}
+                  sortable
+                />
+                <Column
                   field="project_description"
                   header="Description"
                   body={(rowData) => (
@@ -420,12 +463,7 @@ const ContractorDashboard = () => {
                   body={statusTemplate}
                   sortable
                 />
-                <Column
-                  field="priority"
-                  header="Priority"
-                  body={priorityTemplate}
-                  sortable
-                />
+                
                 <Column
                   header="Actions"
                   body={(rowData) => (
@@ -485,6 +523,7 @@ const ContractorDashboard = () => {
         style={{ width: '90vw', maxWidth: '600px',}}
         header="Project Details"
         headerStyle={{paddingTop: '1rem', paddingLeft: '1rem'}}
+        
         modal
         onHide={() => setDisplayDetailsDialog(false)}
       >
@@ -504,11 +543,11 @@ const ContractorDashboard = () => {
                 <div className="detail-item">
                   <label>Status:</label>
                   <Tag
-                    value={selectedProject.project_status || 'Pending'}
+                    value={selectedProject.project_status || 'Hold'}
                     severity={
                       selectedProject.project_status === 'completed'
                         ? 'success'
-                        : selectedProject.project_status === 'active'
+                        : selectedProject.project_status === 'ongoing'
                           ? 'info'
                           : 'warning'
                     }

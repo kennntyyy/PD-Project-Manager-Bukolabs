@@ -15,6 +15,7 @@ import './Dashboard.css';
 
 const ContractorDashboard = () => {
   const [clients, setClients] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('contractorActiveTab') || 'projects',

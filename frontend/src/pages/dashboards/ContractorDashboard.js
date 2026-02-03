@@ -6,10 +6,14 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Tag } from 'primereact/tag';
 import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { InputNumber } from 'primereact/inputnumber';
+import { Slider } from 'primereact/slider';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
+import { ProgressBar } from 'primereact/progressbar';
 import api from '../../services/api';
 import './Dashboard.css';
 
@@ -40,6 +44,7 @@ const ContractorDashboard = () => {
     { key: 'settings', icon: 'pi pi-cog', label: 'Settings' },
   ];
 
+  
   // Project status options
   const statusOptions = [
     { label: 'All Status', value: 'all' },
@@ -47,7 +52,15 @@ const ContractorDashboard = () => {
     { label: 'Ongoing', value: 'ongoing' },
     { label: 'Hold', value: 'hold' },
   ];
-
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '';
+    const apiBaseUrl =
+      process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+    const baseUrl = apiBaseUrl.replace('/api', '');
+    if (imagePath.startsWith('http')) return imagePath;
+    return `${baseUrl}${imagePath}`;
+   };
+  
   const fetchClients = async () => {
     try {
       const response = await api.get('/users?role=client');
@@ -92,6 +105,8 @@ const ContractorDashboard = () => {
       setLoading(false);
     }
   };
+  const [projectReports, setProjectReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('contractorActiveTab', activeTab);
@@ -122,7 +137,30 @@ const ContractorDashboard = () => {
     if (!rowData.project_deadline) return 'N/A';
     return new Date(rowData.project_deadline).toLocaleDateString();
   };
-
+// Save as CSV
+    const handleSaveAsCSV = () => {
+      let csv = 'Project Details\n';
+      if (selectedProject) {
+        Object.entries(selectedProject).forEach(([key, value]) => {
+          csv += `${key},${value}\n`;
+        });
+      }
+      csv += '\nReports\n';
+      if (projectReports.length > 0) {
+        const reportKeys = Object.keys(projectReports[0]);
+        csv += reportKeys.join(',') + '\n';
+        projectReports.forEach(report => {
+          csv += reportKeys.map(key => JSON.stringify(report[key] ?? '')).join(',') + '\n';
+        });
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'project-details.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    };
   // Status badge template
   const statusTemplate = (rowData) => {
     let status = 'Hold';
@@ -140,6 +178,13 @@ const ContractorDashboard = () => {
     }
 
     return <Tag value={status} severity={severity} />;
+  };
+const getContractorName = (contractorId) => {
+    if (!contractorId) return '';
+    const contractor = contractors.find((c) => c.user_id === contractorId);
+    return contractor
+      ? `${contractor.first_name} ${contractor.last_name}`
+      : 'N/A';
   };
 
   // Priority badge template
@@ -315,38 +360,40 @@ const ContractorDashboard = () => {
           {activeTab === 'projects' && (
             <div className="projects-panel">
               <div className="panel-header">
-                <div className="search-filter-section">
+                <div className="search-filter-section" style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <h1>PROJECTS</h1>
+                    <p className="text-color-secondary m-0">
+                      Manage and track all project activities
+                    </p>
+                  </div>
+                  
                   <div className="p-inputgroup" style={{ maxWidth: '400px' }}>
-                    <span className="p-inputgroup-addon">
-                      <i className="pi pi-search" />
-                    </span>
-                    <input
-                      type="text"
-                      className="p-inputtext"
-                      placeholder="Search projects by name, description, amount..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ flex: '1' }}
-                    />
-                    {searchQuery && (
-                      <Button
-                        icon="pi pi-times"
-                        className="p-button-text"
-                        onClick={() => setSearchQuery('')}
-                        tooltip="Clear search"
+                    
+                    <div className="reports-search-box">
+                      <i className="pi pi-search"></i>
+                      <InputText
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="reports-search-input"
                       />
-                    )}
+                      {searchQuery && (
+                        <i
+                          className="pi pi-times"
+                          style={{ color: '#9ca3af', cursor: 'pointer' }}
+                          onClick={() => setSearchQuery('')}
+                        ></i>
+                      )}
+                    </div>
+                   
                   </div>
 
-                  <Dropdown
-                    value={statusFilter}
-                    options={statusOptions}
-                    onChange={(e) => setStatusFilter(e.value)}
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Filter by status"
-                    style={{ minWidth: '200px' }}
-                  />
+                  
                 </div>
 
                 <div className="projects-stats">
@@ -399,7 +446,15 @@ const ContractorDashboard = () => {
                   </div>
                 </div>
               </div>
-
+              <Dropdown
+                    value={statusFilter}
+                    options={statusOptions}
+                    onChange={(e) => setStatusFilter(e.value)}
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Filter by status"
+                    style={{ minWidth: '200px', marginBottom: '1rem' }}
+              />
               <DataTable
                 value={filteredProjects}
                 loading={loading}
@@ -519,120 +574,280 @@ const ContractorDashboard = () => {
       </div>
 
       {/* Project Details Dialog */}
-      <Dialog
-        visible={displayDetailsDialog}
-        style={{ width: '90vw', maxWidth: '600px',}}
-        header="Project Details"
-        headerStyle={{paddingTop: '1rem', paddingLeft: '1rem'}}
-        
-        modal
-        onHide={() => setDisplayDetailsDialog(false)}
-      >
-        {selectedProject && (
-          <div className="project-details">
-            <div className="detail-section">
-              <h4>Basic Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Project Name:</label>
-                  <span>{selectedProject.project_name}</span>
-                </div>
-                <div className="detail-item">
-                  <label>Project ID:</label>
-                  <span>{selectedProject.project_id}</span>
-                </div>
-                <div className="detail-item">
-                  <label>Status:</label>
-                  <Tag
-                    value={selectedProject.project_status || 'Hold'}
-                    severity={
-                      selectedProject.project_status === 'completed'
-                        ? 'success'
-                        : selectedProject.project_status === 'ongoing'
-                          ? 'info'
-                          : 'warning'
-                    }
-                  />
-                </div>
-                <div className="detail-item">
-                  <label>Priority:</label>
-                  <Tag
-                    value={selectedProject.priority || 'Medium'}
-                    severity={
-                      selectedProject.priority === 'high'
-                        ? 'danger'
-                        : selectedProject.priority === 'medium'
-                          ? 'warning'
-                          : 'success'
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Financial Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Contract Amount:</label>
-                  <span className="amount">
-                    {amountTemplate(selectedProject)}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <label>Deadline:</label>
-                  <span>{dateTemplate(selectedProject)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Description</h4>
-              <div className="description-box">
-                {selectedProject.project_description ||
-                  'No description provided.'}
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Additional Information</h4>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>Created Date:</label>
-                  <span>
-                    {selectedProject.created_at
-                      ? new Date(
-                          selectedProject.created_at,
-                        ).toLocaleDateString()
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <label>Last Updated:</label>
-                  <span>
-                    {selectedProject.updated_at
-                      ? new Date(
-                          selectedProject.updated_at,
-                        ).toLocaleDateString()
-                      : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-content-end mt-4">
-          <Button
-            style={{marginBottom: '1rem', marginRight: '1rem', padding: '0.5rem'}}
-            label="Close"
-            severity="secondary"
-            onClick={() => setDisplayDetailsDialog(false)}
-          />
-        </div>
-      </Dialog>
-    </div>
-  );
-};
+     <Dialog
+         header={null}
+         visible={displayDetailsDialog}
+         style={{ width: '70vw', maxHeight: '90vh' }}
+         onHide={() => setDisplayDetailsDialog(false)}
+       >
+         {selectedProject && (
+           <div
+             className="project-details-modal"
+             style={{
+               maxHeight: 'calc(100vh -100px)',
+               overflowY: 'auto',
+               padding: '1.5rem ',
+             }}
+           >
+             {/* Header */}
+             <div
+               style={{
+                 position: 'absolute',
+                 top: 0,
+                 left: 0,
+                 width: '100%',
+                 background: '#4f4d36',
+                 color: 'white',
+                 borderTopLeftRadius: '4px',
+                 borderTopRightRadius: '4px',
+                 borderBottomLeftRadius: 0,
+                 borderBottomRightRadius: 0,
+                 padding: '1.5rem 0 1.25rem 0',
+                 textAlign: 'left',
+                 boxShadow: '0 2px 8px rgba(5, 150, 105, 0.08)',
+                 zIndex: 2
+               }}
+             >
+               <button
+                 onClick={() => setDisplayDetailsDialog(false)}
+                 aria-label="Close"
+                 style={{
+                   position: 'absolute',
+                   top: '1.25rem',
+                   right: '1.5rem',
+                   background: 'rgb(0,0,0,0)',
+                   border: 'none',
+                   color: 'white',
+                   fontSize: '1.5rem',
+                   fontWeight: 700,
+                   borderRadius: '50%',
+                   width: '2.5rem',
+                   height: '2.5rem',
+                   cursor: 'pointer',
+                   display: 'flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   transition: 'background 0.2s',
+                   zIndex: 10
+                 }}
+                 onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.18)'}
+                 onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+               >
+                 ×
+               </button>
+               <h3
+                 style={{
+                   margin: 0,
+                   fontSize: '1.25rem',
+                   fontWeight: 700,
+                   textTransform: 'uppercase',
+                   fontFamily: "'Source Serif Pro', serif",
+                   letterSpacing: '0.5px',
+                   marginLeft: '1rem'
+                 }}
+               >
+                 Project Details
+               </h3>
+             </div>
+             <div style={{ height: '3rem' }} />
+ 
+             {/* Two Column Layout */}
+             <div style={{
+               display: 'flex',
+               flexDirection: 'row',
+               gap: '2rem',
+               alignItems: 'center',
+               justifyContent: 'center',
+               width: '100%',
+               background: '#d2d0af',
+               padding: '1rem',
+               borderRadius: '1rem'
+             }}>
+               <div className="image-container"
+                 style={{
+                  //  border: '2px solid #404A17',
+                   borderRadius: '1rem',
+                   height: '40%',
+                   width: '40%',
+                   display: 'flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   background: '#f8f8f8',
+                   overflow: 'hidden'
+                 }}>
+                 {(() => {
+                  const reportWithImages = projectReports.find(r => r.image_urls && r.image_urls.length > 0);
+                  
+                  if(!reportWithImages) {
+                    return (
+                      <img alt="NO PHOTO UPLOADED YET"></img>
+                    )
+                  }
+                  if (reportWithImages) {
+                   const firstRawUrl = reportWithImages.image_urls[0];
+ 
+                   const formattedUrl = getImageUrl(firstRawUrl);
+                   return (
+                     <img 
+                       src={formattedUrl} 
+                       alt="Project Progress" 
+                       style={{ 
+                         maxWidth: '100%', 
+                         maxHeight: '100%', 
+                         objectFit: 'cover' // 'cover' fills the area nicely, 'contain' shows the whole image
+                       }} 
+                       // Error handling in case the URL is broken
+                       onError={(e) => {
+                         e.target.src = 'https://via.placeholder.com/300?text=Image+Error';
+                       }}
+                     />
+                   );
+                  }
+                 })()}
+               </div>
+               <div className="details-container" style={{
+                 display: 'flex',
+                 flexDirection: 'column',
+                 gap: '0.5rem'
+               }}>
+                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Project Name: </label>
+                 <InputText
+                   name="project_name" 
+                   value={selectedProject.project_name}
+                   disabled>
+                 </InputText>
+                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Contractor: </label>
+                 <InputText
+                   name="project_contractor"
+                   value={getContractorName(selectedProject.contractor_id)}
+                   disabled>
+                 </InputText>
+                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Project Amount: </label>
+                 <InputNumber
+                   name="project_amount"
+                   value={selectedProject.total_amount}
+                   disabled
+                   prefix='₱'
+                   type='decimal'
+                   minFractionDigits={2}
+                   maxFractionDigits={2}
+                   locale="en-PH">
+                 </InputNumber>
+                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_start_date">Project Start Date:</label>
+                 <InputText
+                   name="project_start_date"
+                   disabled
+                   value={selectedProject?.project_start_date 
+                     ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
+                       month: 'long',
+                       day: 'numeric',
+                       year: 'numeric'
+                     })
+                     : ''
+                   }>
+                 </InputText>
+                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_completion_rate">Completion Rate:</label>
+                 <div style={{ display: 'flex', 
+                     alignItems: 'center', 
+                     gap: '1rem',  
+                    //  backgroundColor: 'rgb(160,160,160)', 
+                     padding: '0.5rem', 
+                     borderRadius: '0.25rem' }}>
+                   <ProgressBar 
+                        value={selectedProject.completion_rate || 0} 
+                        style={{ height: '15px', width: '150px', border: '2px solid #4f4d36', background: 'transparent' }}
+                        showValue={false} 
+                    />
+                   <span style={{ fontWeight: 'bold' }}>{selectedProject.completion_rate || 0}%</span>
+                 </div>
+               </div>
+             </div>
+             {/*PROJECT REPORTS TABLE DISABLED TEMPORARILY*/}
+           {/* <div style={{ marginTop: '2rem', 
+               background: '#AEAC8C', 
+               padding: '1rem',
+               borderRadius: '1rem' }}>
+               <h2  style={{
+                 fontWeight: 'bold',
+                 color: '#404A17'
+               }}>ACCOMPLISHMENTS</h2>
+               <DataTable
+                 value={projectReports}
+                 loading={reportsLoading}
+                 emptyMessage="No reports generated for this project."
+                 tableStyle={{ minWidth: '40rem' }}
+                 responsiveLayout="scroll"
+               >
+                 <Column
+                   field="report_date"
+                   header="Date Generated"
+                   body={rowData => rowData.report_date ? new Date(rowData.report_date).toLocaleDateString() : 'N/A'}
+                   sortable
+                 />
+                 <Column
+                   header="Contractor Name"
+                   body={() => getContractorName(selectedProject?.contractor_id)}
+                 />
+                 <Column
+                   field="payment_requested"
+                   header="Payment"
+                   body={rowData => rowData.payment_requested ? `₱${parseFloat(rowData.payment_requested).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                   sortable
+                 />
+                 <Column
+                   header="Project Status"
+                   body={() => {
+                     let status = 'Ongoing';
+                     let severity = 'warning';
+                     if (selectedProject?.project_status === 'completed') {
+                       status = 'Completed';
+                       severity = 'success';
+                     } else if (selectedProject?.project_status === 'active') {
+                       status = 'Active';
+                       severity = 'info';
+                     } else if (selectedProject?.project_status === 'cancelled') {
+                       status = 'Cancelled';
+                       severity = 'danger';
+                     }
+                     return <Tag value={status} severity={severity} />;
+                   }}
+                 />
+                 <Column
+                   header="Export"
+                   body={(rowData) => (
+                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                       <Button  icon="pi pi-file-pdf" className="p-button-sm p-button-danger" onClick={() => downloadReportPDF(rowData)} tooltip="Save as PDF" />
+                       <Button  icon="pi pi-file-excel" className="p-button-sm p-button-success" onClick={handleSaveAsCSV} tooltip="Save as CSV" />
+                     </div>
+                   )}
+                 />
+               </DataTable>
+             </div> */}
+           </div>
+         )}
+ 
+         <div
+           style={{
+             padding: '1rem 2rem',
+             display: 'flex',
+             justifyContent: 'flex-end',
+             gap: '0.5rem',
+           }}
+         >
+           <Button
+             label="Close"
+             severity="secondary"
+             style={{
+               padding: '0.5rem',
+               
+             }}
+             onClick={() => setDisplayDetailsDialog(false)}
+           />
+         </div>
+       </Dialog>
+     </div>
+   );
+ };
+ 
 
 export default ContractorDashboard;

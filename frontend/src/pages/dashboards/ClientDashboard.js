@@ -10,19 +10,23 @@ import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog } from 'primereact/confirmdialog';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
+import { ProgressBar } from 'primereact/progressbar';
 import { Slider } from 'primereact/slider';
 import api from '../../services/api';
 import { pdf, Font } from '@react-pdf/renderer';
 import './Dashboard.css';
 import { ProjectReportPDF } from '../dashboards/staff_panels/ProjectReportPDF';
 
-// Font.register({
-//   family: 'Source Serif Pro',
-//   fonts: [
-//     { src: 'https://fonts.gstatic.com/s/sourceserifpro/v15/ne6v77u_ls8ax40_n68_9y-A-X77D34.ttf' }, // Regular
-//     { src: 'https://fonts.gstatic.com/s/sourceserifpro/v15/ne6z77u_ls8ax40_n68_9y-A-X77D34.ttf', fontWeight: 'bold' } // Bold
-//   ]
-// });
+Font.register({
+  family: 'Source Serif Pro',
+  fonts: [
+    { src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica.ttf' },
+    { 
+      src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica-Bold.ttf', 
+      fontWeight: 'bold' 
+    }
+  ]
+});
 
 const ClientDashboard = () => {
   const [recentReports, setRecentReports] = useState([]);
@@ -84,7 +88,7 @@ const ClientDashboard = () => {
     
           // Convert relative image URLs to absolute URLs for PDF
           const absoluteImageUrls = (report.image_urls || []).map((url) =>
-            getImageUrl(url),
+            getImageUrl(url) // This uses your helper function
           );
     
           // Calculate total spent only for reports up to and including this report
@@ -340,42 +344,38 @@ const ClientDashboard = () => {
     return <Tag value={rowData.priority} severity={severity} />;
   };
 
-  // Filter projects based on search and status
   const getFilteredProjects = () => {
-    let filtered = projects;
+  // 1. Initial filter for deleted status
+  let filtered = projects.filter((project) => {
+    return project.isDeleted === false || project.isDeleted === undefined;
+  });
 
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((project) => {
-        if (statusFilter === 'ongoing')
-          return project.project_status === 'ongoing';
-        if (statusFilter === 'completed')
-          return project.project_status === 'completed';
-        if (statusFilter === 'hold')
-          return project.project_status === 'hold';
-        return true;
-      });
-    }
+  // 2. Apply search if query exists
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase();
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((project) => {
-        return (
-          project.project_name?.toLowerCase().includes(query) ||
-          project.project_description?.toLowerCase().includes(query) ||
-          project.total_amount?.toString().includes(query) ||
-          (project.project_deadline &&
-            new Date(project.project_deadline)
-              .toLocaleDateString()
-              .toLowerCase()
-              .includes(query))
-        );
-      });
-    }
+    filtered = filtered.filter((project) => {
+      // Pre-fetch names from helpers and normalize to lowercase
+      const contractorName = getContractorName(project.contractor_id).toLowerCase();
+      const clientName = getClientName(project.client_id).toLowerCase();
+      
+      return (
+        project.project_name?.toLowerCase().includes(query) ||
+        project.project_description?.toLowerCase().includes(query) ||
+        project.total_amount?.toString().includes(query) ||
+        contractorName.includes(query) || // Search by Contractor
+        clientName.includes(query) ||     // Search by Client
+        (project.project_deadline &&
+          new Date(project.project_deadline)
+            .toLocaleDateString()
+            .toLowerCase()
+            .includes(query))
+      );
+    });
+  }
 
-    return filtered;
-  };
+  return filtered;
+};
 
   const filteredProjects = getFilteredProjects();
 
@@ -483,27 +483,36 @@ const ClientDashboard = () => {
           {activeTab === 'projects' && (
             <div className="projects-panel">
               <div className="panel-header">
-                <div className="search-filter-section">
+                <div className="search-filter-section" style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <h1>PROJECTS</h1>
+                    <p className="text-color-secondary m-0">
+                      Manage and track all project activities
+                    </p>
+                  </div>
                   <div className="p-inputgroup" style={{ maxWidth: '400px' }}>
-                    <span className="p-inputgroup-addon">
-                      <i className="pi pi-search" />
-                    </span>
-                    <input
-                      type="text"
-                      className="p-inputtext"
-                      placeholder="Search projects by name, description, amount..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      style={{ flex: '1' }}
-                    />
-                    {searchQuery && (
-                      <Button
-                        icon="pi pi-times"
-                        className="p-button-text"
-                        onClick={() => setSearchQuery('')}
-                        tooltip="Clear search"
+
+                    <div className="reports-search-box">
+                      <i className="pi pi-search"></i>
+                      <InputText
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="reports-search-input"
                       />
-                    )}
+                      {searchQuery && (
+                        <i
+                          className="pi pi-times"
+                          style={{ color: '#9ca3af', cursor: 'pointer' }}
+                          onClick={() => setSearchQuery('')}
+                        ></i>
+                      )}
+                    </div>
+                   
                   </div>
 
                   {/* <Dropdown
@@ -754,7 +763,7 @@ const ClientDashboard = () => {
             }}>
               <div className="image-container"
                 style={{
-                  border: '2px solid #404A17',
+                  // border: '2px solid #404A17',
                   borderRadius: '1rem',
                   height: '40%',
                   width: '40%',
@@ -767,6 +776,12 @@ const ClientDashboard = () => {
                 {(() => {
                  const reportWithImages = projectReports.find(r => r.image_urls && r.image_urls.length > 0);
 
+                 if(!reportWithImages) {
+                  return (
+                    <img alt="NO PHOTO UPLOADED YET"></img>
+                  )
+                 }
+
                  if (reportWithImages) {
                   const firstRawUrl = reportWithImages.image_urls[0];
 
@@ -778,9 +793,9 @@ const ClientDashboard = () => {
                       style={{ 
                         maxWidth: '100%', 
                         maxHeight: '100%', 
-                        objectFit: 'cover' // 'cover' fills the area nicely, 'contain' shows the whole image
+                        objectFit: 'cover' 
                       }} 
-                      // Error handling in case the URL is broken
+                      
                       onError={(e) => {
                         e.target.src = 'https://via.placeholder.com/300?text=Image+Error';
                       }}
@@ -791,58 +806,113 @@ const ClientDashboard = () => {
               </div>
               <div className="details-container" style={{
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                gap: '0.25rem'
               }}>
-                <label htmlFor="project_name">Project Name: </label>
-                <InputText
-                  name="project_name" 
-                  value={selectedProject.project_name}
-                  disabled>
-                </InputText>
-                <label htmlFor="project_name">Contractor: </label>
-                <InputText
-                  name="project_contractor"
-                  value={getContractorName(selectedProject.contractor_id)}
-                  disabled>
-                </InputText>
-                <label htmlFor="project_name">Project Amount: </label>
-                <InputNumber
-                  name="project_amount"
-                  value={selectedProject.total_amount}
-                  disabled
-                  prefix='₱'
-                  type='decimal'
-                  minFractionDigits={2}
-                  maxFractionDigits={2}
-                  locale="en-PH">
-                </InputNumber>
-                <label htmlFor="project_start_date">Project Start Date:</label>
-                <InputText
-                  name="project_start_date"
-                  disabled
-                  value={selectedProject?.project_start_date 
-                    ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })
-                    : ''
-                  }>
-                </InputText>
-                <label htmlFor="project_completion_rate">Completion Rate:</label>
-                <div style={{ display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '1rem',  
-                    backgroundColor: 'rgb(160,160,160)', 
-                    padding: '0.5rem', 
-                    borderRadius: '0.25rem' }}>
-                  <Slider value={selectedProject.completion_rate || 0} min={0} max={100} disabled style={{ width: '150px' }} />
-                  <span style={{ fontWeight: 'bold' }}>{selectedProject.completion_rate || 0}%</span>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_name">Project Name: </label>
+                  <InputText
+                    name="project_name" 
+                    value={selectedProject.project_name}
+                    disabled>
+                  </InputText>
                 </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_name">Contractor: </label>
+                  <InputText
+                    name="project_contractor"
+                    value={getContractorName(selectedProject.contractor_id)}
+                    disabled>
+                  </InputText>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_name">Project Amount: </label>
+                  <InputNumber
+                    name="project_amount"
+                    value={selectedProject.total_amount}
+                    disabled
+                    prefix='₱'
+                    type='decimal'
+                    minFractionDigits={2}
+                    maxFractionDigits={2}
+                    locale="en-PH">
+                  </InputNumber>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_start_date">Project Start Date:</label>
+                  <InputText
+                    name="project_start_date"
+                    disabled
+                    value={selectedProject?.project_start_date 
+                      ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                      : ''
+                    }>
+                  </InputText>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_deadline">Project Deadline:</label>
+                  <InputText
+                    name="project_deadline"
+                    disabled
+                    value={selectedProject?.project_deadline 
+                      ? new Date(selectedProject.project_deadline).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                      : ''
+                    }>
+                  </InputText>
+                </div>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <label htmlFor="project_completion_rate">Completion Rate:</label>
+                  <div style={{ display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '1rem',  
+                      backgroundColor: 'rgb(160,160,160)', 
+                      padding: '0.5rem', 
+                      borderRadius: '0.25rem' }}>
+                    <ProgressBar 
+                        value={selectedProject.completion_rate || 0} 
+                        style={{ height: '15px', width: '150px', border: '2px solid #4f4d36', background: 'transparent' }}
+                        showValue={false} 
+                    />
+                    <span style={{ fontWeight: 'bold' }}>{selectedProject.completion_rate || 0}%</span>
+                  </div>
+                </div>
+                
               </div>
             </div>
             {/*PROJECT REPORTS TABLE DISABLED TEMPORARILY*/}
-          <div style={{ marginTop: '2rem', 
+          {/* <div style={{ marginTop: '2rem', 
               background: '#AEAC8C', 
               padding: '1rem',
               borderRadius: '1rem' }}>
@@ -901,7 +971,7 @@ const ClientDashboard = () => {
                   )}
                 />
               </DataTable>
-            </div>
+            </div> */}
           </div>
         )}
 

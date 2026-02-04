@@ -58,6 +58,7 @@ export class ReportsService {
       payment_triggered,
       image_urls: imageUrlsArray,
       image_comments: image_comments,
+      created_by: currentUser?.username,
     });
 
     const savedReport = await this.reportRepository.save(report);

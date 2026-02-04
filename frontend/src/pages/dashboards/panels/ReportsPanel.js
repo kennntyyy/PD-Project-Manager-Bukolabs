@@ -331,6 +331,23 @@ const ReportsPanel = () => {
     setShowReportModal(true);
   };
 
+  // Get the last report's end date for the selected project
+  const getLastReportEndDate = () => {
+    const projectReports = recentReports.filter(
+      (report) => report.project_id === selectedProject?.project_id,
+    );
+    if (projectReports.length === 0) return null;
+
+    // Find the most recent report by created_at or end_date
+    const lastReport = projectReports.reduce((latest, current) => {
+      const latestDate = new Date(latest.created_at || latest.end_date || 0);
+      const currentDate = new Date(current.created_at || current.end_date || 0);
+      return currentDate > latestDate ? current : latest;
+    });
+
+    return lastReport.end_date ? new Date(lastReport.end_date) : null;
+  };
+
   const resetForm = () => {
     setCompletionRate(0);
     setReleasedAmount(0);
@@ -439,6 +456,24 @@ const ReportsPanel = () => {
     if (!reportStartDate || !reportEndDate) {
       showToast('warn', 'Warning', 'Please select both start and end dates');
       return;
+    }
+
+    // Validate start date is not before last report's end date
+    const lastReportEndDate = getLastReportEndDate();
+    if (lastReportEndDate) {
+      const lastEndDateOnly = new Date(lastReportEndDate);
+      lastEndDateOnly.setHours(0, 0, 0, 0);
+      const selectedStartDate = new Date(reportStartDate);
+      selectedStartDate.setHours(0, 0, 0, 0);
+
+      if (selectedStartDate <= lastEndDateOnly) {
+        showToast(
+          'error',
+          'Invalid Date',
+          `Report start date must be after ${formatDate(lastReportEndDate)}`,
+        );
+        return;
+      }
     }
 
     // Validate start date is before end date
@@ -900,167 +935,212 @@ const ReportsPanel = () => {
           onClick={handleBackToList}
         />
 
-        <div className="flex justify-between items-center">
-          <div>
+        <div className="flex justify-between items-start gap-4">
+          <div style={{ textAlign: 'left' }}>
             <h2 className="m-0">{selectedProject.project_name}</h2>
             <p className="text-color-secondary m-0">
-              Client: {getClientName(selectedProject.client_id)} | Contractor:{' '}
-              {getContractorName(selectedProject.contractor_id)}
+              Client: {getClientName(selectedProject.client_id)}
+              <br />
+              Contractor: {getContractorName(selectedProject.contractor_id)}
             </p>
+            {!isProjectLocked(selectedProject?.project_status) && (
+              <Button
+                label="Generate New Report"
+                onClick={handleGenerateClick}
+                className="p-button-primary"
+                style={{ marginTop: '1rem' }}
+              />
+            )}
           </div>
-          {!isProjectLocked(selectedProject?.project_status) && (
-            <Button
-              label="Generate New Report"
-              onClick={handleGenerateClick}
-              className="ml-4 p-button-primary"
-            />
-          )}
+          <div
+            className="flex flex-column gap-3 items-end flex-shrink-0"
+            style={{ marginLeft: 'auto' }}
+          >
+            <Card className="p-1" style={{ minWidth: '520px' }}>
+              <h4
+                className="m-0"
+                style={{ fontSize: '12px', marginBottom: '4px' }}
+              >
+                Project Info
+              </h4>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <span className="font-bold text-xs">Status:</span>
+                  <div style={{ marginTop: '2px' }}>
+                    {renderStatusBadge(selectedProject.project_status)}
+                  </div>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Budget:</span>
+                  <p className="m-0 text-xs font-bold text-primary">
+                    {formatCurrency(selectedProject.total_amount)}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Deadline:</span>
+                  <p className="m-0 text-xs">
+                    {formatDate(selectedProject.project_deadline)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 
-      <TabView>
-        <TabPanel
-          header={`Recent Reports (${filteredReports.length})`}
-          className="p-2"
-        >
-          {filteredReports.length > 0 ? (
-            <div className="grid">
-              {filteredReports.map((report, index) => (
-                <div key={index} className="col-12 lg:col-6">
-                  <Card className="p-4">
-                    <div className="flex flex-column gap-3 h-full">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="m-0">
-                            Report #{filteredReports.length - index}
-                          </h4>
-                          <small className="text-color-secondary">
-                            Generated:{' '}
-                            {formatDateTime(
-                              report.created_at || report.start_date,
-                            )}
+      <div style={{ marginTop: '-35px', paddingTop: 0 }}>
+        <h3 style={{ marginTop: 0, marginBottom: '0.5rem', paddingTop: 0 }}>
+          Reports ({filteredReports.length})
+        </h3>
+        {filteredReports.length > 0 ? (
+          <div className="grid">
+            {filteredReports.map((report, index) => (
+              <div key={index} className="col-12 lg:col-6">
+                <Card className="p-4">
+                  <div className="flex flex-column gap-3 h-full">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="m-0">
+                          Report #{filteredReports.length - index}
+                        </h4>
+                        <small className="text-color-secondary">
+                          Generated:{' '}
+                          {formatDateTime(
+                            report.created_at || report.start_date,
+                          )}
+                        </small>
+                        {report.created_by && (
+                          <small
+                            className="text-color-secondary"
+                            style={{ display: 'block', marginTop: '4px' }}
+                          >
+                            By: {report.created_by}
                           </small>
-                        </div>
-                        <Button
-                          icon="pi pi-ellipsis-v"
-                          className="p-button-rounded p-button-text p-button-sm"
-                          onClick={(e) => {
-                            if (!menuRefs.current[index]) {
-                              menuRefs.current[index] = React.createRef();
-                            }
-                            menuRefs.current[index].current.toggle(e);
-                          }}
-                          aria-label="Actions"
-                        />
-                        <Menu
-                          model={getMenuItems(report)}
-                          popup
-                          ref={
-                            menuRefs.current[index] ||
-                            (menuRefs.current[index] = React.createRef())
+                        )}
+                      </div>
+                      <Button
+                        icon="pi pi-ellipsis-v"
+                        className="p-button-rounded p-button-text p-button-sm"
+                        onClick={(e) => {
+                          if (!menuRefs.current[index]) {
+                            menuRefs.current[index] = React.createRef();
                           }
-                          id={`menu_${index}`}
+                          menuRefs.current[index].current.toggle(e);
+                        }}
+                        aria-label="Actions"
+                      />
+                      <Menu
+                        model={getMenuItems(report)}
+                        popup
+                        ref={
+                          menuRefs.current[index] ||
+                          (menuRefs.current[index] = React.createRef())
+                        }
+                        id={`menu_${index}`}
+                      />
+                    </div>
+
+                    <div className="completion-progress-section">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-sm">
+                          Completion Progress
+                        </span>
+                      </div>
+                      <ProgressBar
+                        value={report.current_progress}
+                        className="report-progress-bar"
+                      />
+                    </div>
+
+                    {report.image_urls && report.image_urls.length > 0 && (
+                      <div className="flex items-center gap-2 p-3 surface-100 border-round">
+                        <i className="pi pi-paperclip text-lg" />
+                        <span className="font-bold">
+                          Attachments: {report.image_urls.length} image
+                          {report.image_urls.length !== 1 ? 's' : ''}
+                        </span>
+                        <Button
+                          label="View Images"
+                          icon="pi pi-eye"
+                          className="p-button-sm p-button-text"
+                          onClick={() =>
+                            handleViewImages(
+                              report.image_urls,
+                              report.image_comments,
+                            )
+                          }
                         />
                       </div>
+                    )}
 
-                      <div className="completion-progress-section">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-bold text-sm">
-                            Completion Progress
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={report.current_progress}
-                          className="report-progress-bar"
-                        />
+                    <Divider className="my-2" />
+
+                    <div className="grid">
+                      <div className="col-6">
+                        <span className="font-bold">Period:</span>
+                        <p className="m-0 text-sm">
+                          {formatDate(report.start_date || report.report_date)}{' '}
+                          - {formatDate(report.end_date || report.report_date)}
+                        </p>
                       </div>
-
-                      {report.image_urls && report.image_urls.length > 0 && (
-                        <div className="flex items-center gap-2 p-3 surface-100 border-round">
-                          <i className="pi pi-paperclip text-lg" />
-                          <span className="font-bold">
-                            Attachments: {report.image_urls.length} image
-                            {report.image_urls.length !== 1 ? 's' : ''}
-                          </span>
-                          <Button
-                            label="View Images"
-                            icon="pi pi-eye"
-                            className="p-button-sm p-button-text"
-                            onClick={() =>
-                              handleViewImages(
-                                report.image_urls,
-                                report.image_comments,
+                      <div className="col-6">
+                        <span className="font-bold">Payment:</span>
+                        <p className="m-0 text-sm">
+                          {formatCurrency(report.payment_requested)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            id={`paid-${report.report_id}`}
+                            type="checkbox"
+                            checked={!!report.payment_triggered}
+                            onChange={(e) =>
+                              handlePaymentToggle(
+                                report.report_id,
+                                e.target.checked,
                               )
                             }
                           />
-                        </div>
-                      )}
-
-                      <Divider className="my-2" />
-
-                      <div className="grid">
-                        <div className="col-6">
-                          <span className="font-bold">Period:</span>
-                          <p className="m-0 text-sm">
-                            {formatDate(
-                              report.start_date || report.report_date,
-                            )}{' '}
-                            -{' '}
-                            {formatDate(report.end_date || report.report_date)}
-                          </p>
-                        </div>
-                        <div className="col-6">
-                          <span className="font-bold">Payment:</span>
-                          <p className="m-0 text-sm">
-                            {formatCurrency(report.payment_requested)}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <input
-                              id={`paid-${report.report_id}`}
-                              type="checkbox"
-                              checked={!!report.payment_triggered}
-                              onChange={(e) =>
-                                handlePaymentToggle(
-                                  report.report_id,
-                                  e.target.checked,
-                                )
-                              }
-                            />
-                            <label
-                              htmlFor={`paid-${report.report_id}`}
-                              className="text-sm"
-                            >
-                              Paid
-                            </label>
-                          </div>
+                          <label
+                            htmlFor={`paid-${report.report_id}`}
+                            className="text-sm"
+                          >
+                            Paid
+                          </label>
                         </div>
                       </div>
+                    </div>
 
-                      {report.report_description && (
-                        <div>
-                          <span className="font-bold">Notes:</span>
-                          <p className="m-0 text-sm line-height-3">
-                            {report.report_description.length > 120
-                              ? `${report.report_description.substring(0, 120)}...`
-                              : report.report_description}
-                          </p>
-                        </div>
-                      )}
+                    {report.report_description && (
+                      <div>
+                        <span className="font-bold">Notes:</span>
+                        <p className="m-0 text-sm line-height-3">
+                          {report.report_description.length > 120
+                            ? `${report.report_description.substring(0, 120)}...`
+                            : report.report_description}
+                        </p>
+                      </div>
+                    )}
 
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          label="Download PDF"
-                          icon="pi pi-file-pdf"
-                          className="p-button-outlined p-button-sm p-button-danger"
-                          onClick={() => downloadReportPDF(report)}
-                        />
-                        <Button
-                          label="Download CSV"
-                          icon="pi pi-file-excel"
-                          className="p-button-outlined p-button-sm p-button-success"
-                          onClick={() => downloadReportCSV(report)}
-                        />
-                        {/* <Button
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        label="Download PDF"
+                        icon="pi pi-file-pdf"
+                        className="p-button-outlined p-button-sm p-button-danger"
+                        onClick={() => downloadReportPDF(report)}
+                      />
+                      <Button
+                        label="Download CSV"
+                        icon="pi pi-file-excel"
+                        className="p-button-outlined p-button-sm p-button-success"
+                        onClick={() => downloadReportCSV(report)}
+                      />
+                      {/* <Button
                           label="Regenerate"
                           icon="pi pi-refresh"
                           className="p-button-outlined p-button-sm"
@@ -1083,83 +1163,30 @@ const ReportsPanel = () => {
                             setShowReportModal(true);
                           }}
                         /> */}
-                      </div>
                     </div>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
-              <h3>No Reports Yet</h3>
-              <p className="text-color-secondary mb-4">
-                Generate the first report for this project
-              </p>
-              {!isProjectLocked(selectedProject?.project_status) && (
-                <Button
-                  label="Generate First Report"
-                  icon="pi pi-file"
-                  onClick={handleGenerateClick}
-                  className="p-button-primary"
-                />
-              )}
-            </div>
-          )}
-        </TabPanel>
-
-        <TabPanel header="Project Info" className="p-2">
-          <Card>
-            <div className="grid">
-              <div className="col-12 md:col-6">
-                <h4>Project Details</h4>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-bold">Project Name:</span>
-                    <p className="m-0">{selectedProject.project_name}</p>
                   </div>
-                  <div>
-                    <span className="font-bold">Description:</span>
-                    <p className="m-0">
-                      {selectedProject.project_description || 'No description'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Status:</span>
-                    <span className="ml-2">
-                      {renderStatusBadge(selectedProject.project_status)}
-                    </span>
-                  </div>
-                </div>
+                </Card>
               </div>
-
-              <div className="col-12 md:col-6">
-                <h4>Financial Information</h4>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-bold">Total Budget:</span>
-                    <p className="m-0 text-xl font-bold">
-                      {formatCurrency(selectedProject.total_amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Start Date:</span>
-                    <p className="m-0">
-                      {formatDate(selectedProject.project_start_date)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Deadline:</span>
-                    <p className="m-0">
-                      {formatDate(selectedProject.project_deadline)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </TabPanel>
-      </TabView>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
+            <h3>No Reports Yet</h3>
+            <p className="text-color-secondary mb-4">
+              Generate the first report for this project
+            </p>
+            {!isProjectLocked(selectedProject?.project_status) && (
+              <Button
+                label="Generate First Report"
+                icon="pi pi-file"
+                onClick={handleGenerateClick}
+                className="p-button-primary"
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1384,6 +1411,11 @@ const ReportsPanel = () => {
                   dateFormat="mm/dd/yy"
                   showIcon
                   style={{ width: '100%' }}
+                  minDate={
+                    getLastReportEndDate()
+                      ? new Date(getLastReportEndDate().getTime() + 86400000)
+                      : undefined
+                  }
                 />
               </div>
               <div>
@@ -1404,6 +1436,12 @@ const ReportsPanel = () => {
                   dateFormat="mm/dd/yy"
                   showIcon
                   style={{ width: '100%' }}
+                  minDate={
+                    reportStartDate ||
+                    (getLastReportEndDate()
+                      ? new Date(getLastReportEndDate().getTime() + 86400000)
+                      : undefined)
+                  }
                 />
               </div>
 

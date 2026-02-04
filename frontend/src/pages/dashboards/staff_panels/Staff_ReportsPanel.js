@@ -6,6 +6,7 @@ import {
   View,
   StyleSheet,
   PDFDownloadLink,
+  pdf,
 } from '@react-pdf/renderer';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -18,21 +19,13 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Toast } from 'primereact/toast';
-import { Tag } from 'primereact/tag';
 import { FloatLabel } from 'primereact/floatlabel';
 import { Slider } from 'primereact/slider';
 import { Divider } from 'primereact/divider';
 import { ProgressBar } from 'primereact/progressbar';
 import { Card } from 'primereact/card';
-import { Toolbar } from 'primereact/toolbar';
 import { TabView, TabPanel } from 'primereact/tabview';
-import { Badge } from 'primereact/badge';
-import { Skeleton } from 'primereact/skeleton';
 import { Menu } from 'primereact/menu';
-import { SplitButton } from 'primereact/splitbutton';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import { pdf } from '@react-pdf/renderer';
 import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF';
 import api from '../../../services/api';
 import '../panels/ReportsPanel.css';
@@ -49,6 +42,7 @@ const StaffReportsPanel = () => {
   const [reportValue, setReportValue] = useState('');
   const [reportStartDate, setReportStartDate] = useState(null);
   const [reportEndDate, setReportEndDate] = useState(null);
+  const [isPaymentTriggered, setIsPaymentTriggered] = useState(false);
   const [recentReports, setRecentReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -61,6 +55,7 @@ const StaffReportsPanel = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const toast = useRef(null);
   const menuRefs = useRef({});
+  const statusSyncRef = useRef(new Set());
 
   // Get base URL for images
   const getImageUrl = (imagePath) => {
@@ -127,6 +122,48 @@ const StaffReportsPanel = () => {
     fetchUsers();
     fetchRecentReports();
   }, []);
+
+  useEffect(() => {
+    if (!projects.length || !recentReports.length) return;
+
+    const maxProgressByProject = recentReports.reduce((acc, report) => {
+      const projectId = report.project_id;
+      const progress = Number(report.current_progress || 0);
+      const currentMax = acc.get(projectId) || 0;
+      if (progress > currentMax) acc.set(projectId, progress);
+      return acc;
+    }, new Map());
+
+    const toUpdate = projects.filter((project) => {
+      const maxProgress = maxProgressByProject.get(project.project_id) || 0;
+      return (
+        maxProgress >= 100 &&
+        project.project_status !== 'Done' &&
+        !statusSyncRef.current.has(project.project_id)
+      );
+    });
+
+    if (!toUpdate.length) return;
+
+    toUpdate.forEach((project) =>
+      statusSyncRef.current.add(project.project_id),
+    );
+
+    Promise.all(
+      toUpdate.map((project) =>
+        api.patch(`/projects/${project.project_id}`, {
+          project_status: 'Done',
+        }),
+      ),
+    )
+      .then(() => fetchProjects())
+      .catch((error) => {
+        console.error('Error syncing completed projects:', error);
+        toUpdate.forEach((project) =>
+          statusSyncRef.current.delete(project.project_id),
+        );
+      });
+  }, [projects, recentReports]);
 
   useEffect(() => {
     if (selectedProject) {
@@ -226,12 +263,59 @@ const StaffReportsPanel = () => {
     setSelectedProject(enrichedProject);
   };
 
+  const renderStatusBadge = (status) => {
+    const displayStatus = status || 'Ongoing';
+    const normalized = String(displayStatus).toLowerCase().trim();
+
+    const statusClass =
+      normalized === 'done' || normalized === 'completed'
+        ? 'status-done'
+        : normalized === 'hold' || normalized === 'on hold'
+          ? 'status-hold'
+          : 'status-ongoing';
+
+    const bgColor =
+      statusClass === 'status-done'
+        ? '#10b981'
+        : statusClass === 'status-hold'
+          ? '#f59e0b'
+          : '#0284c7';
+
+    return (
+      <span
+        className={`project-status-badge ${statusClass}`}
+        style={{ backgroundColor: bgColor, color: '#ffffff' }}
+      >
+        {displayStatus}
+      </span>
+    );
+  };
+
   const handleBackToList = () => {
     setSelectedProject(null);
     setFilteredReports([]);
   };
 
+  const isProjectLocked = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    return (
+      normalized === 'hold' ||
+      normalized === 'on_hold' ||
+      normalized === 'done' ||
+      normalized === 'completed' ||
+      normalized === 'cancelled'
+    );
+  };
+
   const handleGenerateClick = () => {
+    if (isProjectLocked(selectedProject?.project_status)) {
+      showToast(
+        'warn',
+        'Not Allowed',
+        'Reports cannot be generated for projects on Hold or Done.',
+      );
+      return;
+    }
     resetForm();
     // Get the highest completion rate from previous reports for this project
     const projectReports = recentReports.filter(
@@ -247,12 +331,30 @@ const StaffReportsPanel = () => {
     setShowReportModal(true);
   };
 
+  // Get the last report's end date for the selected project
+  const getLastReportEndDate = () => {
+    const projectReports = recentReports.filter(
+      (report) => report.project_id === selectedProject?.project_id,
+    );
+    if (projectReports.length === 0) return null;
+
+    // Find the most recent report by created_at or end_date
+    const lastReport = projectReports.reduce((latest, current) => {
+      const latestDate = new Date(latest.created_at || latest.end_date || 0);
+      const currentDate = new Date(current.created_at || current.end_date || 0);
+      return currentDate > latestDate ? current : latest;
+    });
+
+    return lastReport.end_date ? new Date(lastReport.end_date) : null;
+  };
+
   const resetForm = () => {
     setCompletionRate(0);
     setReleasedAmount(0);
     setReportValue('');
     setReportStartDate(null);
     setReportEndDate(null);
+    setIsPaymentTriggered(false);
     setReportImages([]);
     setImagePreviews([]);
     setImageComments([]);
@@ -316,11 +418,62 @@ const StaffReportsPanel = () => {
     setShowImageModal(true);
   };
 
+  const handlePaymentToggle = async (reportId, checked) => {
+    try {
+      await api.patch(`/reports/${reportId}`, {
+        payment_triggered: checked,
+      });
+
+      setRecentReports((prev) =>
+        prev.map((report) =>
+          report.report_id === reportId
+            ? { ...report, payment_triggered: checked }
+            : report,
+        ),
+      );
+
+      showToast(
+        'success',
+        'Updated',
+        checked ? 'Marked as Paid' : 'Marked as Pending',
+      );
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      showToast('error', 'Error', 'Failed to update payment status');
+    }
+  };
+
   const handleSubmitReport = async () => {
+    if (isProjectLocked(selectedProject?.project_status)) {
+      showToast(
+        'warn',
+        'Not Allowed',
+        'Reports cannot be generated for projects on Hold or Done.',
+      );
+      return;
+    }
     // Validate dates are selected
     if (!reportStartDate || !reportEndDate) {
       showToast('warn', 'Warning', 'Please select both start and end dates');
       return;
+    }
+
+    // Validate start date is not before last report's end date
+    const lastReportEndDate = getLastReportEndDate();
+    if (lastReportEndDate) {
+      const lastEndDateOnly = new Date(lastReportEndDate);
+      lastEndDateOnly.setHours(0, 0, 0, 0);
+      const selectedStartDate = new Date(reportStartDate);
+      selectedStartDate.setHours(0, 0, 0, 0);
+
+      if (selectedStartDate <= lastEndDateOnly) {
+        showToast(
+          'error',
+          'Invalid Date',
+          `Report start date must be after ${formatDate(lastReportEndDate)}`,
+        );
+        return;
+      }
     }
 
     // Validate start date is before end date
@@ -393,6 +546,7 @@ const StaffReportsPanel = () => {
 
   const downloadReportPDF = async (report) => {
     try {
+      console.log('Report object:', report); // Debug log
       const project = projects.find((p) => p.project_id === report.project_id);
       if (!project) {
         showToast('error', 'Error', 'Project not found');
@@ -542,6 +696,7 @@ const StaffReportsPanel = () => {
 
       formData.append('current_progress', completionRate);
       formData.append('payment_requested', releasedAmount);
+      formData.append('payment_triggered', isPaymentTriggered);
       formData.append('report_description', reportValue);
 
       // Append multiple images with their comments
@@ -552,11 +707,27 @@ const StaffReportsPanel = () => {
       // Append image comments as JSON
       formData.append('image_comments', JSON.stringify(imageComments));
 
-      await api.post('/reports', formData, {
+      const response = await api.post('/reports', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
+
+      // If completion rate is 100%, automatically set project status to Done
+      if (Number(completionRate) >= 100) {
+        try {
+          await api.patch(`/projects/${selectedProject.project_id}`, {
+            project_status: 'Done',
+          });
+          setSelectedProject((prev) =>
+            prev ? { ...prev, project_status: 'Done' } : prev,
+          );
+          fetchProjects();
+        } catch (error) {
+          console.error('Error updating project status:', error);
+        }
+      }
+
       fetchRecentReports();
     } catch (error) {
       console.error('Error logging report generation:', error);
@@ -615,7 +786,16 @@ const StaffReportsPanel = () => {
     {
       label: 'Regenerate',
       icon: 'pi pi-refresh',
+      disabled: isProjectLocked(selectedProject?.project_status),
       command: () => {
+        if (isProjectLocked(selectedProject?.project_status)) {
+          showToast(
+            'warn',
+            'Not Allowed',
+            'Reports cannot be generated for projects on Hold or Done.',
+          );
+          return;
+        }
         setCompletionRate(report.current_progress || 0);
         setReleasedAmount(report.payment_requested || 0);
         setReportValue(report.report_description || '');
@@ -623,6 +803,7 @@ const StaffReportsPanel = () => {
           report.start_date ? new Date(report.start_date) : null,
         );
         setReportEndDate(report.end_date ? new Date(report.end_date) : null);
+        setIsPaymentTriggered(!!report.payment_triggered);
         setReportImages([]);
         setImagePreviews([]);
         setShowReportModal(true);
@@ -691,31 +872,24 @@ const StaffReportsPanel = () => {
 
               <div className="reports-card-section">
                 <div className="reports-card-item">
-                  <span className="reports-card-label">Client:</span>
+                  <span className="reports-card-label">Status:</span>
                   <span className="reports-card-value">
-                    {getClientName(project.client_id)}
-                  </span>
-                </div>
-                <div className="reports-card-item">
-                  <span className="reports-card-label">Budget:</span>
-                  <span className="reports-card-value">
-                    {formatCurrency(project.total_amount)}
+                    {renderStatusBadge(project.project_status)}
                   </span>
                 </div>
               </div>
 
               <div className="reports-card-section">
                 <div className="reports-card-item">
-                  <span className="reports-card-label">Status:</span>
+                  <span className="reports-card-label">Client:</span>
                   <span className="reports-card-value">
-                    <Tag
-                      value={project.project_status || 'Active'}
-                      severity={
-                        project.project_status === 'Completed'
-                          ? 'success'
-                          : 'info'
-                      }
-                    />
+                    {getClientName(project.client_id)}
+                  </span>
+                </div>
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Contractor:</span>
+                  <span className="reports-card-value">
+                    {getContractorName(project.contractor_id)}
                   </span>
                 </div>
               </div>
@@ -734,6 +908,15 @@ const StaffReportsPanel = () => {
                   </span>
                 </div>
               </div>
+
+              <div className="reports-card-section">
+                <div className="reports-card-item">
+                  <span className="reports-card-label">Budget:</span>
+                  <span className="reports-card-value">
+                    {formatCurrency(project.total_amount)}
+                  </span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -744,7 +927,7 @@ const StaffReportsPanel = () => {
   // Project Detail View (when project is selected)
   const ProjectDetailView = () => (
     <div>
-      <div className="mb-4">
+      <div className="mb-6">
         <Button
           label="Back to Projects"
           icon="pi pi-arrow-left"
@@ -752,143 +935,212 @@ const StaffReportsPanel = () => {
           onClick={handleBackToList}
         />
 
-        <div className="flex justify-content-between align-items-center">
-          <div>
+        <div className="flex justify-between items-start gap-4">
+          <div style={{ textAlign: 'left' }}>
             <h2 className="m-0">{selectedProject.project_name}</h2>
             <p className="text-color-secondary m-0">
-              Client: {getClientName(selectedProject.client_id)} | Contractor:{' '}
-              {getContractorName(selectedProject.contractor_id)}
+              Client: {getClientName(selectedProject.client_id)}
+              <br />
+              Contractor: {getContractorName(selectedProject.contractor_id)}
             </p>
+            {!isProjectLocked(selectedProject?.project_status) && (
+              <Button
+                label="Generate New Report"
+                onClick={handleGenerateClick}
+                className="p-button-primary"
+                style={{ marginTop: '1rem' }}
+              />
+            )}
           </div>
-          <Button
-            label="Generate New Report"
-            icon="pi pi-plus"
-            onClick={handleGenerateClick}
-          />
+          <div
+            className="flex flex-column gap-3 items-end flex-shrink-0"
+            style={{ marginLeft: 'auto' }}
+          >
+            <Card className="p-1" style={{ minWidth: '520px' }}>
+              <h4
+                className="m-0"
+                style={{ fontSize: '12px', marginBottom: '4px' }}
+              >
+                Project Info
+              </h4>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <span className="font-bold text-xs">Status:</span>
+                  <div style={{ marginTop: '2px' }}>
+                    {renderStatusBadge(selectedProject.project_status)}
+                  </div>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Budget:</span>
+                  <p className="m-0 text-xs font-bold text-primary">
+                    {formatCurrency(selectedProject.total_amount)}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Deadline:</span>
+                  <p className="m-0 text-xs">
+                    {formatDate(selectedProject.project_deadline)}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 
-      <TabView>
-        <TabPanel header={`Recent Reports (${filteredReports.length})`}>
-          {filteredReports.length > 0 ? (
-            <div className="grid">
-              {filteredReports.map((report, index) => (
-                <div key={index} className="col-12 lg:col-6">
-                  <Card>
-                    <div className="flex flex-column gap-3">
-                      <div className="flex justify-content-between align-items-start">
-                        <div>
-                          <h4 className="m-0">
-                            Report #{filteredReports.length - index}
-                          </h4>
-                          <small className="text-color-secondary">
-                            Generated:{' '}
-                            {formatDateTime(
-                              report.created_at || report.start_date,
-                            )}
+      <div style={{ marginTop: '-35px', paddingTop: 0 }}>
+        <h3 style={{ marginTop: 0, marginBottom: '0.5rem', paddingTop: 0 }}>
+          Reports ({filteredReports.length})
+        </h3>
+        {filteredReports.length > 0 ? (
+          <div className="grid">
+            {filteredReports.map((report, index) => (
+              <div key={index} className="col-12 lg:col-6">
+                <Card className="p-4">
+                  <div className="flex flex-column gap-3 h-full">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="m-0">
+                          Report #{filteredReports.length - index}
+                        </h4>
+                        <small className="text-color-secondary">
+                          Generated:{' '}
+                          {formatDateTime(
+                            report.created_at || report.start_date,
+                          )}
+                        </small>
+                        {report.created_by && (
+                          <small
+                            className="text-color-secondary"
+                            style={{ display: 'block', marginTop: '4px' }}
+                          >
+                            By: {report.created_by}
                           </small>
-                        </div>
-                        <Button
-                          icon="pi pi-ellipsis-v"
-                          className="p-button-rounded p-button-text p-button-sm"
-                          onClick={(e) => {
-                            if (!menuRefs.current[index]) {
-                              menuRefs.current[index] = React.createRef();
-                            }
-                            menuRefs.current[index].current.toggle(e);
-                          }}
-                          aria-label="Actions"
-                        />
-                        <Menu
-                          model={getMenuItems(report)}
-                          popup
-                          ref={
-                            menuRefs.current[index] ||
-                            (menuRefs.current[index] = React.createRef())
+                        )}
+                      </div>
+                      <Button
+                        icon="pi pi-ellipsis-v"
+                        className="p-button-rounded p-button-text p-button-sm"
+                        onClick={(e) => {
+                          if (!menuRefs.current[index]) {
+                            menuRefs.current[index] = React.createRef();
                           }
-                          id={`menu_${index}`}
+                          menuRefs.current[index].current.toggle(e);
+                        }}
+                        aria-label="Actions"
+                      />
+                      <Menu
+                        model={getMenuItems(report)}
+                        popup
+                        ref={
+                          menuRefs.current[index] ||
+                          (menuRefs.current[index] = React.createRef())
+                        }
+                        id={`menu_${index}`}
+                      />
+                    </div>
+
+                    <div className="completion-progress-section">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-sm">
+                          Completion Progress
+                        </span>
+                      </div>
+                      <ProgressBar
+                        value={report.current_progress}
+                        className="report-progress-bar"
+                      />
+                    </div>
+
+                    {report.image_urls && report.image_urls.length > 0 && (
+                      <div className="flex items-center gap-2 p-3 surface-100 border-round">
+                        <i className="pi pi-paperclip text-lg" />
+                        <span className="font-bold">
+                          Attachments: {report.image_urls.length} image
+                          {report.image_urls.length !== 1 ? 's' : ''}
+                        </span>
+                        <Button
+                          label="View Images"
+                          icon="pi pi-eye"
+                          className="p-button-sm p-button-text"
+                          onClick={() =>
+                            handleViewImages(
+                              report.image_urls,
+                              report.image_comments,
+                            )
+                          }
                         />
                       </div>
+                    )}
 
-                      <div className="completion-progress-section">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-bold text-sm">
-                            Completion Progress
-                          </span>
-                        </div>
-                        <ProgressBar
-                          value={report.current_progress}
-                          className="report-progress-bar"
-                        />
+                    <Divider className="my-2" />
+
+                    <div className="grid">
+                      <div className="col-6">
+                        <span className="font-bold">Period:</span>
+                        <p className="m-0 text-sm">
+                          {formatDate(report.start_date || report.report_date)}{' '}
+                          - {formatDate(report.end_date || report.report_date)}
+                        </p>
                       </div>
-
-                      {report.image_urls && report.image_urls.length > 0 && (
-                        <div className="flex align-items-center gap-2 p-2 surface-100 border-round">
-                          <i className="pi pi-paperclip text-lg" />
-                          <span className="font-bold">
-                            Attachments: {report.image_urls.length} image
-                            {report.image_urls.length !== 1 ? 's' : ''}
-                          </span>
-                          <Button
-                            label="View Images"
-                            icon="pi pi-eye"
-                            className="p-button-sm p-button-text"
-                            onClick={() =>
-                              handleViewImages(
-                                report.image_urls,
-                                report.image_comments,
+                      <div className="col-6">
+                        <span className="font-bold">Payment:</span>
+                        <p className="m-0 text-sm">
+                          {formatCurrency(report.payment_requested)}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            id={`paid-${report.report_id}`}
+                            type="checkbox"
+                            checked={!!report.payment_triggered}
+                            onChange={(e) =>
+                              handlePaymentToggle(
+                                report.report_id,
+                                e.target.checked,
                               )
                             }
                           />
-                        </div>
-                      )}
-
-                      <Divider className="my-2" />
-
-                      <div className="grid">
-                        <div className="col-6">
-                          <span className="font-bold">Period:</span>
-                          <p className="m-0 text-sm">
-                            {formatDate(
-                              report.start_date || report.report_date,
-                            )}{' '}
-                            -{' '}
-                            {formatDate(report.end_date || report.report_date)}
-                          </p>
-                        </div>
-                        <div className="col-6">
-                          <span className="font-bold">Payment:</span>
-                          <p className="m-0 text-sm">
-                            {formatCurrency(report.payment_requested)}
-                          </p>
+                          <label
+                            htmlFor={`paid-${report.report_id}`}
+                            className="text-sm"
+                          >
+                            Paid
+                          </label>
                         </div>
                       </div>
+                    </div>
 
-                      {report.report_description && (
-                        <div>
-                          <span className="font-bold">Notes:</span>
-                          <p className="m-0 text-sm line-height-3">
-                            {report.report_description.length > 120
-                              ? `${report.report_description.substring(0, 120)}...`
-                              : report.report_description}
-                          </p>
-                        </div>
-                      )}
+                    {report.report_description && (
+                      <div>
+                        <span className="font-bold">Notes:</span>
+                        <p className="m-0 text-sm line-height-3">
+                          {report.report_description.length > 120
+                            ? `${report.report_description.substring(0, 120)}...`
+                            : report.report_description}
+                        </p>
+                      </div>
+                    )}
 
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          label="Download PDF"
-                          icon="pi pi-file-pdf"
-                          className="p-button-outlined p-button-sm p-button-danger"
-                          onClick={() => downloadReportPDF(report)}
-                        />
-                        <Button
-                          label="Download CSV"
-                          icon="pi pi-file-excel"
-                          className="p-button-outlined p-button-sm p-button-success"
-                          onClick={() => downloadReportCSV(report)}
-                        />
-                        {/* <Button
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        label="Download PDF"
+                        icon="pi pi-file-pdf"
+                        className="p-button-outlined p-button-sm p-button-danger"
+                        onClick={() => downloadReportPDF(report)}
+                      />
+                      <Button
+                        label="Download CSV"
+                        icon="pi pi-file-excel"
+                        className="p-button-outlined p-button-sm p-button-success"
+                        onClick={() => downloadReportCSV(report)}
+                      />
+                      {/* <Button
                           label="Regenerate"
                           icon="pi pi-refresh"
                           className="p-button-outlined p-button-sm"
@@ -911,86 +1163,30 @@ const StaffReportsPanel = () => {
                             setShowReportModal(true);
                           }}
                         /> */}
-                      </div>
                     </div>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6">
-              <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
-              <h3>No Reports Yet</h3>
-              <p className="text-color-secondary mb-4">
-                Generate the first report for this project
-              </p>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
+            <h3>No Reports Yet</h3>
+            <p className="text-color-secondary mb-4">
+              Generate the first report for this project
+            </p>
+            {!isProjectLocked(selectedProject?.project_status) && (
               <Button
                 label="Generate First Report"
                 icon="pi pi-file"
                 onClick={handleGenerateClick}
+                className="p-button-primary"
               />
-            </div>
-          )}
-        </TabPanel>
-
-        <TabPanel header="Project Info">
-          <Card>
-            <div className="grid">
-              <div className="col-12 md:col-6">
-                <h4>Project Details</h4>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-bold">Project Name:</span>
-                    <p className="m-0">{selectedProject.project_name}</p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Description:</span>
-                    <p className="m-0">
-                      {selectedProject.project_description || 'No description'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Status:</span>
-                    <Tag
-                      value={selectedProject.project_status || 'Active'}
-                      severity={
-                        selectedProject.project_status === 'Completed'
-                          ? 'success'
-                          : 'info'
-                      }
-                      className="ml-2"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="col-12 md:col-6">
-                <h4>Financial Information</h4>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-bold">Total Budget:</span>
-                    <p className="m-0 text-xl font-bold">
-                      {formatCurrency(selectedProject.total_amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Start Date:</span>
-                    <p className="m-0">
-                      {formatDate(selectedProject.project_start_date)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-bold">Deadline:</span>
-                    <p className="m-0">
-                      {formatDate(selectedProject.project_deadline)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </TabPanel>
-      </TabView>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1002,33 +1198,24 @@ const StaffReportsPanel = () => {
 
       {/* Report Generation Modal */}
       <Dialog
-        header={`ACCOMPLISHMENT REPORT`}
+        header="Generate New Report"
         visible={showReportModal}
         style={{ width: '70vw', maxHeight: '90vh' }}
+        contentStyle={{ padding: '1.5rem 2rem' }}
         onHide={() => setShowReportModal(false)}
-        footer={
-          <div>
-            <Button
-              label="Cancel"
-              icon="pi pi-times"
-              className="p-button-text"
-              onClick={() => setShowReportModal(false)}
-            />
-            <Button
-              label={isGenerating ? 'Generating...' : 'Generate Report'}
-              icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
-              onClick={handleSubmitReport}
-              disabled={isGenerating}
-            />
-          </div>
-        }
+        headerStyle={{
+          backgroundColor: '#404a17',
+          color: 'white',
+          padding: '1rem',
+        }}
       >
         {selectedProject && (
           <div
+            className="report-modal-scroll"
             style={{
               maxHeight: 'calc(90vh - 200px)',
               overflowY: 'auto',
-              padding: '1.5rem 2rem',
+              padding: 0,
             }}
           >
             {/* Project Period Header */}
@@ -1051,20 +1238,18 @@ const StaffReportsPanel = () => {
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 columnGap: '2rem',
-                rowGap: '0.25rem',
+                rowGap: '1rem',
                 alignItems: 'start',
               }}
             >
               {/* Row 1 */}
-              <div style={{ alignSelf: 'start' }}>
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
                     display: 'block',
                     marginBottom: '0.5rem',
                     fontSize: '12px',
-                    height: '18px',
-                    lineHeight: '18px',
                   }}
                 >
                   Project Name:
@@ -1075,51 +1260,41 @@ const StaffReportsPanel = () => {
                   style={{
                     width: '100%',
                     padding: '0.75rem',
-                    margin: 0,
-                    marginTop: 0,
+                    height: '42px',
                   }}
                 />
               </div>
-              <div style={{ alignSelf: 'start' }}>
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
                     display: 'block',
                     marginBottom: '0.5rem',
                     fontSize: '12px',
-                    height: '18px',
-                    lineHeight: '18px',
                   }}
                 >
-                  Amount to be Released *
+                  Contract Amount
                 </label>
-                <div style={{ marginTop: '-0.75rem' }}>
-                  <InputNumber
-                    value={releasedAmount}
-                    onValueChange={(e) => setReleasedAmount(e.value)}
-                    prefix="₱"
-                    min={0}
-                    mode="decimal"
-                    locale="en-PH"
-                    placeholder="0.00"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      margin: 0,
-                      marginTop: 0,
-                    }}
-                  />
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    border: '1px solid #e5e7eb',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {formatCurrency(selectedProject?.total_amount)}
                 </div>
               </div>
 
               {/* Row 2 */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
-              >
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
@@ -1133,21 +1308,10 @@ const StaffReportsPanel = () => {
                 <InputText
                   value={getClientName(selectedProject?.client_id) || ''}
                   disabled
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    margin: 0,
-                    marginTop: 0,
-                  }}
+                  style={{ width: '100%', padding: '0.75rem', height: '42px' }}
                 />
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
-              >
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
@@ -1156,42 +1320,28 @@ const StaffReportsPanel = () => {
                     fontSize: '12px',
                   }}
                 >
-                  Report Period *
+                  Total Spent:
                 </label>
                 <div
                   style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    border: '1px solid #e5e7eb',
+                    height: '42px',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem',
+                    alignItems: 'center',
                   }}
                 >
-                  <Calendar
-                    value={reportStartDate}
-                    onChange={(e) => setReportStartDate(e.value)}
-                    placeholder="Start Date"
-                    dateFormat="mm/dd/yy"
-                    showIcon
-                    style={{ width: '100%' }}
-                  />
-                  <Calendar
-                    value={reportEndDate}
-                    onChange={(e) => setReportEndDate(e.value)}
-                    placeholder="End Date"
-                    dateFormat="mm/dd/yy"
-                    showIcon
-                    style={{ width: '100%' }}
-                  />
+                  {formatCurrency(selectedProject?.total_amount_released || 0)}
                 </div>
               </div>
 
               {/* Row 3 */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}
-              >
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
@@ -1207,52 +1357,10 @@ const StaffReportsPanel = () => {
                     getContractorName(selectedProject?.contractor_id) || ''
                   }
                   disabled
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    margin: 0,
-                    marginTop: 0,
-                  }}
+                  style={{ width: '100%', padding: '0.75rem', height: '42px' }}
                 />
               </div>
-              <div
-                style={{
-                  padding: '1rem',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '4px',
-                  textAlign: 'center',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    marginBottom: '0.5rem',
-                    color: '#666',
-                  }}
-                >
-                  Contract Amount
-                </div>
-                <div
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 'bold',
-                    color: '#1f2937',
-                  }}
-                >
-                  {formatCurrency(selectedProject?.total_amount)}
-                </div>
-              </div>
-
-              {/* Row 4 */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  flex: 1,
-                }}
-              >
+              <div>
                 <label
                   style={{
                     fontWeight: 'bold',
@@ -1261,65 +1369,148 @@ const StaffReportsPanel = () => {
                     fontSize: '12px',
                   }}
                 >
-                  Description
+                  Remaining Balance:
+                </label>
+                <div
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: '#065f46',
+                    border: '1px solid #86efac',
+                    height: '42px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {formatCurrency(
+                    (Number(selectedProject?.total_amount) || 0) -
+                      (selectedProject?.total_amount_released || 0),
+                  )}
+                </div>
+              </div>
+
+              {/* Row 4 - Report Period */}
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Report Start Date *
+                </label>
+                <Calendar
+                  value={reportStartDate}
+                  onChange={(e) => setReportStartDate(e.value)}
+                  placeholder="Start Date"
+                  dateFormat="mm/dd/yy"
+                  showIcon
+                  style={{ width: '100%' }}
+                  minDate={
+                    getLastReportEndDate()
+                      ? new Date(getLastReportEndDate().getTime() + 86400000)
+                      : undefined
+                  }
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Report End Date *
+                </label>
+                <Calendar
+                  value={reportEndDate}
+                  onChange={(e) => setReportEndDate(e.value)}
+                  placeholder="End Date"
+                  dateFormat="mm/dd/yy"
+                  showIcon
+                  style={{ width: '100%' }}
+                  minDate={
+                    reportStartDate ||
+                    (getLastReportEndDate()
+                      ? new Date(getLastReportEndDate().getTime() + 86400000)
+                      : undefined)
+                  }
+                />
+              </div>
+
+              {/* Row 5 - Amount to Release */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Amount to be Released *
+                </label>
+                <InputNumber
+                  value={releasedAmount}
+                  onValueChange={(e) => setReleasedAmount(e.value)}
+                  prefix="₱"
+                  min={0}
+                  mode="decimal"
+                  locale="en-PH"
+                  placeholder="0.00"
+                  style={{
+                    width: '100%',
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <input
+                    id="payment-triggered"
+                    type="checkbox"
+                    checked={isPaymentTriggered}
+                    onChange={(e) => setIsPaymentTriggered(e.target.checked)}
+                  />
+                  <label
+                    htmlFor="payment-triggered"
+                    style={{ fontSize: '12px' }}
+                  >
+                    Paid
+                  </label>
+                </div>
+              </div>
+
+              {/* Row 6 - Description */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Description *
                 </label>
                 <InputTextarea
                   value={reportValue}
                   onChange={(e) => setReportValue(e.target.value)}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    margin: 0,
-                    marginTop: 0,
-                  }}
+                  rows={4}
+                  style={{ width: '100%', padding: '0.75rem' }}
+                  placeholder="Enter report description..."
                 />
-              </div>
-              <div
-                style={{
-                  padding: '1rem',
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '4px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                >
-                  <span style={{ fontWeight: 'bold' }}>Total Spent:</span>
-                  <span>
-                    {formatCurrency(
-                      selectedProject?.total_amount_released || 0,
-                    )}
-                  </span>
-                </div>
-                <hr
-                  style={{
-                    margin: '0.5rem 0',
-                    border: 'none',
-                    borderTop: '1px solid #e5e7eb',
-                  }}
-                />
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '12px',
-                  }}
-                >
-                  <span style={{ fontWeight: 'bold' }}>Remaining Balance:</span>
-                  <span style={{ fontWeight: 'bold', color: '#065f46' }}>
-                    {formatCurrency(
-                      (Number(selectedProject?.total_amount) || 0) -
-                        (selectedProject?.total_amount_released || 0),
-                    )}
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -1491,6 +1682,30 @@ const StaffReportsPanel = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Generate Button */}
+            <div
+              style={{
+                textAlign: 'center',
+                marginTop: '2rem',
+                paddingBottom: '1rem',
+              }}
+            >
+              <Button
+                label={isGenerating ? 'Generating...' : 'Generate Report'}
+                icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
+                onClick={handleSubmitReport}
+                disabled={isGenerating}
+                style={{
+                  backgroundColor: '#4f4d36',
+                  borderColor: '#4f4d36',
+                  color: 'white',
+                  padding: '0.75rem 2rem',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              />
             </div>
           </div>
         )}

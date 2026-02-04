@@ -57,8 +57,11 @@ const ProjectsPanel = () => {
   // ============================================
 
   useEffect(() => {
-    fetchProjects();
-    fetchContractors();
+    const loadData = async () => {
+      await fetchContractors();
+      await fetchProjects();
+    };
+    loadData();
   }, [viewMode]);
 
   // ============================================
@@ -68,8 +71,8 @@ const ProjectsPanel = () => {
   // Function to get contractor name by ID
   const getContractorName = (contractorId) => {
     if (!contractorId) return '';
-    const contractor = contractors.find((c) => c.user_id === contractorId);
-    return contractor
+    const contractor = contractors?.find((c) => c?.user_id === contractorId);
+    return contractor && contractor.first_name && contractor.last_name
       ? `${contractor.first_name} ${contractor.last_name}`.toLowerCase()
       : '';
   };
@@ -77,8 +80,8 @@ const ProjectsPanel = () => {
   // Function to get client name by ID
   const getClientName = (clientId) => {
     if (!clientId) return '';
-    const client = clients.find((c) => c.user_id === clientId);
-    return client
+    const client = clients?.find((c) => c?.user_id === clientId);
+    return client && client.first_name && client.last_name
       ? `${client.first_name} ${client.last_name}`.toLowerCase()
       : '';
   };
@@ -207,6 +210,23 @@ const ProjectsPanel = () => {
         detail: 'Project name is required',
       });
       return;
+    }
+
+    // Validate due date is not before today
+    if (newProject.dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newProject.dueDate);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      if (selectedDate < today) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Due date cannot be before today',
+        });
+        return;
+      }
     }
 
     try {
@@ -417,10 +437,10 @@ const ProjectsPanel = () => {
   const contractorTemplate = (rowData) => {
     if (!rowData.contractor_id) return 'N/A';
 
-    const contractor = contractors.find(
-      (c) => c.user_id === rowData.contractor_id,
+    const contractor = contractors?.find(
+      (c) => c?.user_id === rowData.contractor_id,
     );
-    return contractor
+    return contractor && contractor.first_name && contractor.last_name
       ? `${contractor.first_name} ${contractor.last_name}`
       : 'N/A';
   };
@@ -429,8 +449,10 @@ const ProjectsPanel = () => {
   const clientTemplate = (rowData) => {
     if (!rowData.client_id) return 'N/A';
 
-    const client = clients.find((c) => c.user_id === rowData.client_id);
-    return client ? `${client.first_name} ${client.last_name}` : 'N/A';
+    const client = clients?.find((c) => c?.user_id === rowData.client_id);
+    return client && client.first_name && client.last_name
+      ? `${client.first_name} ${client.last_name}`
+      : 'N/A';
   };
 
   // Format amount with currency
@@ -774,6 +796,7 @@ const ProjectsPanel = () => {
             placeholder="Select due date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
+            minDate={new Date()}
           />
         </div>
 
@@ -923,6 +946,7 @@ const ProjectsPanel = () => {
             placeholder="Select due date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
+            minDate={new Date()}
           />
         </div>
 

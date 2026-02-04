@@ -87,7 +87,9 @@ const AdminDashboard = () => {
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <img className="sidebar-logo-img" src={logoUrl} alt="Logo" />
+            <img className="sidebar-logo-img" src={logoUrl} alt="Logo" style={{
+               width: '200%', height: '200%',
+            }} />
           </div>
         </div>
 

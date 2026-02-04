@@ -1183,10 +1183,68 @@ const StaffReportsPanel = () => {
                 onClick={handleGenerateClick}
                 className="p-button-primary"
               />
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </TabPanel>
+
+        <TabPanel header="Project Info">
+          <Card>
+            <div className="grid">
+              <div className="col-12 md:col-6 p-4">
+                <h4>Project Details</h4>
+                <div className="space-y-3">
+                  <div>
+                    <span className="font-bold">Project Name:</span>
+                    <p className="m-0">{selectedProject.project_name}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Description:</span>
+                    <p className="m-0">
+                      {selectedProject.project_description || 'No description'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Status:</span>
+                    <Tag
+                      value={selectedProject.project_status || 'Active'}
+                      severity={
+                        selectedProject.project_status === 'Completed'
+                          ? 'success'
+                          : 'info'
+                      }
+                      className="ml-2"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-12 md:col-6 p-4">
+                <h4>Financial Information</h4>
+                <div className="space-y-3">
+                  <div>
+                    <span className="font-bold">Total Budget:</span>
+                    <p className="m-0 text-xl font-bold">
+                      {formatCurrency(selectedProject.total_amount)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Start Date:</span>
+                    <p className="m-0">
+                      {formatDate(selectedProject.project_start_date)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold">Deadline:</span>
+                    <p className="m-0">
+                      {formatDate(selectedProject.project_deadline)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </TabPanel>
+      </TabView>
     </div>
   );
 

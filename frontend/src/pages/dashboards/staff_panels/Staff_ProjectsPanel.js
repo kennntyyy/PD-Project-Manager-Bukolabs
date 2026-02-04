@@ -4,6 +4,7 @@ import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
+import { InputNumber } from 'primereact/inputnumber';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
@@ -140,6 +141,35 @@ const ProjectsPanel = () => {
   // Clear search
   const handleClearSearch = () => {
     setSearchQuery('');
+  };
+
+  // ============================================
+  // FORMATTING FUNCTIONS
+  // ============================================
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '₱0.00';
+    return `₱${Number(amount).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  // Format amount display in input (add commas)
+  const formatAmountForDisplay = (amount) => {
+    if (!amount) return '';
+    const numAmount = Number(amount);
+    return numAmount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // Remove formatting from input (return raw number)
+  const parseAmountFromInput = (formattedAmount) => {
+    if (!formattedAmount) return '';
+    // Remove all non-numeric characters except decimal point
+    return formattedAmount.replace(/[^0-9.]/g, '');
   };
 
   // ============================================
@@ -590,15 +620,17 @@ const ProjectsPanel = () => {
           >
             Project Amount
           </label>
-          <InputText
+          <InputNumber
             id="project-amount"
-            type="number"
-            step="0.01"
-            value={newProject.amount}
-            onChange={(e) =>
-              setNewProject({ ...newProject, amount: e.target.value })
+            value={newProject.amount ? Number(newProject.amount) : null}
+            onValueChange={(e) =>
+              setNewProject({ ...newProject, amount: e.value || '' })
             }
             placeholder="Enter project amount"
+            prefix="₱ "
+            thousandSeparator=","
+            minFractionDigits={2}
+            maxFractionDigits={2}
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>
@@ -738,15 +770,17 @@ const ProjectsPanel = () => {
           >
             Project Amount
           </label>
-          <InputText
+          <InputNumber
             id="edit-project-amount"
-            type="number"
-            step="0.01"
-            value={editingProject.amount}
-            onChange={(e) =>
-              setEditingProject({ ...editingProject, amount: e.target.value })
+            value={editingProject.amount ? Number(editingProject.amount) : null}
+            onValueChange={(e) =>
+              setEditingProject({ ...editingProject, amount: e.value || '' })
             }
             placeholder="Enter project amount"
+            prefix="₱ "
+            thousandSeparator=","
+            minFractionDigits={2}
+            maxFractionDigits={2}
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>

@@ -66,6 +66,6 @@ export class Report {
   @Column({ type: 'uuid' })
   project_id: string;
 
-  @Column({ type: 'uuid', default: 'angeloTEST' })
+  @Column({ type: 'varchar', nullable: true })
   created_by: string;
 }

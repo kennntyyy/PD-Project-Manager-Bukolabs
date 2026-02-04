@@ -1465,6 +1465,8 @@ const ReportsPanel = () => {
                   mode="decimal"
                   locale="en-PH"
                   placeholder="0.00"
+                  minFractionDigits={2}
+                  maxFractionDigits={2}
                   style={{
                     width: '100%',
                   }}

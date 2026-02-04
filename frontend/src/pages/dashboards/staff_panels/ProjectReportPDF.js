@@ -12,7 +12,7 @@ const styles = StyleSheet.create({
   page: {
     padding: 40,
     backgroundColor: '#fff',
-    fontFamily: 'Source Serif Pro',
+    fontFamily: 'Helvetica',
   },
   container: {
     border: '1pt solid #808080',
@@ -137,7 +137,15 @@ export const ProjectReportPDF = ({
               <Text style={styles.sectionTitle}>Report Images</Text>
               {imageUrls.map((imageUrl, index) => (
                 <View key={index}>
-                  <Image src={imageUrl} style={styles.image} />
+                  {imageUrl && (
+                    <Image
+                      src={imageUrl}
+                      style={styles.image}
+                      onError={() =>
+                        console.warn(`Failed to load image ${index}`)
+                      }
+                    />
+                  )}
                   {parsedComments[index] && (
                     <View style={styles.imageComment}>
                       <Text style={{ fontSize: 10, color: '#333' }}>

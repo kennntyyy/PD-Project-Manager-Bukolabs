@@ -163,17 +163,17 @@ const ContractorDashboard = () => {
     };
   // Status badge template
   const statusTemplate = (rowData) => {
-    let status = 'Hold';
+    let status = 'Pending';
     let severity = 'warning';
 
-    if (rowData.project_status === 'completed') {
+    if (rowData.project_status === 'done') {
       status = 'Completed';
       severity = 'success';
     } else if (rowData.project_status === 'ongoing') {
       status = 'Ongoing';
       severity = 'info';
     } else if (rowData.project_status === 'hold') {
-      status = 'on Hold';
+      status = 'On Hold';
       severity = 'danger';
     }
 
@@ -248,6 +248,20 @@ const getContractorName = (contractorId) => {
 
   const filteredProjects = getFilteredProjects();
 
+  const ProjectDetailRow = ({ label, value }) => (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'space-between', 
+      alignItems: 'center',
+      padding: '0.5rem 0', 
+      borderBottom: '1px solid #eee' 
+    }}>
+      <label style={{ fontWeight: 'bold', color: '#404A17' }}>{label}</label>
+      <div style={{ textAlign: 'right', color: '#333' }}>{value}</div>
+    </div>
+  );
+
   return (
     <div className="dashboard-container">
       <Toast ref={toast} />
@@ -257,7 +271,7 @@ const getContractorName = (contractorId) => {
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <img src="/logo.png" alt="Logo" style={{
-              width: '150%', height: '150%',
+              width: '200%', height: '200%',
             }}/>
           </div>
           {/* <div className="sidebar-title">
@@ -577,7 +591,7 @@ const getContractorName = (contractorId) => {
      <Dialog
          header={null}
          visible={displayDetailsDialog}
-         style={{ width: '70vw', maxHeight: '90vh' }}
+         style={{ width: '40vw', maxHeight: '90vh' }}
          onHide={() => setDisplayDetailsDialog(false)}
        >
          {selectedProject && (
@@ -659,11 +673,12 @@ const getContractorName = (contractorId) => {
                alignItems: 'center',
                justifyContent: 'center',
                width: '100%',
-               background: '#d2d0af',
+              //  background: '#d2d0af',
+              border: '1px solid rgb(0,0,0)',
                padding: '1rem',
                borderRadius: '1rem'
              }}>
-               <div className="image-container"
+               {/* <div className="image-container"
                  style={{
                   //  border: '2px solid #404A17',
                    borderRadius: '1rem',
@@ -704,63 +719,60 @@ const getContractorName = (contractorId) => {
                    );
                   }
                  })()}
-               </div>
+               </div> */}
                <div className="details-container" style={{
-                 display: 'flex',
-                 flexDirection: 'column',
-                 gap: '0.5rem'
-               }}>
-                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Project Name: </label>
-                 <InputText
-                   name="project_name" 
-                   value={selectedProject.project_name}
-                   disabled>
-                 </InputText>
-                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Contractor: </label>
-                 <InputText
-                   name="project_contractor"
-                   value={getContractorName(selectedProject.contractor_id)}
-                   disabled>
-                 </InputText>
-                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_name">Project Amount: </label>
-                 <InputNumber
-                   name="project_amount"
-                   value={selectedProject.total_amount}
-                   disabled
-                   prefix='₱'
-                   type='decimal'
-                   minFractionDigits={2}
-                   maxFractionDigits={2}
-                   locale="en-PH">
-                 </InputNumber>
-                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_start_date">Project Start Date:</label>
-                 <InputText
-                   name="project_start_date"
-                   disabled
-                   value={selectedProject?.project_start_date 
-                     ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
-                       month: 'long',
-                       day: 'numeric',
-                       year: 'numeric'
-                     })
-                     : ''
-                   }>
-                 </InputText>
-                 <label style={{fontWeight: 'bold', color: '#4f4d36'}} htmlFor="project_completion_rate">Completion Rate:</label>
-                 <div style={{ display: 'flex', 
-                     alignItems: 'center', 
-                     gap: '1rem',  
-                    //  backgroundColor: 'rgb(160,160,160)', 
-                     padding: '0.5rem', 
-                     borderRadius: '0.25rem' }}>
-                   <ProgressBar 
+                  maxWidth: '300px', // Prevents the details from stretching too wide
+                  width: '80%',
+                  margin: '0 auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem'
+                  }}>
+                  <ProjectDetailRow 
+                    label="Project Name:" 
+                    value={selectedProject?.project_name} 
+                  />
+                  <ProjectDetailRow 
+                    label="Contractor:" 
+                    value={getContractorName(selectedProject?.contractor_id)} 
+                  />
+                  <ProjectDetailRow 
+                    label="Project Amount:" 
+                    value={`₱${selectedProject?.total_amount?.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} 
+                  />
+                  <ProjectDetailRow 
+                    label="Project Start Date:" 
+                    value={selectedProject?.project_start_date ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
+                      month: 'long', day: 'numeric', year: 'numeric'
+                    }) : 'N/A'} 
+                  />
+                  <ProjectDetailRow 
+                    label="Project Deadline:" 
+                    value={selectedProject?.project_deadline ? new Date(selectedProject.project_deadline).toLocaleDateString('en-US', {
+                      month: 'long', day: 'numeric', year: 'numeric'
+                    }) : 'N/A'} 
+                  />
+                  
+                  {/* Special row for progress bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0' }}>
+                    <label style={{ fontWeight: 'bold', color: '#404A17' }}>Completion Rate:</label>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.75rem', 
+                      backgroundColor: '#f0f0f0', 
+                      padding: '0.25rem 0.5rem', 
+                      borderRadius: '4px' 
+                    }}>
+                      <ProgressBar 
                         value={selectedProject.completion_rate || 0} 
-                        style={{ height: '15px', width: '150px', border: '2px solid #4f4d36', background: 'transparent' }}
+                        style={{ height: '12px', width: '120px', border: '1px solid black' }}
                         showValue={false} 
-                    />
-                   <span style={{ fontWeight: 'bold' }}>{selectedProject.completion_rate || 0}%</span>
-                 </div>
-               </div>
+                      />
+                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{selectedProject.completion_rate || 0}%</span>
+                    </div>
+                  </div>
+                </div>
              </div>
              {/*PROJECT REPORTS TABLE DISABLED TEMPORARILY*/}
            {/* <div style={{ marginTop: '2rem', 

@@ -4,17 +4,16 @@ import { Column } from 'primereact/column';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
-import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Toast } from 'primereact/toast';
-import { Tag } from 'primereact/tag';
+import { ConfirmDialog } from 'primereact/confirmdialog';
 import api from '../../../services/api';
 
 // ============================================
 // PROJECTS MANAGEMENT PANEL
-// Handles: Create, Read, Update, Delete projects
+// Handles: Create, Read, Update projects (View Only)
 // ============================================
 
 const ProjectsPanel = () => {
@@ -27,7 +26,6 @@ const ProjectsPanel = () => {
   const [loading, setLoading] = useState(false);
   const [displayDialog, setDisplayDialog] = useState(false);
   const [displayEditDialog, setDisplayEditDialog] = useState(false);
-  const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
   const toast = useRef(null);
 
@@ -38,6 +36,7 @@ const ProjectsPanel = () => {
     dueDate: null,
     contractor_id: null,
     client_id: null,
+    project_status: 'Ongoing',
   });
 
   const [editingProject, setEditingProject] = useState({
@@ -48,6 +47,7 @@ const ProjectsPanel = () => {
     dueDate: null,
     contractor_id: null,
     client_id: null,
+    project_status: 'Ongoing',
   });
 
   // ============================================
@@ -55,9 +55,12 @@ const ProjectsPanel = () => {
   // ============================================
 
   useEffect(() => {
-    fetchProjects();
-    fetchContractors();
-  }, [viewMode]);
+    const loadData = async () => {
+      await fetchContractors();
+      await fetchProjects();
+    };
+    loadData();
+  }, []);
 
   // ============================================
   // SEARCH FUNCTIONALITY
@@ -66,16 +69,17 @@ const ProjectsPanel = () => {
   // Function to get contractor name by ID
   const getContractorName = (contractorId) => {
     if (!contractorId) return '';
-    const contractor = contractors.find((c) => c.user_id === contractorId);
-    return contractor
+    const contractor = contractors?.find((c) => c?.user_id === contractorId);
+    return contractor && contractor.first_name && contractor.last_name
       ? `${contractor.first_name} ${contractor.last_name}`.toLowerCase()
       : '';
   };
 
+  // Function to get client name by ID
   const getClientName = (clientId) => {
     if (!clientId) return '';
-    const client = clients.find((c) => c.user_id === clientId);
-    return client
+    const client = clients?.find((c) => c?.user_id === clientId);
+    return client && client.first_name && client.last_name
       ? `${client.first_name} ${client.last_name}`.toLowerCase()
       : '';
   };
@@ -83,20 +87,13 @@ const ProjectsPanel = () => {
   // Filter projects based on search query
   const getFilteredProjects = () => {
     if (!searchQuery.trim()) {
-      return projects.filter((project) => {
-        if (viewMode === 'deleted') {
-          return project.isDeleted === true;
-        }
-        return project.isDeleted === false || project.isDeleted === undefined;
-      });
+      return projects.filter((project) => !project.isDeleted);
     }
 
     const query = searchQuery.toLowerCase();
 
     return projects.filter((project) => {
-      // Check view mode filter first
-      if (viewMode === 'deleted' && project.isDeleted !== true) return false;
-      if (viewMode === 'active' && project.isDeleted === true) return false;
+      if (project.isDeleted) return false;
 
       // Search in project name
       if (project.project_name?.toLowerCase().includes(query)) {
@@ -152,12 +149,7 @@ const ProjectsPanel = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      let response;
-      if (viewMode === 'deleted') {
-        response = await api.get('/projects?includeDeleted=true');
-      } else {
-        response = await api.get('/projects');
-      }
+      const response = await api.get('/projects');
       setProjects(response.data);
     } catch (error) {
       console.error('Fetch projects error:', error);
@@ -206,6 +198,23 @@ const ProjectsPanel = () => {
       return;
     }
 
+    // Validate due date is not before today
+    if (newProject.dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newProject.dueDate);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      if (selectedDate < today) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Due date cannot be before today',
+        });
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       await api.post('/projects', {
@@ -215,6 +224,7 @@ const ProjectsPanel = () => {
         project_deadline: newProject.dueDate,
         contractor_id: newProject.contractor_id,
         client_id: newProject.client_id,
+        project_status: 'Ongoing',
       });
 
       setDisplayDialog(false);
@@ -225,6 +235,7 @@ const ProjectsPanel = () => {
         dueDate: null,
         contractor_id: null,
         client_id: null,
+        project_status: 'Ongoing',
       });
 
       toast.current?.show({
@@ -249,38 +260,6 @@ const ProjectsPanel = () => {
     }
   };
 
-  const handleDeleteProject = (project) => {
-    confirmDialog({
-      message: `Are you sure you want to delete "${project.project_name}"? This can be restored from the recycle bin.`,
-      header: 'Confirm',
-      icon: 'pi pi-exclamation-triangle',
-      accept: async () => {
-        try {
-          setLoading(true);
-          await api.delete(`/projects/${project.project_id}`);
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Project moved to recycle bin',
-          });
-          fetchProjects();
-        } catch (error) {
-          console.error('Delete project error:', error);
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail:
-              error.response?.data?.message ||
-              error.message ||
-              'Failed to delete project',
-          });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  };
-
   const openEditDialog = (project) => {
     setEditingProject({
       project_id: project.project_id,
@@ -292,6 +271,7 @@ const ProjectsPanel = () => {
         : null,
       contractor_id: project.contractor_id,
       client_id: project.client_id || null,
+      project_status: project.project_status || 'Ongoing',
     });
     setDisplayEditDialog(true);
   };
@@ -316,6 +296,7 @@ const ProjectsPanel = () => {
         project_deadline: editingProject.dueDate,
         client_id: editingProject.client_id,
         contractor_id: editingProject.contractor_id,
+        project_status: editingProject.project_status,
       });
 
       setDisplayEditDialog(false);
@@ -340,48 +321,14 @@ const ProjectsPanel = () => {
     }
   };
 
-  const handleRestoreProject = (project) => {
-    confirmDialog({
-      message: `Restore "${project.project_name}" to active projects?`,
-      header: 'Confirm',
-      icon: 'pi pi-refresh',
-      accept: async () => {
-        try {
-          setLoading(true);
-          await api.patch(`/projects/${project.project_id}`, {
-            isDeleted: false,
-          });
-          toast.current?.show({
-            severity: 'success',
-            summary: 'Success',
-            detail: 'Project restored successfully',
-          });
-          fetchProjects();
-        } catch (error) {
-          console.error('Restore project error:', error);
-          toast.current?.show({
-            severity: 'error',
-            summary: 'Error',
-            detail:
-              error.response?.data?.message ||
-              error.message ||
-              'Failed to restore project',
-          });
-        } finally {
-          setLoading(false);
-        }
-      },
-    });
-  };
-
   // Contractor name template
   const contractorTemplate = (rowData) => {
     if (!rowData.contractor_id) return 'N/A';
 
-    const contractor = contractors.find(
-      (c) => c.user_id === rowData.contractor_id,
+    const contractor = contractors?.find(
+      (c) => c?.user_id === rowData.contractor_id,
     );
-    return contractor
+    return contractor && contractor.first_name && contractor.last_name
       ? `${contractor.first_name} ${contractor.last_name}`
       : 'N/A';
   };
@@ -390,8 +337,10 @@ const ProjectsPanel = () => {
   const clientTemplate = (rowData) => {
     if (!rowData.client_id) return 'N/A';
 
-    const client = clients.find((c) => c.user_id === rowData.client_id);
-    return client ? `${client.first_name} ${client.last_name}` : 'N/A';
+    const client = clients?.find((c) => c?.user_id === rowData.client_id);
+    return client && client.first_name && client.last_name
+      ? `${client.first_name} ${client.last_name}`
+      : 'N/A';
   };
 
   // Format amount with currency
@@ -412,80 +361,100 @@ const ProjectsPanel = () => {
   // Get filtered projects
   const filteredProjects = getFilteredProjects();
 
+  // Status template
+  const statusTemplate = (rowData) => {
+    const status = rowData.project_status || 'Ongoing';
+    const normalized = String(status).toLowerCase().trim();
+
+    const statusClass =
+      normalized === 'done' || normalized === 'completed'
+        ? 'status-done'
+        : normalized === 'hold' || normalized === 'on hold'
+          ? 'status-hold'
+          : 'status-ongoing';
+
+    const bgColor =
+      statusClass === 'status-done'
+        ? '#10b981'
+        : statusClass === 'status-hold'
+          ? '#f59e0b'
+          : '#0284c7';
+
+    return (
+      <span
+        className={`project-status-badge ${statusClass}`}
+        style={{ backgroundColor: bgColor, color: '#ffffff' }}
+      >
+        {status}
+      </span>
+    );
+  };
+
   // ============================================
   // RENDER
   // ============================================
 
   return (
-    <div>
+    <div className="panel-container">
       <Toast ref={toast} />
       <ConfirmDialog />
 
-      <div className="dashboard-card">
-        <div className="card-header">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-            }}
-          >
-            <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
-              Projects
-            </h3>
-          </div>
-        </div>
-
-        {/* Search Bar and Action Buttons */}
+      {/* Title Section */}
+      <div className="mb-6">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '16px',
-            paddingLeft: '16px',
-            paddingRight: '16px',
-            gap: '16px',
-            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            gap: '2rem',
           }}
         >
-          {/* Search Bar */}
-          <div
-            className="p-inputgroup"
-            style={{ flex: '1', minWidth: '300px', maxWidth: '500px' }}
-          >
-            <span className="p-inputgroup-addon">
-              <i className="pi pi-search" />
-            </span>
+          <div>
+            <h2 className="m-0">Projects</h2>
+            <p className="text-color-secondary m-0">
+              Manage and track all project activities
+            </p>
+          </div>
+          <div className="reports-search-box">
+            <i className="pi pi-search"></i>
             <InputText
-              placeholder="Search projects by name, description, contractor, amount..."
+              placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: '1' }}
+              className="reports-search-input"
             />
             {searchQuery && (
-              <Button
-                icon="pi pi-times"
-                className="p-button-text"
-                onClick={handleClearSearch}
-                tooltip="Clear search"
-              />
+              <i
+                className="pi pi-times"
+                style={{ color: '#9ca3af', cursor: 'pointer' }}
+                onClick={() => setSearchQuery('')}
+              ></i>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {searchQuery && (
-              <Button
-                label={`${filteredProjects.length} result${filteredProjects.length !== 1 ? 's' : ''} found`}
-                icon="pi pi-filter"
-                severity="secondary"
-                className="p-button-outlined"
-                disabled
-              />
-            )}
-          </div>
+      <div className="dashboard-card">
+        <div
+          className="card-header"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+          }}
+        >
+          <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
+            Projects
+          </h3>
+          <Button
+            label="Add New Project"
+            icon="pi pi-plus"
+            severity="info"
+            onClick={() => setDisplayDialog(true)}
+            className="add-user-btn"
+          />
         </div>
 
         <DataTable
@@ -495,7 +464,11 @@ const ProjectsPanel = () => {
           rows={10}
           rowsPerPageOptions={[5, 10, 20, 50]}
           tableStyle={{ minWidth: '50rem' }}
-          emptyMessage="No projects found."
+          emptyMessage={
+            searchQuery
+              ? 'No projects match your search criteria.'
+              : 'No projects found.'
+          }
           responsiveLayout="scroll"
           style={{
             border: '1px solid #e5e7eb',
@@ -503,6 +476,18 @@ const ProjectsPanel = () => {
           }}
         >
           <Column field="project_name" header="Project Name" sortable />
+          <Column
+            field="project_status"
+            header="Status"
+            body={statusTemplate}
+            sortable
+          />
+          <Column field="client_id" header="Client" body={clientTemplate} />
+          <Column
+            field="contractor_id"
+            header="Contractor"
+            body={contractorTemplate}
+          />
           <Column
             field="project_description"
             header="Description"
@@ -531,12 +516,6 @@ const ProjectsPanel = () => {
             body={dateTemplate}
             sortable
           />
-          <Column field="client_id" header="Client" body={clientTemplate} />
-          <Column
-            field="contractor_id"
-            header="Contractor"
-            body={contractorTemplate}
-          />
 
           <Column
             header="Actions"
@@ -552,14 +531,12 @@ const ProjectsPanel = () => {
           />
         </DataTable>
       </div>
-
-      {/* ============================================ */}
-      {/* CREATE PROJECT DIALOG */}
       {/* ============================================ */}
       <Dialog
         visible={displayDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
         header="Add New Project"
+        contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplayDialog(false)}
         className="p-fluid"
@@ -641,27 +618,7 @@ const ProjectsPanel = () => {
             placeholder="Select due date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-          />
-        </div>
-
-        <div className="field mt-3">
-          <label
-            htmlFor="project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
-          >
-            Client
-          </label>
-          <Dropdown
-            id="project-client"
-            value={newProject.client_id}
-            onChange={(e) =>
-              setNewProject({ ...newProject, client_id: e.value })
-            }
-            options={clients}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a client"
-            style={{ borderColor: '#cbd5e1' }}
+            minDate={new Date()}
           />
         </div>
 
@@ -686,13 +643,34 @@ const ProjectsPanel = () => {
           />
         </div>
 
-        <div className="flex justify-content-end gap-2 mt-5">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={() => setDisplayDialog(false)}
+        <div className="field mt-3">
+          <label
+            htmlFor="project-client"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Client
+          </label>
+          <Dropdown
+            id="project-client"
+            value={newProject.client_id}
+            onChange={(e) =>
+              setNewProject({ ...newProject, client_id: e.value })
+            }
+            options={clients}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a client"
+            style={{ borderColor: '#cbd5e1' }}
           />
-          <Button label="Create" onClick={handleAddProject} loading={loading} />
+        </div>
+
+        <div className="flex justify-content-center mt-5">
+          <Button
+            label="Create"
+            onClick={handleAddProject}
+            loading={loading}
+            className="modal-primary-btn"
+          />
         </div>
       </Dialog>
 
@@ -703,6 +681,7 @@ const ProjectsPanel = () => {
         visible={displayEditDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
         header="Edit Project"
+        contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplayEditDialog(false)}
         className="p-fluid"
@@ -789,27 +768,7 @@ const ProjectsPanel = () => {
             placeholder="Select due date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-          />
-        </div>
-
-        <div className="field mt-3">
-          <label
-            htmlFor="edit-project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
-          >
-            Client
-          </label>
-          <Dropdown
-            id="edit-project-client"
-            value={editingProject.client_id}
-            onChange={(e) =>
-              setEditingProject({ ...editingProject, client_id: e.value })
-            }
-            options={clients}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a client"
-            style={{ borderColor: '#cbd5e1' }}
+            minDate={new Date()}
           />
         </div>
 
@@ -834,16 +793,58 @@ const ProjectsPanel = () => {
           />
         </div>
 
-        <div className="flex justify-content-end gap-2 mt-5">
-          <Button
-            label="Cancel"
-            severity="secondary"
-            onClick={() => setDisplayEditDialog(false)}
+        <div className="field mt-3">
+          <label
+            htmlFor="edit-project-status"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Status
+          </label>
+          <Dropdown
+            id="edit-project-status"
+            value={editingProject.project_status}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, project_status: e.value })
+            }
+            options={[
+              { label: 'Ongoing', value: 'Ongoing' },
+              { label: 'Hold', value: 'Hold' },
+              { label: 'Done', value: 'Done' },
+            ]}
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Select status"
+            style={{ borderColor: '#cbd5e1' }}
           />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="edit-project-client"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Client
+          </label>
+          <Dropdown
+            id="edit-project-client"
+            value={editingProject.client_id}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, client_id: e.value })
+            }
+            options={clients}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a client"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="flex justify-content-center mt-5">
           <Button
             label="Update"
             onClick={handleEditProject}
             loading={loading}
+            className="modal-primary-btn"
           />
         </div>
       </Dialog>

@@ -936,7 +936,7 @@ const StaffReportsPanel = () => {
         <TabPanel header="Project Info">
           <Card>
             <div className="grid">
-              <div className="col-12 md:col-6">
+              <div className="col-12 md:col-6 p-4">
                 <h4>Project Details</h4>
                 <div className="space-y-3">
                   <div>
@@ -964,7 +964,7 @@ const StaffReportsPanel = () => {
                 </div>
               </div>
 
-              <div className="col-12 md:col-6">
+              <div className="col-12 md:col-6 p-4">
                 <h4>Financial Information</h4>
                 <div className="space-y-3">
                   <div>

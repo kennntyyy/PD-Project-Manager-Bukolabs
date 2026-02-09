@@ -26,6 +26,7 @@ export class ProjectsService {
       project_deadline,
       contractor_id,
       client_id,
+      parent_project_id,
     } = createProjectDto;
 
     const project = this.projectRepository.create({
@@ -36,6 +37,7 @@ export class ProjectsService {
       created_by: userId,
       contractor_id,
       client_id,
+      parent_project_id,
     });
 
     const savedProject = await this.projectRepository.save(project);
@@ -51,6 +53,7 @@ export class ProjectsService {
         project_name: savedProject.project_name,
         contractor_id,
         client_id,
+        parent_project_id,
       },
     });
 
@@ -106,6 +109,7 @@ export class ProjectsService {
       contractor_id: 'contractor_id',
       client_id: 'client_id',
       project_status: 'project_status',
+      parent_project_id: 'parent_project_id',
     };
 
     const actualChanges: Record<string, any> = {};

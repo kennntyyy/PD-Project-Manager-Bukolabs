@@ -83,6 +83,9 @@ export class Project {
     @Column()
     contractor_id: number;
 
+    @Column({ nullable: true })
+    parent_project_id: string;
+
     @Column()
     created_by: number;
 

@@ -30,7 +30,11 @@ import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF
 import api from '../../../services/api';
 import './ReportsPanel.css';
 
-const ReportsPanel = () => {
+const ReportsPanel = ({
+  embeddedProjectId,
+  embedded = false,
+  onReportsChanged,
+}) => {
   const [projects, setProjects] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [clients, setClients] = useState([]);
@@ -99,6 +103,9 @@ const ReportsPanel = () => {
     try {
       const response = await api.get('/reports');
       setRecentReports(response.data);
+      if (onReportsChanged) {
+        onReportsChanged();
+      }
     } catch (error) {
       console.error('Error fetching reports:', error);
     }
@@ -122,6 +129,16 @@ const ReportsPanel = () => {
     fetchUsers();
     fetchRecentReports();
   }, []);
+
+  useEffect(() => {
+    if (!embeddedProjectId || !projects.length) return;
+    const project = projects.find(
+      (item) => item.project_id === embeddedProjectId,
+    );
+    if (project) {
+      handleProjectClick(project);
+    }
+  }, [embeddedProjectId, projects, recentReports]);
 
   useEffect(() => {
     if (!projects.length || !recentReports.length) return;
@@ -292,6 +309,7 @@ const ReportsPanel = () => {
   };
 
   const handleBackToList = () => {
+    if (embedded) return;
     setSelectedProject(null);
     setFilteredReports([]);
   };
@@ -536,6 +554,9 @@ const ReportsPanel = () => {
 
       // Refresh reports list
       fetchRecentReports();
+      if (onReportsChanged) {
+        onReportsChanged();
+      }
     } catch (error) {
       console.error('Error submitting report:', error);
       showToast('error', 'Error', 'Failed to generate report');
@@ -928,12 +949,14 @@ const ReportsPanel = () => {
   const ProjectDetailView = () => (
     <div>
       <div className="mb-6">
-        <Button
-          label="Back to Projects"
-          icon="pi pi-arrow-left"
-          className="p-button-text mb-3"
-          onClick={handleBackToList}
-        />
+        {!embedded && (
+          <Button
+            label="Back to Projects"
+            icon="pi pi-arrow-left"
+            className="p-button-text mb-3"
+            onClick={handleBackToList}
+          />
+        )}
 
         <div className="flex justify-between items-start gap-4">
           <div style={{ textAlign: 'left' }}>
@@ -1194,7 +1217,13 @@ const ReportsPanel = () => {
     <div className="reports-container">
       <Toast ref={toast} />
 
-      {!selectedProject ? renderProjectListView() : <ProjectDetailView />}
+      {embedded
+        ? selectedProject
+          ? <ProjectDetailView />
+          : null
+        : !selectedProject
+          ? renderProjectListView()
+          : <ProjectDetailView />}
 
       {/* Report Generation Modal */}
       <Dialog
@@ -1459,7 +1488,26 @@ const ReportsPanel = () => {
                 </label>
                 <InputNumber
                   value={releasedAmount}
-                  onValueChange={(e) => setReleasedAmount(e.value)}
+                  onValueChange={(e) => {
+                    const newAmount = Number(e.value || 0);
+                    setReleasedAmount(newAmount);
+
+                    const contractAmount = Number(selectedProject?.total_amount) || 0;
+                    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                    const unreleasedBudget = contractAmount - totalReleased;
+
+                    if (unreleasedBudget > 0) {
+                      const calculatedRate = (newAmount / unreleasedBudget) * 100;
+                      const clampedRate = Math.min(
+                        100,
+                        Math.max(calculatedRate, minCompletionRate),
+                      );
+                      const roundedRate = Number(clampedRate.toFixed(2));
+                      setCompletionRate(roundedRate);
+                    } else {
+                      setCompletionRate(minCompletionRate);
+                    }
+                  }}
                   prefix="₱"
                   min={0}
                   mode="decimal"
@@ -1548,17 +1596,28 @@ const ReportsPanel = () => {
                       fontSize: '14px',
                     }}
                   >
-                    {completionRate}%
+                    {Number(completionRate || 0).toFixed(2)}%
                   </div>
                 </div>
                 <Slider
                   value={completionRate}
-                  onChange={(e) =>
-                    setCompletionRate(Math.max(e.value, minCompletionRate))
-                  }
+                  onChange={(e) => {
+                    const newRate = Math.max(e.value, minCompletionRate);
+                    const roundedRate = Number(newRate.toFixed(2));
+                    setCompletionRate(roundedRate);
+                    // Calculate unreleased budget
+                    const contractAmount = Number(selectedProject?.total_amount) || 0;
+                    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                    const unreleasedBudget = contractAmount - totalReleased;
+                    // Set releasedAmount to the corresponding percentage of unreleased budget
+                    const newAmount = Number(
+                      ((unreleasedBudget * roundedRate) / 100).toFixed(2),
+                    );
+                    setReleasedAmount(newAmount);
+                  }}
                   min={minCompletionRate}
                   max={100}
-                  step={1}
+                  step={0.01}
                   className="completion-rate-slider"
                   style={{ height: '6px' }}
                 />

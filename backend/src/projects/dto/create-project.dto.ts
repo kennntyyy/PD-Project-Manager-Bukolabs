@@ -45,4 +45,8 @@ export class CreateProjectDto {
   @IsOptional()
   @IsString()
   contractor_id?: string;
+
+  @IsOptional()
+  @IsString()
+  parent_project_id?: string;
 }

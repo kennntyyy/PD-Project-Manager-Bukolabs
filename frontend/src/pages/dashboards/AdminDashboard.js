@@ -8,6 +8,7 @@ import UserManagementPanel from './panels/UserManagementPanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SettingsPanel from './panels/SettingsPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
+import ProjectDashboardPanel from './panels/ProjectDashboardPanel';
 import AuditLogsPanel from './panels/AuditLogsPanel';
 import './Dashboard.css';
 
@@ -106,7 +107,7 @@ const AdminDashboard = () => {
             }}
           >
             <i className="pi pi-home"></i>
-            <span>Overview</span>
+            <span>Dashboard</span>
           </div>
           <div
             className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
@@ -133,7 +134,7 @@ const AdminDashboard = () => {
               }
             }}
           >
-            <i className="pi pi-chart-bar"></i>
+            {/* <i className="pi pi-chart-bar"></i>
             <span>Reports</span>
           </div>
           <div
@@ -146,7 +147,7 @@ const AdminDashboard = () => {
                 handleNavClick('settings');
               }
             }}
-          >
+          > */}
             <i className="pi pi-cog"></i>
             <span>Settings</span>
           </div>
@@ -163,6 +164,20 @@ const AdminDashboard = () => {
           >
             <i className="pi pi-folder"></i>
             <span>Projects</span>
+          </div>
+          <div
+            className={`nav-item ${activeNav === 'project-dashboard' ? 'active' : ''}`}
+            onClick={() => handleNavClick('project-dashboard')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('project-dashboard');
+              }
+            }}
+          >
+            <i className="pi pi-briefcase"></i>
+            <span>Project Dashboard</span>
           </div>
           <div
             className={`nav-item ${activeNav === 'audit-logs' ? 'active' : ''}`}
@@ -226,6 +241,7 @@ const AdminDashboard = () => {
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'settings' && <SettingsPanel />}
           {activeTab === 'projects' && <ProjectsPanel />}
+          {activeTab === 'project-dashboard' && <ProjectDashboardPanel />}
           {activeTab === 'audit-logs' && <AuditLogsPanel />}
         </div>
       </div>

@@ -28,6 +28,9 @@ const ProjectsPanel = () => {
   const [loading, setLoading] = useState(false);
   const [displayDialog, setDisplayDialog] = useState(false);
   const [displayEditDialog, setDisplayEditDialog] = useState(false);
+  const [displaySubProjectDialog, setDisplaySubProjectDialog] = useState(false);
+  const [displayProjectDashboard, setDisplayProjectDashboard] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
   const toast = useRef(null);
@@ -37,9 +40,20 @@ const ProjectsPanel = () => {
     description: '',
     amount: '',
     dueDate: null,
+    client_id: null,
+    project_status: 'Ongoing',
+  });
+
+  const [subProjectParent, setSubProjectParent] = useState(null);
+  const [newSubProject, setNewSubProject] = useState({
+    name: '',
+    description: '',
+    amount: '',
+    dueDate: null,
     contractor_id: null,
     client_id: null,
     project_status: 'Ongoing',
+    parent_project_id: null,
   });
 
   const [editingProject, setEditingProject] = useState({
@@ -52,6 +66,9 @@ const ProjectsPanel = () => {
     client_id: null,
     project_status: 'Ongoing',
   });
+
+  const getSubProjects = (parentId) =>
+    projects?.filter((p) => p?.parent_project_id === parentId) || [];
 
   // ============================================
   // LIFECYCLE
@@ -91,6 +108,7 @@ const ProjectsPanel = () => {
   const getFilteredProjects = () => {
     if (!searchQuery.trim()) {
       return projects.filter((project) => {
+        if (project.parent_project_id) return false;
         if (viewMode === 'deleted') {
           return project.isDeleted === true;
         }
@@ -101,6 +119,7 @@ const ProjectsPanel = () => {
     const query = searchQuery.toLowerCase();
 
     return projects.filter((project) => {
+      if (project.parent_project_id) return false;
       // Check view mode filter first
       if (viewMode === 'deleted' && project.isDeleted !== true) return false;
       if (viewMode === 'active' && project.isDeleted === true) return false;
@@ -266,7 +285,6 @@ const ProjectsPanel = () => {
         project_description: newProject.description,
         total_amount: newProject.amount,
         project_deadline: newProject.dueDate,
-        contractor_id: newProject.contractor_id,
         client_id: newProject.client_id,
         project_status: 'Ongoing',
       });
@@ -277,7 +295,6 @@ const ProjectsPanel = () => {
         description: '',
         amount: '',
         dueDate: null,
-        contractor_id: null,
         client_id: null,
         project_status: 'Ongoing',
       });
@@ -298,6 +315,102 @@ const ProjectsPanel = () => {
           error.response?.data?.message ||
           error.message ||
           'Failed to create project',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openSubProjectDialog = (parentProject) => {
+    setSubProjectParent(parentProject);
+    setNewSubProject({
+      name: '',
+      description: '',
+      amount: '',
+      dueDate: null,
+      contractor_id: null,
+      client_id: parentProject?.client_id || null,
+      project_status: 'Ongoing',
+      parent_project_id: parentProject?.project_id || null,
+    });
+    setDisplaySubProjectDialog(true);
+  };
+
+  const openProjectDashboard = (project) => {
+    setSelectedProject(project);
+    setDisplayProjectDashboard(true);
+  };
+
+  const handleAddSubProject = async () => {
+    // Validation
+    if (!newSubProject.name.trim()) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Sub-project name is required',
+      });
+      return;
+    }
+
+    // Validate due date is not before today
+    if (newSubProject.dueDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDate = new Date(newSubProject.dueDate);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      if (selectedDate < today) {
+        toast.current?.show({
+          severity: 'warn',
+          summary: 'Warning',
+          detail: 'Due date cannot be before today',
+        });
+        return;
+      }
+    }
+
+    try {
+      setLoading(true);
+      await api.post('/projects', {
+        project_name: newSubProject.name,
+        project_description: newSubProject.description,
+        total_amount: newSubProject.amount,
+        project_deadline: newSubProject.dueDate,
+        contractor_id: newSubProject.contractor_id,
+        client_id: newSubProject.client_id,
+        project_status: 'Ongoing',
+        parent_project_id: newSubProject.parent_project_id,
+      });
+
+      setDisplaySubProjectDialog(false);
+      setSubProjectParent(null);
+      setNewSubProject({
+        name: '',
+        description: '',
+        amount: '',
+        dueDate: null,
+        contractor_id: null,
+        client_id: null,
+        project_status: 'Ongoing',
+        parent_project_id: null,
+      });
+
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Sub-project created successfully',
+      });
+
+      fetchProjects();
+    } catch (error) {
+      console.error('Create sub-project error:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail:
+          error.response?.data?.message ||
+          error.message ||
+          'Failed to create sub-project',
       });
     } finally {
       setLoading(false);
@@ -473,6 +586,14 @@ const ProjectsPanel = () => {
     return contractor && contractor.first_name && contractor.last_name
       ? `${contractor.first_name} ${contractor.last_name}`
       : 'N/A';
+  };
+
+  const parentProjectTemplate = (rowData) => {
+    if (!rowData.parent_project_id) return '—';
+    const parent = projects?.find(
+      (p) => p?.project_id === rowData.parent_project_id,
+    );
+    return parent?.project_name || 'N/A';
   };
 
   // Client name template
@@ -663,6 +784,11 @@ const ProjectsPanel = () => {
         >
           <Column field="project_name" header="Project Name" sortable />
           <Column
+            field="parent_project_id"
+            header="Parent Project"
+            body={parentProjectTemplate}
+          />
+          <Column
             field="project_status"
             header="Status"
             body={statusTemplate}
@@ -709,6 +835,13 @@ const ProjectsPanel = () => {
               <div style={{ display: 'flex', gap: '8px' }}>
                 {viewMode === 'active' ? (
                   <>
+                    <Button
+                      icon="pi pi-plus"
+                      className="p-button-rounded p-button-sm p-button-info user-action-btn"
+                      onClick={() => openSubProjectDialog(rowData)}
+                      tooltip="Add Sub-Project"
+                      tooltipOptions={{ position: 'top' }}
+                    />
                     <Button
                       icon="pi pi-pencil"
                       className="p-button-rounded p-button-sm p-button-warning user-action-btn"
@@ -834,27 +967,6 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
-            htmlFor="project-contractor"
-            style={{ color: '#404a17', fontWeight: '600' }}
-          >
-            Contractor
-          </label>
-          <Dropdown
-            id="project-contractor"
-            value={newProject.contractor_id}
-            onChange={(e) =>
-              setNewProject({ ...newProject, contractor_id: e.value })
-            }
-            options={contractors}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a contractor"
-            style={{ borderColor: '#cbd5e1' }}
-          />
-        </div>
-
-        <div className="field mt-3">
-          <label
             htmlFor="project-client"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
@@ -882,6 +994,294 @@ const ProjectsPanel = () => {
             className="modal-primary-btn"
           />
         </div>
+      </Dialog>
+
+      <Dialog
+        visible={displaySubProjectDialog}
+        style={{ width: '90vw', maxWidth: '500px' }}
+        header="Add Sub-Project"
+        contentStyle={{ padding: '1.5rem 2rem' }}
+        modal
+        onHide={() => setDisplaySubProjectDialog(false)}
+        className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#404a17',
+          color: 'white',
+          padding: '1rem',
+        }}
+      >
+        <div className="field mt-2">
+          <label
+            htmlFor="parent-project"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Parent Project
+          </label>
+          <InputText
+            id="parent-project"
+            value={subProjectParent?.project_name || ''}
+            disabled
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-name"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Sub-Project Name *
+          </label>
+          <InputText
+            id="sub-project-name"
+            value={newSubProject.name}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, name: e.target.value })
+            }
+            placeholder="Enter sub-project name"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-description"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Description
+          </label>
+          <InputTextarea
+            id="sub-project-description"
+            value={newSubProject.description}
+            onChange={(e) =>
+              setNewSubProject({
+                ...newSubProject,
+                description: e.target.value,
+              })
+            }
+            placeholder="Enter sub-project description"
+            rows={4}
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-amount"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Project Amount
+          </label>
+          <InputNumber
+            id="sub-project-amount"
+            value={newSubProject.amount ? Number(newSubProject.amount) : null}
+            onValueChange={(e) =>
+              setNewSubProject({ ...newSubProject, amount: e.value || '' })
+            }
+            placeholder="Enter project amount"
+            prefix="₱ "
+            thousandSeparator="," 
+            minFractionDigits={2}
+            maxFractionDigits={2}
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-due-date"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Due Date
+          </label>
+          <Calendar
+            id="sub-project-due-date"
+            value={newSubProject.dueDate}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, dueDate: e.value })
+            }
+            dateFormat="mm/dd/yy"
+            placeholder="Select due date"
+            style={{ borderColor: '#cbd5e1' }}
+            className="w-full"
+            minDate={new Date()}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-contractor"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Contractor
+          </label>
+          <Dropdown
+            id="sub-project-contractor"
+            value={newSubProject.contractor_id}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, contractor_id: e.value })
+            }
+            options={contractors}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a contractor"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-client"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Client
+          </label>
+          <Dropdown
+            id="sub-project-client"
+            value={newSubProject.client_id}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, client_id: e.value })
+            }
+            options={clients}
+            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
+            optionValue="user_id"
+            placeholder="Select a client"
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="flex justify-content-center mt-5">
+          <Button
+            label="Create"
+            onClick={handleAddSubProject}
+            loading={loading}
+            className="modal-primary-btn"
+          />
+        </div>
+      </Dialog>
+
+      <Dialog
+        visible={displayProjectDashboard}
+        style={{ width: '95vw', maxWidth: '900px' }}
+        header="Project Dashboard"
+        contentStyle={{ padding: '1.5rem 2rem' }}
+        modal
+        onHide={() => setDisplayProjectDashboard(false)}
+        className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#404a17',
+          color: 'white',
+          padding: '1rem',
+        }}
+      >
+        {selectedProject ? (
+          <>
+            <div className="mb-4">
+              <h3 style={{ margin: 0, color: '#111827' }}>
+                {selectedProject.project_name}
+              </h3>
+              <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+                {selectedProject.project_description || 'No description'}
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1rem',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Status
+                </div>
+                <div>{selectedProject.project_status || 'Ongoing'}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Client
+                </div>
+                <div>{clientTemplate(selectedProject)}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Contractor
+                </div>
+                <div>{contractorTemplate(selectedProject)}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Amount
+                </div>
+                <div>{amountTemplate(selectedProject)}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  Due Date
+                </div>
+                <div>{dateTemplate(selectedProject)}</div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem',
+              }}
+            >
+              <h4 style={{ margin: 0 }}>Sub-Projects</h4>
+              <Button
+                label="Add Sub-Project"
+                icon="pi pi-plus"
+                severity="info"
+                onClick={() => openSubProjectDialog(selectedProject)}
+                className="p-button-sm"
+              />
+            </div>
+
+            <DataTable
+              value={getSubProjects(selectedProject.project_id)}
+              rows={5}
+              paginator
+              rowsPerPageOptions={[5, 10, 20]}
+              emptyMessage="No sub-projects found."
+              responsiveLayout="scroll"
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+              }}
+            >
+              <Column field="project_name" header="Sub-Project" />
+              <Column
+                field="project_status"
+                header="Status"
+                body={statusTemplate}
+              />
+              <Column field="client_id" header="Client" body={clientTemplate} />
+              <Column
+                field="contractor_id"
+                header="Contractor"
+                body={contractorTemplate}
+              />
+              <Column
+                field="total_amount"
+                header="Amount"
+                body={amountTemplate}
+              />
+              <Column
+                field="project_deadline"
+                header="Due Date"
+                body={dateTemplate}
+              />
+            </DataTable>
+          </>
+        ) : (
+          <p style={{ margin: 0 }}>No project selected.</p>
+        )}
       </Dialog>
 
       {/* ============================================ */}

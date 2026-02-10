@@ -243,8 +243,83 @@
   text-align: center;
 }
 
+.subproject-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.subproject-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.subproject-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.subproject-title {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.subproject-desc {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.subproject-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.subproject-progress-text {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.subproject-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.subproject-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.subproject-paginator {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
 @media (max-width: 900px) {
   .project-dashboard-search-top {
     padding: 0.65rem 0.85rem;
+  }
+
+  .subproject-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .subproject-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

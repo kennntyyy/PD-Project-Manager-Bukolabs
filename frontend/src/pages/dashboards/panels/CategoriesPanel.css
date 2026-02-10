@@ -1,0 +1,32 @@
+.categories-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.categories-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.categories-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+  flex: 1;
+}
+
+.categories-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.categories-table .p-datatable-header {
+  border-radius: 12px 12px 0 0;
+}

@@ -126,6 +126,51 @@
   text-align: center;
 }
 
+.nav-caret {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.nav-subitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px 10px 48px;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Source Serif Pro', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.nav-subitem span {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 1px;
+}
+
+.nav-subitem i {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+}
+
+.nav-subitem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.nav-subitem.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-left-color: white;
+  color: white;
+}
+
 .sidebar-footer {
   position: absolute;
   bottom: 20px;

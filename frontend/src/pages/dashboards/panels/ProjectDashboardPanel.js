@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { DataTable } from 'primereact/datatable';
-import { Column } from 'primereact/column';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { InputNumber } from 'primereact/inputnumber';
@@ -9,6 +7,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
+import { Paginator } from 'primereact/paginator';
 import { Toast } from 'primereact/toast';
 import ReportsPanel from './ReportsPanel';
 import api from '../../../services/api';
@@ -33,6 +32,8 @@ const ProjectDashboardPanel = () => {
   const [displaySubProjectDialog, setDisplaySubProjectDialog] = useState(false);
   const [displayReportsDialog, setDisplayReportsDialog] = useState(false);
   const [reportsProject, setReportsProject] = useState(null);
+  const [subProjectFirst, setSubProjectFirst] = useState(0);
+  const [subProjectRows, setSubProjectRows] = useState(6);
   const [newSubProject, setNewSubProject] = useState({
     name: '',
     description: '',
@@ -228,6 +229,12 @@ const ProjectDashboardPanel = () => {
       )
     : [];
 
+  const pagedSubProjects = useMemo(() => {
+    const start = subProjectFirst;
+    const end = subProjectFirst + subProjectRows;
+    return subProjects.slice(start, end);
+  }, [subProjects, subProjectFirst, subProjectRows]);
+
   const completionByProjectId = useMemo(() => {
     const map = new Map();
 
@@ -286,6 +293,17 @@ const ProjectDashboardPanel = () => {
     }
     setSelectedProject(null);
   }, [projects]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    setSubProjectFirst(0);
+  }, [selectedProject?.project_id]);
+
+  useEffect(() => {
+    if (subProjectFirst >= subProjects.length && subProjects.length > 0) {
+      setSubProjectFirst(0);
+    }
+  }, [subProjectFirst, subProjects.length]);
 
   const openSubProjectDialog = () => {
     if (!selectedProject) return;
@@ -512,75 +530,90 @@ const ProjectDashboardPanel = () => {
                   className="p-button-sm"
                 />
               </div>
-              <DataTable
-                key={`subprojects-${selectedProject?.project_id || 'none'}-${reportsVersion}`}
-                value={subProjects}
-                dataKey="project_id"
-                rows={5}
-                paginator
-                rowsPerPageOptions={[5, 10, 20]}
-                emptyMessage="No sub-projects found."
-                responsiveLayout="scroll"
-              >
-                <Column field="project_name" header="Sub-Project" />
-                <Column
-                  field="project_status"
-                  header="Status"
-                  body={statusTemplate}
-                />
-                <Column
-                  header="Completion"
-                  body={(rowData) => {
+              {subProjects.length === 0 ? (
+                <div className="project-dashboard-empty">
+                  No sub-projects found.
+                </div>
+              ) : (
+                <div
+                  className="subproject-grid"
+                  key={`subprojects-${selectedProject?.project_id || 'none'}-${reportsVersion}`}
+                >
+                  {pagedSubProjects.map((subproject) => {
                     const rate = getCompletionRateForProject(
-                      rowData.project_id,
+                      subproject.project_id,
                     );
                     return (
-                      <div style={{ minWidth: '120px' }}>
-                        <ProgressBar
-                          value={rate}
-                          className="report-progress-bar"
-                          style={{ height: '8px' }}
-                        />
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                          {rate}%
+                      <div
+                        key={subproject.project_id}
+                        className="subproject-card"
+                      >
+                        <div className="subproject-card-header">
+                          <h5 className="subproject-title">
+                            {subproject.project_name}
+                          </h5>
+                          {statusTemplate(subproject)}
+                        </div>
+                        <p className="subproject-desc">
+                          {subproject.project_description || 'No description'}
+                        </p>
+                        <div className="subproject-progress">
+                          <ProgressBar
+                            value={rate}
+                            className="report-progress-bar"
+                            style={{ height: '8px' }}
+                          />
+                          <div className="subproject-progress-text">
+                            {rate}% complete
+                          </div>
+                        </div>
+                        <div className="subproject-meta">
+                          <div>
+                            <div className="metric-label">Contractor</div>
+                            <div>
+                              {getContractorName(subproject.contractor_id)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="metric-label">Amount</div>
+                            <div>{amountTemplate(subproject)}</div>
+                          </div>
+                          <div>
+                            <div className="metric-label">Due Date</div>
+                            <div>{dateTemplate(subproject)}</div>
+                          </div>
+                        </div>
+                        <div className="subproject-actions">
+                          <Button
+                            icon="pi pi-file"
+                            label="Reports"
+                            severity="secondary"
+                            className="p-button-sm"
+                            style={{ backgroundColor: '#404a17', color: '#ffffff' }}
+                            onClick={() => {
+                              setReportsProject(subproject);
+                              setDisplayReportsDialog(true);
+                            }}
+                          />
                         </div>
                       </div>
                     );
+                  })}
+                </div>
+              )}
+              {subProjects.length > 0 && (
+                <Paginator
+                  className="subproject-paginator"
+                  first={subProjectFirst}
+                  rows={subProjectRows}
+                  totalRecords={subProjects.length}
+                  rowsPerPageOptions={[6, 9, 12]}
+                  onPageChange={(event) => {
+                    setSubProjectFirst(event.first);
+                    setSubProjectRows(event.rows);
                   }}
                 />
-                <Column
-                  field="contractor_id"
-                  header="Contractor"
-                  body={(rowData) => getContractorName(rowData.contractor_id)}
-                />
-                <Column
-                  field="total_amount"
-                  header="Amount"
-                  body={amountTemplate}
-                />
-                <Column
-                  field="project_deadline"
-                  header="Due Date"
-                  body={dateTemplate}
-                />
-                <Column
-                  header="Reports"
-                  body={(rowData) => (
-                    <Button
-                      icon="pi pi-file"
-                      severity="secondary"
-                      className="p-button-sm p-button-text"
-                      tooltip="Reports"
-                      tooltipOptions={{ position: 'top' }}
-                      style={{ backgroundColor: '#404a17', color: '#ffffff' }}
-                      onClick={() => {
-                        setReportsProject(rowData);
-                        setDisplayReportsDialog(true);
-                      }}
-                    />
-                  )}
-                />
-              </DataTable>
+              )}
 
               <div className="project-dashboard-divider" />
 

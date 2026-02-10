@@ -11,6 +11,7 @@ import { CronService } from './common/services/cron.service';
 import { User } from './users/entities/user.entity';
 import { ReportsModule } from './reports/reports.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     ProjectsModule,
     ReportsModule,
     AuditLogsModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService, CronService],

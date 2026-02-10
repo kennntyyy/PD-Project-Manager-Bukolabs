@@ -10,6 +10,7 @@ import SettingsPanel from './panels/SettingsPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
 import ProjectDashboardPanel from './panels/ProjectDashboardPanel';
 import AuditLogsPanel from './panels/AuditLogsPanel';
+import CategoriesPanel from './panels/CategoriesPanel';
 import './Dashboard.css';
 
 // ============================================
@@ -31,6 +32,14 @@ const AdminDashboard = () => {
   const [activeNav, setActiveNav] = useState(
     () => localStorage.getItem('adminActiveNav') || 'overview',
   );
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const saved = localStorage.getItem('adminSettingsOpen');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const storedTab = localStorage.getItem('adminActiveTab') || '';
+    return storedTab.startsWith('settings');
+  });
   const toast = useRef(null);
   const logoUrl = `${process.env.PUBLIC_URL}/logo.png`;
 
@@ -45,7 +54,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     localStorage.setItem('adminActiveTab', activeTab);
     localStorage.setItem('adminActiveNav', activeNav);
-  }, [activeTab, activeNav]);
+    localStorage.setItem('adminSettingsOpen', settingsOpen.toString());
+  }, [activeTab, activeNav, settingsOpen]);
 
   const loadUsers = async () => {
     try {
@@ -70,10 +80,10 @@ const AdminDashboard = () => {
   // ============================================
   // NAV HANDLERS
   // ============================================
-  const handleNavClick = (navName) => {
+  const handleNavClick = (navName, tabName = navName) => {
     console.log('Navigating to:', navName);
     setActiveNav(navName);
-    setActiveTab(navName);
+    setActiveTab(tabName);
   };
 
   // ============================================
@@ -123,7 +133,7 @@ const AdminDashboard = () => {
             <i className="pi pi-users"></i>
             <span>User Management</span>
           </div>
-          <div
+          {/* <div
             className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
             onClick={() => handleNavClick('reports')}
             role="button"
@@ -134,23 +144,10 @@ const AdminDashboard = () => {
               }
             }}
           >
-            {/* <i className="pi pi-chart-bar"></i>
+             <i className="pi pi-chart-bar"></i>
             <span>Reports</span>
-          </div>
-          <div
-            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
-            onClick={() => handleNavClick('settings')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                handleNavClick('settings');
-              }
-            }}
-          > */}
-            <i className="pi pi-cog"></i>
-            <span>Settings</span>
-          </div>
+          </div> */}
+          
           <div
             className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
             onClick={() => handleNavClick('projects')}
@@ -179,6 +176,45 @@ const AdminDashboard = () => {
             <i className="pi pi-briefcase"></i>
             <span>Project Dashboard</span>
           </div>
+          {/* settings here */}
+          <div
+            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+            onClick={() => {
+              setSettingsOpen((prev) => !prev);
+              handleNavClick('settings', 'settings');
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setSettingsOpen((prev) => !prev);
+                handleNavClick('settings', 'settings');
+              }
+            }}
+          >
+            <i className="pi pi-cog"></i>
+            <span>Settings</span>
+            <i
+              className={`pi ${settingsOpen ? 'pi-chevron-down' : 'pi-chevron-right'} nav-caret`}
+            ></i>
+          </div>
+          {settingsOpen && (
+            <div
+              className={`nav-subitem ${activeTab === 'settings-categories' ? 'active' : ''}`}
+              onClick={() => handleNavClick('settings', 'settings-categories')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleNavClick('settings', 'settings-categories');
+                }
+              }}
+            >
+              <i className="pi pi-tags"></i>
+              <span>Categories</span>
+            </div>
+          )}
+          
           <div
             className={`nav-item ${activeNav === 'audit-logs' ? 'active' : ''}`}
             onClick={() => handleNavClick('audit-logs')}
@@ -240,6 +276,7 @@ const AdminDashboard = () => {
           {activeTab === 'users' && <UserManagementPanel />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'settings' && <SettingsPanel />}
+          {activeTab === 'settings-categories' && <CategoriesPanel />}
           {activeTab === 'projects' && <ProjectsPanel />}
           {activeTab === 'project-dashboard' && <ProjectDashboardPanel />}
           {activeTab === 'audit-logs' && <AuditLogsPanel />}

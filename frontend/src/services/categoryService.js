@@ -11,4 +11,12 @@ export const categoryService = {
     const response = await api.post(CATEGORIES_API, categoryData);
     return response.data;
   },
+  update: async (id, categoryData) => {
+    const response = await api.patch(`${CATEGORIES_API}/${id}`, categoryData);
+    return response.data;
+  },
+  remove: async (id) => {
+    const response = await api.delete(`${CATEGORIES_API}/${id}`);
+    return response.data;
+  },
 };

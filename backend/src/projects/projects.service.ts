@@ -27,6 +27,7 @@ export class ProjectsService {
       contractor_id,
       client_id,
       parent_project_id,
+      category_id,
     } = createProjectDto;
 
     const project = this.projectRepository.create({
@@ -38,6 +39,7 @@ export class ProjectsService {
       contractor_id,
       client_id,
       parent_project_id,
+      category_id,
     });
 
     const savedProject = await this.projectRepository.save(project);
@@ -54,6 +56,7 @@ export class ProjectsService {
         contractor_id,
         client_id,
         parent_project_id,
+        category_id,
       },
     });
 
@@ -92,6 +95,7 @@ export class ProjectsService {
       contractor_id: UpdateProjectDto.contractor_id,
       client_id: UpdateProjectDto.client_id,
       project_status: UpdateProjectDto.project_status,
+      category_id: UpdateProjectDto.category_id,
     };
     // If restoring, clear deleted_at and isDeleted
     if (UpdateProjectDto.isDeleted === false) {
@@ -110,6 +114,7 @@ export class ProjectsService {
       client_id: 'client_id',
       project_status: 'project_status',
       parent_project_id: 'parent_project_id',
+      category_id: 'category_id',
     };
 
     const actualChanges: Record<string, any> = {};

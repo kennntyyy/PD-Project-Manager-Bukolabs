@@ -30,3 +30,21 @@
 .categories-table .p-datatable-header {
   border-radius: 12px 12px 0 0;
 }
+
+.category-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.categories-dialog .p-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.categories-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}

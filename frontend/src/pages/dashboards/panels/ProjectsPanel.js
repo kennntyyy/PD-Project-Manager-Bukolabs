@@ -835,13 +835,13 @@ const ProjectsPanel = () => {
               <div style={{ display: 'flex', gap: '8px' }}>
                 {viewMode === 'active' ? (
                   <>
-                    <Button
+                    {/* <Button
                       icon="pi pi-plus"
                       className="p-button-rounded p-button-sm p-button-info user-action-btn"
                       onClick={() => openSubProjectDialog(rowData)}
                       tooltip="Add Sub-Project"
                       tooltipOptions={{ position: 'top' }}
-                    />
+                    /> */}
                     <Button
                       icon="pi pi-pencil"
                       className="p-button-rounded p-button-sm p-button-warning user-action-btn"

@@ -22,6 +22,7 @@ const ProjectDashboardPanel = () => {
   const [projects, setProjects] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [clients, setClients] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,6 +42,7 @@ const ProjectDashboardPanel = () => {
     dueDate: null,
     contractor_id: null,
     client_id: null,
+    category_id: null,
     project_status: 'Ongoing',
     parent_project_id: null,
   });
@@ -55,6 +57,7 @@ const ProjectDashboardPanel = () => {
     const loadData = async () => {
       await fetchUsers();
       await fetchProjects();
+      await fetchCategories();
       await fetchReports();
     };
     loadData();
@@ -102,6 +105,20 @@ const ProjectDashboardPanel = () => {
         severity: 'error',
         summary: 'Error',
         detail: 'Failed to load users',
+      });
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/categories');
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load categories',
       });
     }
   };
@@ -314,6 +331,7 @@ const ProjectDashboardPanel = () => {
       dueDate: null,
       contractor_id: null,
       client_id: selectedProject.client_id || null,
+      category_id: null,
       project_status: 'Ongoing',
       parent_project_id: selectedProject.project_id,
     });
@@ -370,6 +388,7 @@ const ProjectDashboardPanel = () => {
         project_deadline: newSubProject.dueDate,
         contractor_id: newSubProject.contractor_id,
         client_id: newSubProject.client_id,
+        category_id: newSubProject.category_id,
         project_status: 'Ongoing',
         parent_project_id: newSubProject.parent_project_id,
       });
@@ -382,6 +401,7 @@ const ProjectDashboardPanel = () => {
         dueDate: null,
         contractor_id: null,
         client_id: null,
+        category_id: null,
         project_status: 'Ongoing',
         parent_project_id: null,
       });
@@ -809,6 +829,27 @@ const ProjectDashboardPanel = () => {
             thousandSeparator=","
             minFractionDigits={2}
             maxFractionDigits={2}
+            style={{ borderColor: '#cbd5e1' }}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-category"
+            style={{ color: '#404a17', fontWeight: '600' }}
+          >
+            Category
+          </label>
+          <Dropdown
+            id="sub-project-category"
+            value={newSubProject.category_id}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, category_id: e.value })
+            }
+            options={categories}
+            optionLabel="category_name"
+            optionValue="category_id"
+            placeholder="Select a category"
             style={{ borderColor: '#cbd5e1' }}
           />
         </div>

@@ -88,6 +88,9 @@ export class Project {
   contractor_id: string;
 
   @Column({ type: 'uuid', nullable: true })
+  category_id: string;
+
+  @Column({ type: 'uuid', nullable: true })
   parent_project_id: string;
 
   @Column({ nullable: true })

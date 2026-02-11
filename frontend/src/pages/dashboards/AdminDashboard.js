@@ -119,49 +119,7 @@ const AdminDashboard = () => {
             <i className="pi pi-home"></i>
             <span>Dashboard</span>
           </div>
-          <div
-            className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
-            onClick={() => handleNavClick('users')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                handleNavClick('users');
-              }
-            }}
-          >
-            <i className="pi pi-users"></i>
-            <span>User Management</span>
-          </div>
-          {/* <div
-            className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
-            onClick={() => handleNavClick('reports')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                handleNavClick('reports');
-              }
-            }}
-          >
-             <i className="pi pi-chart-bar"></i>
-            <span>Reports</span>
-          </div> */}
-          
-          <div
-            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
-            onClick={() => handleNavClick('projects')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                handleNavClick('projects');
-              }
-            }}
-          >
-            <i className="pi pi-folder"></i>
-            <span>Projects</span>
-          </div>
+          {/*Projects Dashboard*/}
           <div
             className={`nav-item ${activeNav === 'project-dashboard' ? 'active' : ''}`}
             onClick={() => handleNavClick('project-dashboard')}
@@ -176,6 +134,55 @@ const AdminDashboard = () => {
             <i className="pi pi-briefcase"></i>
             <span>Project Dashboard</span>
           </div>
+
+          <div
+            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
+            onClick={() => handleNavClick('projects')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('projects');
+              }
+            }}
+          >
+            <i className="pi pi-folder"></i>
+            <span>Projects</span>
+          </div>
+
+          <div
+            className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
+            onClick={() => handleNavClick('users')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('users');
+              }
+            }}
+          >
+            {/*Projects*/}
+            <i className="pi pi-users"></i>
+            <span>User Management</span>
+          </div>
+
+            
+
+          {/* <div
+            className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
+            onClick={() => handleNavClick('reports')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleNavClick('reports');
+              }
+            }}
+          >
+             <i className="pi pi-chart-bar"></i>
+            <span>Reports</span>
+          </div> */}
+
           {/* settings here */}
           <div
             className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}

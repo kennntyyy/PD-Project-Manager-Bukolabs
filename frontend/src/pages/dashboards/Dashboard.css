@@ -443,6 +443,20 @@
   border-color: #dee2e6 !important;
 }
 
+.btn-danger {
+  background: #b23b3b !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #922f2f !important;
+  box-shadow: 0 8px 20px rgba(178, 59, 59, 0.25) !important;
+}
+
 /* ===== Data Table ===== */
 .p-datatable {
   border-radius: 14px !important;

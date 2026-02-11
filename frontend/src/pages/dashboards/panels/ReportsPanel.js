@@ -27,6 +27,8 @@ import { Card } from 'primereact/card';
 import { TabView, TabPanel } from 'primereact/tabview';
 import { Menu } from 'primereact/menu';
 import { ProjectReportPDF } from '../../dashboards/staff_panels/ProjectReportPDF';
+import { ProjectAggregateReportPDF } from '../../dashboards/staff_panels/ProjectAggregateReportPDF';
+import { ProjectReportsListPDF } from '../../dashboards/staff_panels/ProjectReportsListPDF';
 import api from '../../../services/api';
 import './ReportsPanel.css';
 
@@ -844,6 +846,309 @@ const ReportsPanel = ({
     },
   ];
 
+  const getProjectReports = (projectId) =>
+    recentReports.filter((report) => report.project_id === projectId);
+
+  const getLatestProgress = (projectReports) =>
+    projectReports.reduce(
+      (max, report) => Math.max(max, Number(report.current_progress || 0)),
+      0,
+    );
+
+  const getTotalReleased = (projectReports) =>
+    projectReports.reduce(
+      (sum, report) => sum + (Number(report.payment_requested) || 0),
+      0,
+    );
+
+  const getReportRange = (projectReports) => {
+    if (!projectReports.length) {
+      return { start: 'N/A', end: 'N/A' };
+    }
+
+    const sorted = [...projectReports].sort((a, b) => {
+      const aDate = new Date(a.created_at || a.start_date || a.report_date);
+      const bDate = new Date(b.created_at || b.start_date || b.report_date);
+      return aDate - bDate;
+    });
+
+    const startReport = sorted[0];
+    const endReport = sorted[sorted.length - 1];
+
+    return {
+      start: formatDate(startReport.start_date || startReport.report_date),
+      end: formatDate(endReport.end_date || endReport.report_date),
+    };
+  };
+
+  const downloadAggregateReportCSV = () => {
+    if (!selectedProject || selectedProject.parent_project_id) {
+      showToast(
+        'warn',
+        'Not Available',
+        'Summary reports are only available for main projects.',
+      );
+      return;
+    }
+
+    try {
+      const mainReports = getProjectReports(selectedProject.project_id);
+      const reportRange = getReportRange(mainReports);
+      const mainSummary = {
+        reportCount: mainReports.length,
+        latestProgress: getLatestProgress(mainReports),
+        totalReleased: getTotalReleased(mainReports),
+      };
+
+      const subProjects = projects.filter(
+        (project) => project.parent_project_id === selectedProject.project_id,
+      );
+
+      const rows = [
+        ['Main Project Summary'],
+        ['Project Name', selectedProject.project_name],
+        ['Client', getClientName(selectedProject.client_id)],
+        ['Contractor', getContractorName(selectedProject.contractor_id)],
+        ['Status', selectedProject.project_status || 'Ongoing'],
+        ['Report Period', `${reportRange.start} - ${reportRange.end}`],
+        ['Total Reports', mainSummary.reportCount],
+        ['Latest Progress', `${mainSummary.latestProgress}%`],
+        ['Total Released', formatCurrency(mainSummary.totalReleased)],
+        ['Budget', formatCurrency(selectedProject.total_amount)],
+        [],
+        [
+          'Subproject',
+          'Status',
+          'Report Period',
+          'Reports',
+          'Latest Progress',
+          'Total Released',
+        ],
+      ];
+
+      subProjects.forEach((project) => {
+        const reports = getProjectReports(project.project_id);
+        const period = getReportRange(reports);
+        rows.push([
+          project.project_name,
+          project.project_status || 'Ongoing',
+          `${period.start} - ${period.end}`,
+          reports.length,
+          `${getLatestProgress(reports)}%`,
+          formatCurrency(getTotalReleased(reports)),
+        ]);
+      });
+
+      const csvContent = rows.map((row) => row.join(',')).join('\n');
+      const encodedUri = encodeURI(
+        'data:text/csv;charset=utf-8,' + csvContent,
+      );
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute(
+        'download',
+        `Report_Summary_${selectedProject.project_name}_${formatDateForFilename(new Date())}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('success', 'Success', 'Summary CSV downloaded successfully');
+    } catch (error) {
+      console.error('Error generating summary CSV:', error);
+      showToast('error', 'Error', 'Failed to generate summary CSV');
+    }
+  };
+
+  const downloadProjectReportsCSV = (project) => {
+    if (!project) {
+      showToast('error', 'Error', 'Project not found');
+      return;
+    }
+    try {
+      const reports = getProjectReports(project.project_id);
+      if (!reports.length) {
+        showToast('info', 'No Reports', 'No reports found for this project');
+        return;
+      }
+
+      const rows = [
+        ['Project', project.project_name],
+        ['Report Period', `${formatDate(project.project_start_date)} - ${formatDate(project.project_deadline)}`],
+        [],
+        [
+          'Report #',
+          'Start Date',
+          'End Date',
+          'Progress',
+          'Payment Requested',
+          'Generated At',
+        ],
+      ];
+
+      reports
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.created_at || a.start_date) -
+            new Date(b.created_at || b.start_date),
+        )
+        .forEach((report, index) => {
+          rows.push([
+            index + 1,
+            formatDate(report.start_date || report.report_date),
+            formatDate(report.end_date || report.report_date),
+            `${report.current_progress || 0}%`,
+            formatCurrency(report.payment_requested),
+            formatDateTime(report.created_at || report.start_date),
+          ]);
+        });
+
+      const csvContent = rows.map((row) => row.join(',')).join('\n');
+      const encodedUri = encodeURI(
+        'data:text/csv;charset=utf-8,' + csvContent,
+      );
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute(
+        'download',
+        `Reports_${project.project_name}_${formatDateForFilename(new Date())}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('success', 'Success', 'Project reports CSV downloaded');
+    } catch (error) {
+      console.error('Error generating project reports CSV:', error);
+      showToast('error', 'Error', 'Failed to generate project reports CSV');
+    }
+  };
+
+  const downloadProjectReportsPDF = async (project) => {
+    if (!project) {
+      showToast('error', 'Error', 'Project not found');
+      return;
+    }
+
+    try {
+      const reports = getProjectReports(project.project_id)
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.created_at || a.start_date) -
+            new Date(b.created_at || b.start_date),
+        );
+
+      if (!reports.length) {
+        showToast('info', 'No Reports', 'No reports found for this project');
+        return;
+      }
+
+      const reportPeriod = getReportRange(reports);
+
+      // Get parent project name if this is a subproject
+      let parentProjectName = '';
+      if (project.parent_project_id) {
+        const parentProject = projects.find(
+          (p) => p.project_id === project.parent_project_id,
+        );
+        parentProjectName = parentProject?.project_name || '';
+      }
+
+      const doc = (
+        <ProjectReportsListPDF
+          project={project}
+          clientName={getClientName(project.client_id)}
+          contractorName={getContractorName(project.contractor_id)}
+          parentProjectName={parentProjectName}
+          reportPeriod={reportPeriod}
+          reports={reports}
+          formatCurrency={formatCurrency}
+          formatDate={formatDate}
+          formatDateTime={formatDateTime}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const fileName = `Reports_${project.project_name}_${formatDateForFilename(new Date())}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'Success', 'Project reports PDF downloaded');
+    } catch (error) {
+      console.error('Error generating project reports PDF:', error);
+      showToast('error', 'Error', 'Failed to generate project reports PDF');
+    }
+  };
+
+  const downloadAggregateReportPDF = async () => {
+    if (!selectedProject || selectedProject.parent_project_id) {
+      showToast(
+        'warn',
+        'Not Available',
+        'Summary reports are only available for main projects.',
+      );
+      return;
+    }
+
+    try {
+      const mainReports = getProjectReports(selectedProject.project_id);
+      const reportRange = getReportRange(mainReports);
+      const mainSummary = {
+        reportCount: mainReports.length,
+        latestProgress: getLatestProgress(mainReports),
+        totalReleased: getTotalReleased(mainReports),
+      };
+
+      const subProjects = projects.filter(
+        (project) => project.parent_project_id === selectedProject.project_id,
+      );
+
+      const subprojectSummaries = subProjects.map((project) => {
+        const reports = getProjectReports(project.project_id);
+        return {
+          project_id: project.project_id,
+          project_name: project.project_name,
+          project_status: project.project_status,
+          latestProgress: getLatestProgress(reports),
+          totalReleased: getTotalReleased(reports),
+          reportCount: reports.length,
+        };
+      });
+
+      const doc = (
+        <ProjectAggregateReportPDF
+          mainProject={selectedProject}
+          clientName={getClientName(selectedProject.client_id)}
+          contractorName={getContractorName(selectedProject.contractor_id)}
+          reportRange={reportRange}
+          mainSummary={mainSummary}
+          subprojectSummaries={subprojectSummaries}
+          generatedAt={formatDateTime(new Date())}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const fileName = `Report_Summary_${selectedProject.project_name}_${formatDateForFilename(new Date())}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'Success', 'Summary PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error generating summary PDF:', error);
+      showToast('error', 'Error', 'Failed to generate summary PDF');
+    }
+  };
+
   // Project List View
   const renderProjectListView = () => {
     const filteredProjects = projects.filter((project) =>
@@ -966,14 +1271,29 @@ const ReportsPanel = ({
               <br />
               Contractor: {getContractorName(selectedProject.contractor_id)}
             </p>
-            {!isProjectLocked(selectedProject?.project_status) && (
+            <div className="flex gap-2" style={{ marginTop: '1rem' }}>
+              {!isProjectLocked(selectedProject?.project_status) && (
+                <Button
+                  label="Generate New Report"
+                  onClick={handleGenerateClick}
+                  className="p-button-primary"
+                />
+              )}
               <Button
-                label="Generate New Report"
-                onClick={handleGenerateClick}
-                className="p-button-primary"
-                style={{ marginTop: '1rem' }}
+                label="Print Reports CSV"
+                icon="pi pi-file-excel"
+                className="p-button-outlined p-button-sm p-button-success"
+                disabled={!getProjectReports(selectedProject.project_id).length}
+                onClick={() => downloadProjectReportsCSV(selectedProject)}
               />
-            )}
+              <Button
+                label="Print Reports PDF"
+                icon="pi pi-file-pdf"
+                className="p-button-outlined p-button-sm p-button-danger"
+                disabled={!getProjectReports(selectedProject.project_id).length}
+                onClick={() => downloadProjectReportsPDF(selectedProject)}
+              />
+            </div>
           </div>
           <div
             className="flex flex-column gap-3 items-end flex-shrink-0"
@@ -1016,6 +1336,158 @@ const ReportsPanel = ({
           </div>
         </div>
       </div>
+
+      {selectedProject && !selectedProject.parent_project_id && (
+        <Card className="p-4 mb-4">
+          <div className="flex justify-between items-center gap-3">
+            <div>
+              <h4 className="m-0">All Reports Summary</h4>
+              <small className="text-color-secondary">
+                Main project totals and per-subproject status
+              </small>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                label="Download Summary PDF"
+                icon="pi pi-file-pdf"
+                className="p-button-outlined p-button-sm p-button-danger"
+                onClick={downloadAggregateReportPDF}
+              />
+              <Button
+                label="Download Summary CSV"
+                icon="pi pi-file-excel"
+                className="p-button-outlined p-button-sm p-button-success"
+                onClick={downloadAggregateReportCSV}
+              />
+            </div>
+          </div>
+
+          <Divider className="my-3" />
+
+          {(() => {
+            const mainReports = getProjectReports(selectedProject.project_id);
+            const mainSummary = {
+              reportCount: mainReports.length,
+              latestProgress: getLatestProgress(mainReports),
+              totalReleased: getTotalReleased(mainReports),
+            };
+            const mainReportPeriod = getReportRange(mainReports);
+
+            const subProjects = projects.filter(
+              (project) =>
+                project.parent_project_id === selectedProject.project_id,
+            );
+
+            const subSummaries = subProjects.map((project) => {
+              const reports = getProjectReports(project.project_id);
+              const reportPeriod = getReportRange(reports);
+              return {
+                project,
+                project_id: project.project_id,
+                project_name: project.project_name,
+                project_status: project.project_status,
+                latestProgress: getLatestProgress(reports),
+                totalReleased: getTotalReleased(reports),
+                reportCount: reports.length,
+                reportPeriod,
+              };
+            });
+
+            return (
+              <div className="grid">
+                <div className="col-12 lg:col-5">
+                  <h5 className="mt-0 mb-2">Main Project</h5>
+                  <div className="grid">
+                    <div className="col-12 sm:col-6">
+                      <span className="font-bold text-xs">Status:</span>
+                      <div style={{ marginTop: '4px' }}>
+                        {renderStatusBadge(selectedProject.project_status)}
+                      </div>
+                    </div>
+                    <div className="col-12 sm:col-6">
+                      <span className="font-bold text-xs">Reports:</span>
+                      <p className="m-0 text-sm">{mainSummary.reportCount}</p>
+                    </div>
+                    <div className="col-12 sm:col-6">
+                      <span className="font-bold text-xs">Report Period:</span>
+                      <p className="m-0 text-sm">
+                        {mainReportPeriod.start} - {mainReportPeriod.end}
+                      </p>
+                    </div>
+                    <div className="col-12 sm:col-6">
+                      <span className="font-bold text-xs">Latest Progress:</span>
+                      <p className="m-0 text-sm">{mainSummary.latestProgress}%</p>
+                    </div>
+                    <div className="col-12 sm:col-6">
+                      <span className="font-bold text-xs">Total Released:</span>
+                      <p className="m-0 text-sm">
+                        {formatCurrency(mainSummary.totalReleased)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-12 lg:col-7">
+                  <h5 className="mt-0 mb-2">Subprojects</h5>
+                  {subSummaries.length ? (
+                    <div className="grid">
+                      {subSummaries.map((summary) => (
+                        <div
+                          key={summary.project_id}
+                          className="col-12"
+                          style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}
+                        >
+                          <div className="flex justify-between items-start gap-3">
+                            <div>
+                              <div className="font-bold text-sm">
+                                {summary.project_name}
+                              </div>
+                              <div style={{ marginTop: '4px' }}>
+                                {renderStatusBadge(summary.project_status)}
+                              </div>
+                              <div className="text-xs text-color-secondary" style={{ marginTop: '6px' }}>
+                                Report Period: {summary.reportPeriod.start} - {summary.reportPeriod.end}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-color-secondary">
+                                Latest Progress
+                              </div>
+                              <div className="font-bold text-sm">
+                                {summary.latestProgress}%
+                              </div>
+                              <div className="text-xs text-color-secondary mt-2">
+                                Total Released
+                              </div>
+                              <div className="font-bold text-sm">
+                                {formatCurrency(summary.totalReleased)}
+                              </div>
+                              <div className="mt-2">
+                                <Button
+                                  label="Print Reports CSV"
+                                  icon="pi pi-file-excel"
+                                  className="p-button-text p-button-sm"
+                                  onClick={() =>
+                                    downloadProjectReportsCSV(summary.project)
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="m-0 text-sm text-color-secondary">
+                      No subprojects found.
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </Card>
+      )}
 
       <div style={{ marginTop: '-35px', paddingTop: 0 }}>
         <h3 style={{ marginTop: 0, marginBottom: '0.5rem', paddingTop: 0 }}>

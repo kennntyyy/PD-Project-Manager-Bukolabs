@@ -49,4 +49,8 @@ export class CreateProjectDto {
   @IsOptional()
   @IsString()
   parent_project_id?: string;
+
+  @IsOptional()
+  @IsString()
+  category_id?: string;
 }

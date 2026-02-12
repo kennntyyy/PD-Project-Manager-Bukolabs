@@ -5,6 +5,8 @@ import { Toast } from 'primereact/toast';
 import { userService } from '../../services/userService';
 import OverviewPanel from './panels/OverviewPanel';
 import UserManagementPanel from './panels/UserManagementPanel';
+import ClientManagementPanel from './panels/ClientManagementPanel';
+import ContractorManagementPanel from './panels/ContractorManagementPanel';
 import ReportsPanel from './panels/ReportsPanel';
 import SettingsPanel from './panels/SettingsPanel';
 import ProjectsPanel from './panels/ProjectsPanel';
@@ -29,9 +31,21 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('adminActiveTab') || 'overview',
   );
-  const [activeNav, setActiveNav] = useState(
-    () => localStorage.getItem('adminActiveNav') || 'overview',
-  );
+  const [activeNav, setActiveNav] = useState(() => {
+    const storedNav = localStorage.getItem('adminActiveNav') || 'overview';
+    if (storedNav === 'clients' || storedNav === 'contractors') {
+      return 'users';
+    }
+    return storedNav;
+  });
+  const [usersOpen, setUsersOpen] = useState(() => {
+    const saved = localStorage.getItem('adminUsersOpen');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const storedTab = localStorage.getItem('adminActiveTab') || '';
+    return ['users', 'clients', 'contractors'].includes(storedTab);
+  });
   const [settingsOpen, setSettingsOpen] = useState(() => {
     const saved = localStorage.getItem('adminSettingsOpen');
     if (saved !== null) {
@@ -54,8 +68,9 @@ const AdminDashboard = () => {
   useEffect(() => {
     localStorage.setItem('adminActiveTab', activeTab);
     localStorage.setItem('adminActiveNav', activeNav);
+    localStorage.setItem('adminUsersOpen', usersOpen.toString());
     localStorage.setItem('adminSettingsOpen', settingsOpen.toString());
-  }, [activeTab, activeNav, settingsOpen]);
+  }, [activeTab, activeNav, usersOpen, settingsOpen]);
 
   const loadUsers = async () => {
     try {
@@ -152,11 +167,15 @@ const AdminDashboard = () => {
 
           <div
             className={`nav-item ${activeNav === 'users' ? 'active' : ''}`}
-            onClick={() => handleNavClick('users')}
+            onClick={() => {
+              setUsersOpen((prev) => !prev);
+              handleNavClick('users');
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
+                setUsersOpen((prev) => !prev);
                 handleNavClick('users');
               }
             }}
@@ -164,7 +183,42 @@ const AdminDashboard = () => {
             {/*Projects*/}
             <i className="pi pi-users"></i>
             <span>User Management</span>
+            <i
+              className={`pi ${usersOpen ? 'pi-chevron-down' : 'pi-chevron-right'} nav-caret`}
+            ></i>
           </div>
+          {usersOpen && (
+            <div
+              className={`nav-subitem ${activeTab === 'clients' ? 'active' : ''}`}
+              onClick={() => handleNavClick('users', 'clients')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleNavClick('users', 'clients');
+                }
+              }}
+            >
+              <i className="pi pi-id-card"></i>
+              <span>Clients</span>
+            </div>
+          )}
+          {usersOpen && (
+            <div
+              className={`nav-subitem ${activeTab === 'contractors' ? 'active' : ''}`}
+              onClick={() => handleNavClick('users', 'contractors')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleNavClick('users', 'contractors');
+                }
+              }}
+            >
+              <i className="pi pi-wrench"></i>
+              <span>Contractors</span>
+            </div>
+          )}
 
             
 
@@ -238,7 +292,7 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-footer flex flex-col" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div className="user-profile">
             <div className="user-avatar">
               {(() => {
@@ -267,7 +321,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <Button
-            className="logout-btn"
+            className="logout-btn p-button-sm"
             label="Logout"
             icon="pi pi-sign-out"
             onClick={logout}
@@ -280,7 +334,11 @@ const AdminDashboard = () => {
         {/* Body - Render appropriate panel based on activeTab */}
         <div className="dashboard-body">
           {activeTab === 'overview' && <OverviewPanel users={users} />}
-          {activeTab === 'users' && <UserManagementPanel />}
+          {activeTab === 'users' && (
+            <UserManagementPanel roleFilters={['admin', 'staff']} />
+          )}
+          {activeTab === 'clients' && <ClientManagementPanel />}
+          {activeTab === 'contractors' && <ContractorManagementPanel />}
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'settings' && <SettingsPanel />}
           {activeTab === 'settings-categories' && <CategoriesPanel />}

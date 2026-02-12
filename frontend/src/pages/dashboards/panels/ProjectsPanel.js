@@ -638,10 +638,10 @@ const ProjectsPanel = () => {
 
     const bgColor =
       statusClass === 'status-done'
-        ? '#10b981'
+        ? '#16a34a'
         : statusClass === 'status-hold'
-          ? '#f59e0b'
-          : '#0284c7';
+          ? '#eab308'
+          : '#f97316';
 
     return (
       <span
@@ -999,7 +999,7 @@ const ProjectsPanel = () => {
       <Dialog
         visible={displaySubProjectDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
-        header="Add Sub-Project"
+        header="Add Project"
         contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplaySubProjectDialog(false)}
@@ -1030,7 +1030,7 @@ const ProjectsPanel = () => {
             htmlFor="sub-project-name"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
-            Sub-Project Name *
+            Project Name *
           </label>
           <InputText
             id="sub-project-name"

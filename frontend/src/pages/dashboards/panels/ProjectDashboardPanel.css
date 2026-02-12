@@ -199,6 +199,20 @@
   padding: 1.5rem;
 }
 
+.report-progress-bar .p-progressbar {
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.report-progress-bar .p-progressbar-value {
+  background: var(--progress-color, #4f4d36) !important;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  box-shadow: none;
+}
+
 .project-dashboard-card-linked {
   padding: 1.75rem;
 }

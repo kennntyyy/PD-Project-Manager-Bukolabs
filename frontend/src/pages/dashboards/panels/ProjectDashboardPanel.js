@@ -154,6 +154,14 @@ const ProjectDashboardPanel = () => {
       : 'N/A';
   };
 
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return 'N/A';
+    const category = categories?.find(
+      (item) => item?.category_id === categoryId,
+    );
+    return category?.category_name || 'N/A';
+  };
+
   const amountTemplate = (rowData) => {
     if (!rowData.total_amount) return 'N/A';
     return `₱${parseFloat(rowData.total_amount).toLocaleString(undefined, {
@@ -167,8 +175,44 @@ const ProjectDashboardPanel = () => {
     return new Date(rowData.project_deadline).toLocaleDateString();
   };
 
-  const statusTemplate = (rowData) => {
-    const status = rowData.project_status || 'Ongoing';
+  const isProjectCompleted = (rowData, completionValue) => {
+    const status = rowData?.project_status || '';
+    const normalized = String(status).toLowerCase().trim();
+    if (normalized === 'done' || normalized === 'completed') return true;
+    if (typeof completionValue === 'number' && completionValue >= 100) {
+      return true;
+    }
+    return false;
+  };
+
+  const getDaysRemainingInfo = (rowData, completionValue) => {
+    if (isProjectCompleted(rowData, completionValue)) {
+      return { text: 'Completed', color: '#16a34a' };
+    }
+
+    const endValue = rowData?.project_deadline;
+    if (!endValue) return { text: 'N/A', color: '#6b7280' };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(endValue);
+    if (Number.isNaN(endDate.getTime())) {
+      return { text: 'N/A', color: '#6b7280' };
+    }
+    endDate.setHours(0, 0, 0, 0);
+
+    const remaining = Math.ceil((endDate - today) / 86400000);
+    const dayLabel = Math.abs(remaining) === 1 ? 'day' : 'days';
+    const text = `${remaining} ${dayLabel}`;
+
+    if (remaining < 0) return { text, color: '#dc2626' };
+    if (remaining <= 10) return { text, color: '#f59e0b' };
+
+    return { text, color: '#0f766e' };
+  };
+
+  const getStatusMeta = (rowData) => {
+    const status = rowData?.project_status || 'Ongoing';
     const normalized = String(status).toLowerCase().trim();
 
     const statusClass =
@@ -178,17 +222,22 @@ const ProjectDashboardPanel = () => {
           ? 'status-hold'
           : 'status-ongoing';
 
-    const bgColor =
+    const color =
       statusClass === 'status-done'
-        ? '#10b981'
+        ? '#16a34a'
         : statusClass === 'status-hold'
-          ? '#f59e0b'
-          : '#0284c7';
+          ? '#eab308'
+          : '#f97316';
 
+    return { status, statusClass, color };
+  };
+
+  const statusTemplate = (rowData) => {
+    const { status, statusClass, color } = getStatusMeta(rowData);
     return (
       <span
         className={`project-status-badge ${statusClass}`}
-        style={{ backgroundColor: bgColor, color: '#ffffff' }}
+        style={{ backgroundColor: color, color: '#ffffff' }}
       >
         {status}
       </span>
@@ -436,7 +485,7 @@ const ProjectDashboardPanel = () => {
         <div>
           <h2 className="m-0">Project Dashboard</h2>
           <p className="text-color-secondary m-0">
-            Select a project to view its details and sub-projects
+            Select a project to view its details and projects
           </p>
         </div>
         <div className="project-dashboard-search-group">
@@ -513,12 +562,23 @@ const ProjectDashboardPanel = () => {
                   <div>{getContractorName(selectedProject.contractor_id)}</div>
                 </div> */}
                 <div>
-                  <div className="metric-label">Amount</div>
+                  <div className="metric-label">Contract Amount</div>
                   <div>{amountTemplate(selectedProject)}</div>
                 </div>
                 <div>
                   <div className="metric-label">Due Date</div>
                   <div>{dateTemplate(selectedProject)}</div>
+                </div>
+                <div>
+                  <div className="metric-label">Days Remaining</div>
+                  <div
+                    style={{
+                      color: getDaysRemainingInfo(selectedProject, completionRate)
+                        .color,
+                    }}
+                  >
+                    {getDaysRemainingInfo(selectedProject, completionRate).text}
+                  </div>
                 </div>
               </div>
 
@@ -527,6 +587,9 @@ const ProjectDashboardPanel = () => {
                 <ProgressBar
                   value={completionRate}
                   className="report-progress-bar"
+                  style={{
+                    '--progress-color': getStatusMeta(selectedProject).color,
+                  }}
                 />
                 <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
                   {completionRate}% complete
@@ -537,13 +600,13 @@ const ProjectDashboardPanel = () => {
 
               <div className="project-dashboard-card-header">
                 <div>
-                  <h4>Sub-Projects</h4>
+                  <h4>Projects</h4>
                   <span className="text-muted">
                     {subProjects.length} total
                   </span>
                 </div>
                 <Button
-                  label="Add Sub-Project"
+                  label="Add Project"
                   icon="pi pi-plus"
                   severity="info"
                   onClick={openSubProjectDialog}
@@ -552,7 +615,7 @@ const ProjectDashboardPanel = () => {
               </div>
               {subProjects.length === 0 ? (
                 <div className="project-dashboard-empty">
-                  No sub-projects found.
+                  No projects found.
                 </div>
               ) : (
                 <div
@@ -581,7 +644,11 @@ const ProjectDashboardPanel = () => {
                           <ProgressBar
                             value={rate}
                             className="report-progress-bar"
-                            style={{ height: '8px' }}
+                            style={{
+                              height: '12px',
+                              '--progress-color': getStatusMeta(subproject)
+                                .color,
+                            }}
                           />
                           <div className="subproject-progress-text">
                             {rate}% complete
@@ -595,18 +662,33 @@ const ProjectDashboardPanel = () => {
                             </div>
                           </div>
                           <div>
-                            <div className="metric-label">Amount</div>
+                            <div className="metric-label">Category</div>
+                            <div>{getCategoryName(subproject.category_id)}</div>
+                          </div>
+                          <div>
+                            <div className="metric-label">Contract Amount</div>
                             <div>{amountTemplate(subproject)}</div>
                           </div>
                           <div>
                             <div className="metric-label">Due Date</div>
                             <div>{dateTemplate(subproject)}</div>
                           </div>
+                          <div>
+                            <div className="metric-label">Days Remaining</div>
+                            <div
+                              style={{
+                                color: getDaysRemainingInfo(subproject, rate)
+                                  .color,
+                              }}
+                            >
+                              {getDaysRemainingInfo(subproject, rate).text}
+                            </div>
+                          </div>
                         </div>
                         <div className="subproject-actions">
                           <Button
                             icon="pi pi-file"
-                            label="Reports"
+                            label="Billings"
                             severity="secondary"
                             className="p-button-sm"
                             style={{ backgroundColor: '#404a17', color: '#ffffff' }}
@@ -639,13 +721,13 @@ const ProjectDashboardPanel = () => {
 
               <div className="project-dashboard-card-header">
                 <div>
-                  <h4>Reports</h4>
+                  <h4>Billing</h4>
                   <span className="text-muted">
-                    Generate and review project reports
+                    Generate and review project billing
                   </span>
                 </div>
                 <Button
-                  label="Open Reports"
+                  label="Open Billings"
                   icon="pi pi-file"
                   severity="info"
                   onClick={() => {
@@ -722,7 +804,7 @@ const ProjectDashboardPanel = () => {
                             </p>
                             <div className="project-card-meta">
                               <div>
-                                <span className="metric-label">Amount</span>
+                                <span className="metric-label">Contract Amount</span>
                                 <div>{amountTemplate(project)}</div>
                               </div>
                               <div>
@@ -745,7 +827,7 @@ const ProjectDashboardPanel = () => {
       <Dialog
         visible={displaySubProjectDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
-        header="Add Sub-Project"
+        header="Add Project"
         contentStyle={{ padding: '1.5rem 2rem' }}
         modal
         onHide={() => setDisplaySubProjectDialog(false)}
@@ -776,7 +858,7 @@ const ProjectDashboardPanel = () => {
             htmlFor="sub-project-name"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
-            Sub-Project Name *
+            Project Name *
           </label>
           <InputText
             id="sub-project-name"
@@ -816,7 +898,7 @@ const ProjectDashboardPanel = () => {
             htmlFor="sub-project-amount"
             style={{ color: '#404a17', fontWeight: '600' }}
           >
-            Project Amount
+            Project Contract Amount
           </label>
           <InputNumber
             id="sub-project-amount"
@@ -824,7 +906,7 @@ const ProjectDashboardPanel = () => {
             onValueChange={(e) =>
               setNewSubProject({ ...newSubProject, amount: e.value || '' })
             }
-            placeholder="Enter project amount"
+            placeholder="Enter project contract amount"
             prefix="₱ "
             thousandSeparator=","
             minFractionDigits={2}
@@ -931,7 +1013,7 @@ const ProjectDashboardPanel = () => {
       <Dialog
         visible={displayReportsDialog}
         style={{ width: '95vw', maxWidth: '1100px' }}
-        header="Project Reports"
+        header="Project Billing"
         contentStyle={{ padding: '1.25rem 1.5rem' }}
         modal
         onHide={() => {
@@ -953,7 +1035,7 @@ const ProjectDashboardPanel = () => {
             onReportsChanged={fetchReports}
           />
         ) : (
-          <p style={{ margin: 0 }}>Select a project to view reports.</p>
+          <p style={{ margin: 0 }}>Select a project to view billing.</p>
         )}
       </Dialog>
     </div>

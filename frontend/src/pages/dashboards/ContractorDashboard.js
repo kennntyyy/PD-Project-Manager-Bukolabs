@@ -1,21 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
-import { DataTable } from 'primereact/datatable';
-import { Column } from 'primereact/column';
 import { Tag } from 'primereact/tag';
-import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
-import { InputNumber } from 'primereact/inputnumber';
-import { Slider } from 'primereact/slider';
-import { InputTextarea } from 'primereact/inputtextarea';
-import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { ProgressBar } from 'primereact/progressbar';
 import api from '../../services/api';
 import './Dashboard.css';
+import './panels/ProjectDashboardPanel.css';
 
 const ContractorDashboard = () => {
   const [clients, setClients] = useState([]);
@@ -32,10 +26,11 @@ const ContractorDashboard = () => {
   // Projects state
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [displayDetailsDialog, setDisplayDetailsDialog] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'active', 'completed', 'pending'
+  const [selectedClientGroup, setSelectedClientGroup] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
 
   const navItems = [
     { key: 'projects', icon: 'pi pi-folder', label: 'My Projects' },
@@ -78,7 +73,7 @@ const ContractorDashboard = () => {
     if (!clientId) return '';
     const client = clients.find((c) => c.user_id === clientId);
     return client
-      ? `${client.first_name} ${client.last_name}`.toLowerCase()
+      ? `${client.first_name} ${client.last_name}`
       : '';
   };
 
@@ -114,13 +109,13 @@ const ContractorDashboard = () => {
 
     if (activeTab === 'projects') {
       fetchMyProjects();
+      fetchReports();
     }
   }, [activeTab, activeNav]);
 
   // Handle opening project details
   const openProjectDetails = (project) => {
     setSelectedProject(project);
-    setDisplayDetailsDialog(true);
   };
 
   // Format amount with currency
@@ -161,23 +156,34 @@ const ContractorDashboard = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     };
-  // Status badge template
-  const statusTemplate = (rowData) => {
-    let status = 'Pending';
-    let severity = 'warning';
+  const getStatusMeta = (rowData) => {
+    const statusValue = String(rowData?.project_status || '').toLowerCase();
 
-    if (rowData.project_status === 'done') {
-      status = 'Completed';
-      severity = 'success';
-    } else if (rowData.project_status === 'ongoing') {
-      status = 'Ongoing';
-      severity = 'info';
-    } else if (rowData.project_status === 'hold') {
-      status = 'On Hold';
-      severity = 'danger';
+    if (statusValue === 'done' || statusValue === 'completed') {
+      return { label: 'Completed', severity: 'success', color: '#16a34a' };
     }
 
-    return <Tag value={status} severity={severity} />;
+    if (statusValue === 'hold' || statusValue === 'on hold') {
+      return { label: 'On Hold', severity: 'danger', color: '#dc2626' };
+    }
+
+    if (statusValue === 'ongoing') {
+      return { label: 'Ongoing', severity: 'warning', color: '#f97316' };
+    }
+
+    return { label: 'Pending', severity: 'warning', color: '#f59e0b' };
+  };
+
+  // Status badge template
+  const statusTemplate = (rowData) => {
+    const meta = getStatusMeta(rowData);
+    return (
+      <Tag
+        value={meta.label}
+        severity={meta.severity}
+        style={{ backgroundColor: meta.color, color: '#ffffff' }}
+      />
+    );
   };
 const getContractorName = (contractorId) => {
     if (!contractorId) return '';
@@ -209,6 +215,61 @@ const getContractorName = (contractorId) => {
     return <Tag value={rowData.priority} severity={severity} />;
   };
 
+  const fetchReports = async () => {
+    try {
+      const response = await api.get('/reports');
+      setRecentReports(response.data.filter((r) => !r.isDeleted));
+    } catch (error) {
+      console.error('Failed to fetch reports:', error);
+    }
+  };
+
+  const getCompletionRateForProject = (projectId) => {
+    if (!projectId) return 0;
+    const matchingReports = recentReports.filter((report) => {
+      const reportProjectId =
+        report?.project_id?.project_id ||
+        report?.project_id?.id ||
+        report?.project_id ||
+        report?.project?.project_id ||
+        report?.project?.id;
+      return reportProjectId === projectId;
+    });
+    if (matchingReports.length === 0) return 0;
+    return Math.max(
+      ...matchingReports.map((report) => Number(report.current_progress || 0)),
+    );
+  };
+
+  const getDaysRemainingInfo = (rowData, completionRate) => {
+    const statusValue = String(rowData?.project_status || '').toLowerCase();
+    const isComplete =
+      (statusValue === 'done' || statusValue === 'completed') &&
+      Number(completionRate || 0) >= 100;
+
+    if (isComplete) {
+      return { text: 'Completed', color: '#16a34a' };
+    }
+
+    const endValue = rowData?.project_deadline;
+    if (!endValue) return { text: 'N/A', color: '#6b7280' };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(endValue);
+    if (Number.isNaN(endDate.getTime())) {
+      return { text: 'N/A', color: '#6b7280' };
+    }
+    endDate.setHours(0, 0, 0, 0);
+
+    const remaining = Math.ceil((endDate - today) / 86400000);
+    const dayLabel = Math.abs(remaining) === 1 ? 'day' : 'days';
+    const text = `${remaining} ${dayLabel}`;
+
+    if (remaining < 0) return { text, color: '#dc2626' };
+    return { text, color: '#0f766e' };
+  };
+
   // Filter projects based on search and status
   const getFilteredProjects = () => {
     let filtered = projects;
@@ -234,6 +295,7 @@ const getContractorName = (contractorId) => {
           project.project_name?.toLowerCase().includes(query) ||
           project.project_description?.toLowerCase().includes(query) ||
           project.total_amount?.toString().includes(query) ||
+          getClientName(project.client_id).toLowerCase().includes(query) ||
           (project.project_deadline &&
             new Date(project.project_deadline)
               .toLocaleDateString()
@@ -247,20 +309,45 @@ const getContractorName = (contractorId) => {
   };
 
   const filteredProjects = getFilteredProjects();
+  const groupedProjects = useMemo(() => {
+    const grouped = new Map();
 
-  const ProjectDetailRow = ({ label, value }) => (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between', 
-      alignItems: 'center',
-      padding: '0.5rem 0', 
-      borderBottom: '1px solid #eee' 
-    }}>
-      <label style={{ fontWeight: 'bold', color: '#404A17' }}>{label}</label>
-      <div style={{ textAlign: 'right', color: '#333' }}>{value}</div>
-    </div>
-  );
+    filteredProjects.forEach((project) => {
+      const clientName = getClientName(project.client_id) || 'Unassigned';
+      if (!grouped.has(clientName)) {
+        grouped.set(clientName, []);
+      }
+      grouped.get(clientName).push(project);
+    });
+
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([clientName, projects]) => ({ clientName, projects }));
+  }, [filteredProjects, clients]);
+  const selectedSubprojects = selectedProject
+    ? projects.filter(
+        (project) =>
+          project.parent_project_id === selectedProject.project_id &&
+          project.contractor_id === user?.user_id,
+      )
+    : [];
+  const selectedCompletionRate = selectedProject
+    ? selectedSubprojects.length > 0
+      ? Math.round(
+          selectedSubprojects.reduce(
+            (sum, subproject) =>
+              sum + getCompletionRateForProject(subproject.project_id),
+            0,
+          ) / selectedSubprojects.length,
+        )
+      : getCompletionRateForProject(selectedProject.project_id)
+    : 0;
+  const selectedDaysRemaining = selectedProject
+    ? getDaysRemainingInfo(selectedProject, selectedCompletionRate)
+    : { text: 'N/A', color: '#6b7280' };
+  const uniqueClientCount = new Set(
+    projects.map((project) => project.client_id).filter(Boolean),
+  ).size;
 
   return (
     <div className="dashboard-container">
@@ -301,6 +388,12 @@ const getContractorName = (contractorId) => {
                 <img
                   src={`data:image/jpeg;base64,${user.profile_pic}`}
                   alt={user?.username}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                  }}
                 />
               ) : (
                 <span>{user?.username?.charAt(0).toUpperCase()}</span>
@@ -314,7 +407,7 @@ const getContractorName = (contractorId) => {
             </div>
           </div>
           <Button
-            className="logout-btn"
+            className="logout-btn p-button-sm"
             label="Logout"
             icon="pi pi-sign-out"
             onClick={logout}
@@ -419,6 +512,13 @@ const getContractorName = (contractorId) => {
                     </div>
                   </div>
                   <div className="stat-card">
+                    <i className="pi pi-users" style={{ color: '#6366F1' }} />
+                    <div>
+                      <h3>{uniqueClientCount}</h3>
+                      <p>Total Clients</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
                     <i
                       className="pi pi-check-circle"
                       style={{ color: '#10B981' }}
@@ -460,95 +560,252 @@ const getContractorName = (contractorId) => {
                   </div>
                 </div>
               </div>
-              <Dropdown
-                    value={statusFilter}
-                    options={statusOptions}
-                    onChange={(e) => setStatusFilter(e.value)}
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Filter by status"
-                    style={{ minWidth: '200px', marginBottom: '1rem' }}
-              />
-              <DataTable
-                value={filteredProjects}
-                loading={loading}
-                paginator
-                rows={10}
-                rowsPerPageOptions={[5, 10, 20]}
-                tableStyle={{ minWidth: '50rem' }}
-                emptyMessage={
-                  searchQuery || statusFilter !== 'all'
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <Dropdown
+                  value={statusFilter}
+                  options={statusOptions}
+                  onChange={(e) => setStatusFilter(e.value)}
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Filter by status"
+                  style={{ minWidth: '200px', marginBottom: '1rem' }}
+                />
+              </div>
+
+              {selectedProject ? (
+                <div
+                  className="project-dashboard-card project-dashboard-card-linked"
+                  style={{ marginTop: '1rem' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Button
+                      label="Back to Projects"
+                      icon="pi pi-arrow-left"
+                      severity="secondary"
+                      className="p-button-text p-button-sm"
+                      onClick={() => setSelectedProject(null)}
+                    />
+                  </div>
+                  <h3>{selectedProject.project_name}</h3>
+                  <p className="text-muted">
+                    {selectedProject.project_description || 'No description'}
+                  </p>
+
+                  <div className="project-dashboard-metrics">
+                    <div>
+                      <div className="metric-label">Status</div>
+                      <div>{statusTemplate(selectedProject)}</div>
+                    </div>
+                    <div>
+                      <div className="metric-label">Client</div>
+                      <div>{getClientName(selectedProject.client_id) || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="metric-label">Contract Amount</div>
+                      <div>{amountTemplate(selectedProject)}</div>
+                    </div>
+                    <div>
+                      <div className="metric-label">Start Date</div>
+                      <div>
+                        {selectedProject?.project_start_date
+                          ? new Date(
+                              selectedProject.project_start_date,
+                            ).toLocaleDateString('en-US', {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="metric-label">Due Date</div>
+                      <div>{dateTemplate(selectedProject)}</div>
+                    </div>
+                    <div>
+                      <div className="metric-label">Days Remaining</div>
+                      <div style={{ color: selectedDaysRemaining.color }}>
+                        {selectedDaysRemaining.text}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '1rem' }}>
+                    <div className="metric-label">Completion Rate</div>
+                    <ProgressBar
+                      value={selectedCompletionRate}
+                      className="report-progress-bar"
+                      style={{
+                        '--progress-color': getStatusMeta(selectedProject).color,
+                      }}
+                    />
+                    <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                      {selectedCompletionRate}% complete
+                    </div>
+                  </div>
+
+                  <div className="project-dashboard-divider" />
+
+                  <div style={{ marginTop: '1rem' }}>
+                    <div className="project-dashboard-card-header">
+                      <div>
+                        <h4>Subprojects</h4>
+                        <span className="text-muted">
+                          {selectedSubprojects.length} total
+                        </span>
+                      </div>
+                    </div>
+                    {selectedSubprojects.length === 0 ? (
+                      <div className="project-dashboard-empty">
+                        No subprojects found.
+                      </div>
+                    ) : (
+                      <div className="subproject-grid">
+                        {selectedSubprojects.map((subproject) => {
+                          const subCompletion = getCompletionRateForProject(
+                            subproject.project_id,
+                          );
+                          const subDaysRemaining = getDaysRemainingInfo(
+                            subproject,
+                            subCompletion,
+                          );
+                          return (
+                            <div
+                              key={subproject.project_id}
+                              className="subproject-card"
+                            >
+                              <div className="subproject-card-header">
+                                <h5 className="subproject-title">
+                                  {subproject.project_name}
+                                </h5>
+                                {statusTemplate(subproject)}
+                              </div>
+                              <p className="subproject-desc">
+                                {subproject.project_description ||
+                                  'No description'}
+                              </p>
+                              <div className="subproject-progress">
+                                <ProgressBar
+                                  value={subCompletion}
+                                  className="report-progress-bar"
+                                  style={{
+                                    height: '12px',
+                                    '--progress-color': getStatusMeta(subproject)
+                                      .color,
+                                  }}
+                                />
+                                <div className="subproject-progress-text">
+                                  {subCompletion}% complete
+                                </div>
+                              </div>
+                              <div className="subproject-meta">
+                                <div>
+                                  <div className="metric-label">Contract Amount</div>
+                                  <div>{amountTemplate(subproject)}</div>
+                                </div>
+                                <div>
+                                  <div className="metric-label">Due Date</div>
+                                  <div>{dateTemplate(subproject)}</div>
+                                </div>
+                                <div>
+                                  <div className="metric-label">Days Remaining</div>
+                                  <div style={{ color: subDaysRemaining.color }}>
+                                    {subDaysRemaining.text}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : loading ? (
+                <div className="project-dashboard-empty">Loading projects...</div>
+              ) : filteredProjects.length === 0 ? (
+                <div className="project-dashboard-empty">
+                  {searchQuery || statusFilter !== 'all'
                     ? 'No projects match your criteria.'
-                    : 'No projects assigned yet.'
-                }
-                responsiveLayout="scroll"
-                className="projects-table"
-              >
-                <Column
-                  field="project_name"
-                  header="Project Name"
-                  sortable
-                  body={(rowData) => (
-                    <div className="project-name-cell">
-                      <strong>{rowData.project_name}</strong>
-                      <small className="text-muted">
-                        {rowData.project_id?.substring(0, 8)}
-                      </small>
-                    </div>
-                  )}
-                />
-                <Column
-                  field="client_name"
-                  header="Client"
-                  body={(rowData) => {
-                    const clientName = getClientName(rowData.client_id);
-                    return <span>{clientName || 'N/A'}</span>;
-                  }}
-                  sortable
-                />
-                <Column
-                  field="project_description"
-                  header="Description"
-                  body={(rowData) => (
-                    <div className="description-cell">
-                      {rowData.project_description || 'No description'}
-                    </div>
-                  )}
-                />
-                <Column
-                  field="total_amount"
-                  header="Amount"
-                  body={amountTemplate}
-                  sortable
-                />
-                <Column
-                  field="project_deadline"
-                  header="Deadline"
-                  body={dateTemplate}
-                  sortable
-                />
-                <Column
-                  field="project_status"
-                  header="Status"
-                  body={statusTemplate}
-                  sortable
-                />
-                
-                <Column
-                  header="Actions"
-                  body={(rowData) => (
-                    <div className="actions-cell">
-                      <Button
-                        icon="pi pi-eye"
-                        className="p-button-rounded p-button-sm p-button-info"
-                        onClick={() => openProjectDetails(rowData)}
-                        tooltip="View Details"
-                        tooltipOptions={{ position: 'top' }}
-                      />
-                    </div>
-                  )}
-                />
-              </DataTable>
+                    : 'No projects assigned yet.'}
+                </div>
+              ) : (
+                <div className="project-dashboard-list">
+                  <div className="project-dashboard-groups">
+                    {!selectedClientGroup ? (
+                      <div className="project-dashboard-grid">
+                        {groupedProjects.map((group) => (
+                          <button
+                            key={group.clientName}
+                            type="button"
+                            className="project-dashboard-card project-dashboard-client-card"
+                            onClick={() => setSelectedClientGroup(group)}
+                          >
+                            <div className="project-card-header">
+                              <h4 className="project-card-title">
+                                {group.clientName}
+                              </h4>
+                            </div>
+                            <p className="project-card-desc">
+                              {group.projects.length} project
+                              {group.projects.length !== 1 ? 's' : ''}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="project-dashboard-group">
+                        <div className="project-dashboard-group-header">
+                          <div>
+                            <h4>{selectedClientGroup.clientName}</h4>
+                            <span className="text-muted">
+                              {selectedClientGroup.projects.length} project
+                              {selectedClientGroup.projects.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <Button
+                            label="Back to Clients"
+                            icon="pi pi-arrow-left"
+                            severity="secondary"
+                            className="p-button-text p-button-sm"
+                            onClick={() => setSelectedClientGroup(null)}
+                          />
+                        </div>
+                        <div className="project-dashboard-grid">
+                          {selectedClientGroup.projects.map((project) => (
+                            <button
+                              key={project.project_id}
+                              type="button"
+                              className="project-dashboard-card project-dashboard-card-item"
+                              onClick={() => openProjectDetails(project)}
+                            >
+                              <div className="project-card-header">
+                                <h4 className="project-card-title">
+                                  {project.project_name}
+                                </h4>
+                                {statusTemplate(project)}
+                              </div>
+                              <p className="project-card-desc">
+                                {project.project_description || 'No description'}
+                              </p>
+                              <div className="project-card-meta">
+                                <div>
+                                  <span className="metric-label">Contract Amount</span>
+                                  <div>{amountTemplate(project)}</div>
+                                </div>
+                                <div>
+                                  <span className="metric-label">Due Date</span>
+                                  <div>{dateTemplate(project)}</div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -587,276 +844,6 @@ const getContractorName = (contractorId) => {
         </div>
       </div>
 
-      {/* Project Details Dialog */}
-     <Dialog
-         header={null}
-         visible={displayDetailsDialog}
-         style={{ width: '40vw', maxHeight: '90vh' }}
-         onHide={() => setDisplayDetailsDialog(false)}
-       >
-         {selectedProject && (
-           <div
-             className="project-details-modal"
-             style={{
-               maxHeight: 'calc(100vh -100px)',
-               overflowY: 'auto',
-               padding: '1.5rem ',
-             }}
-           >
-             {/* Header */}
-             <div
-               style={{
-                 position: 'absolute',
-                 top: 0,
-                 left: 0,
-                 width: '100%',
-                 background: '#4f4d36',
-                 color: 'white',
-                 borderTopLeftRadius: '4px',
-                 borderTopRightRadius: '4px',
-                 borderBottomLeftRadius: 0,
-                 borderBottomRightRadius: 0,
-                 padding: '1.5rem 0 1.25rem 0',
-                 textAlign: 'left',
-                 boxShadow: '0 2px 8px rgba(5, 150, 105, 0.08)',
-                 zIndex: 2
-               }}
-             >
-               <button
-                 onClick={() => setDisplayDetailsDialog(false)}
-                 aria-label="Close"
-                 style={{
-                   position: 'absolute',
-                   top: '1.25rem',
-                   right: '1.5rem',
-                   background: 'rgb(0,0,0,0)',
-                   border: 'none',
-                   color: 'white',
-                   fontSize: '1.5rem',
-                   fontWeight: 700,
-                   borderRadius: '50%',
-                   width: '2.5rem',
-                   height: '2.5rem',
-                   cursor: 'pointer',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   transition: 'background 0.2s',
-                   zIndex: 10
-                 }}
-                 onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.18)'}
-                 onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-               >
-                 ×
-               </button>
-               <h3
-                 style={{
-                   margin: 0,
-                   fontSize: '1.25rem',
-                   fontWeight: 700,
-                   textTransform: 'uppercase',
-                   fontFamily: "'Source Serif Pro', serif",
-                   letterSpacing: '0.5px',
-                   marginLeft: '1rem'
-                 }}
-               >
-                 Project Details
-               </h3>
-             </div>
-             <div style={{ height: '3rem' }} />
- 
-             {/* Two Column Layout */}
-             <div style={{
-               display: 'flex',
-               flexDirection: 'row',
-               gap: '2rem',
-               alignItems: 'center',
-               justifyContent: 'center',
-               width: '100%',
-              //  background: '#d2d0af',
-              border: '1px solid rgb(0,0,0)',
-               padding: '1rem',
-               borderRadius: '1rem'
-             }}>
-               {/* <div className="image-container"
-                 style={{
-                  //  border: '2px solid #404A17',
-                   borderRadius: '1rem',
-                   height: '40%',
-                   width: '40%',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   background: '#f8f8f8',
-                   overflow: 'hidden'
-                 }}>
-                 {(() => {
-                  const reportWithImages = projectReports.find(r => r.image_urls && r.image_urls.length > 0);
-                  
-                  if(!reportWithImages) {
-                    return (
-                      <img alt="NO PHOTO UPLOADED YET"></img>
-                    )
-                  }
-                  if (reportWithImages) {
-                   const firstRawUrl = reportWithImages.image_urls[0];
- 
-                   const formattedUrl = getImageUrl(firstRawUrl);
-                   return (
-                     <img 
-                       src={formattedUrl} 
-                       alt="Project Progress" 
-                       style={{ 
-                         maxWidth: '100%', 
-                         maxHeight: '100%', 
-                         objectFit: 'cover' // 'cover' fills the area nicely, 'contain' shows the whole image
-                       }} 
-                       // Error handling in case the URL is broken
-                       onError={(e) => {
-                         e.target.src = 'https://via.placeholder.com/300?text=Image+Error';
-                       }}
-                     />
-                   );
-                  }
-                 })()}
-               </div> */}
-               <div className="details-container" style={{
-                  maxWidth: '300px', // Prevents the details from stretching too wide
-                  width: '80%',
-                  margin: '0 auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem'
-                  }}>
-                  <ProjectDetailRow 
-                    label="Project Name:" 
-                    value={selectedProject?.project_name} 
-                  />
-                  <ProjectDetailRow 
-                    label="Contractor:" 
-                    value={getContractorName(selectedProject?.contractor_id)} 
-                  />
-                  <ProjectDetailRow 
-                    label="Project Amount:" 
-                    value={`₱${selectedProject?.total_amount?.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} 
-                  />
-                  <ProjectDetailRow 
-                    label="Project Start Date:" 
-                    value={selectedProject?.project_start_date ? new Date(selectedProject.project_start_date).toLocaleDateString('en-US', {
-                      month: 'long', day: 'numeric', year: 'numeric'
-                    }) : 'N/A'} 
-                  />
-                  <ProjectDetailRow 
-                    label="Project Deadline:" 
-                    value={selectedProject?.project_deadline ? new Date(selectedProject.project_deadline).toLocaleDateString('en-US', {
-                      month: 'long', day: 'numeric', year: 'numeric'
-                    }) : 'N/A'} 
-                  />
-                  
-                  {/* Special row for progress bar */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0' }}>
-                    <label style={{ fontWeight: 'bold', color: '#404A17' }}>Completion Rate:</label>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.75rem', 
-                      backgroundColor: '#f0f0f0', 
-                      padding: '0.25rem 0.5rem', 
-                      borderRadius: '4px' 
-                    }}>
-                      <ProgressBar 
-                        value={selectedProject.completion_rate || 0} 
-                        style={{ height: '12px', width: '120px', border: '1px solid black' }}
-                        showValue={false} 
-                      />
-                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{selectedProject.completion_rate || 0}%</span>
-                    </div>
-                  </div>
-                </div>
-             </div>
-             {/*PROJECT REPORTS TABLE DISABLED TEMPORARILY*/}
-           {/* <div style={{ marginTop: '2rem', 
-               background: '#AEAC8C', 
-               padding: '1rem',
-               borderRadius: '1rem' }}>
-               <h2  style={{
-                 fontWeight: 'bold',
-                 color: '#404A17'
-               }}>ACCOMPLISHMENTS</h2>
-               <DataTable
-                 value={projectReports}
-                 loading={reportsLoading}
-                 emptyMessage="No reports generated for this project."
-                 tableStyle={{ minWidth: '40rem' }}
-                 responsiveLayout="scroll"
-               >
-                 <Column
-                   field="report_date"
-                   header="Date Generated"
-                   body={rowData => rowData.report_date ? new Date(rowData.report_date).toLocaleDateString() : 'N/A'}
-                   sortable
-                 />
-                 <Column
-                   header="Contractor Name"
-                   body={() => getContractorName(selectedProject?.contractor_id)}
-                 />
-                 <Column
-                   field="payment_requested"
-                   header="Payment"
-                   body={rowData => rowData.payment_requested ? `₱${parseFloat(rowData.payment_requested).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
-                   sortable
-                 />
-                 <Column
-                   header="Project Status"
-                   body={() => {
-                     let status = 'Ongoing';
-                     let severity = 'warning';
-                     if (selectedProject?.project_status === 'completed') {
-                       status = 'Completed';
-                       severity = 'success';
-                     } else if (selectedProject?.project_status === 'active') {
-                       status = 'Active';
-                       severity = 'info';
-                     } else if (selectedProject?.project_status === 'cancelled') {
-                       status = 'Cancelled';
-                       severity = 'danger';
-                     }
-                     return <Tag value={status} severity={severity} />;
-                   }}
-                 />
-                 <Column
-                   header="Export"
-                   body={(rowData) => (
-                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                       <Button  icon="pi pi-file-pdf" className="p-button-sm p-button-danger" onClick={() => downloadReportPDF(rowData)} tooltip="Save as PDF" />
-                       <Button  icon="pi pi-file-excel" className="p-button-sm p-button-success" onClick={handleSaveAsCSV} tooltip="Save as CSV" />
-                     </div>
-                   )}
-                 />
-               </DataTable>
-             </div> */}
-           </div>
-         )}
- 
-         <div
-           style={{
-             padding: '1rem 2rem',
-             display: 'flex',
-             justifyContent: 'flex-end',
-             gap: '0.5rem',
-           }}
-         >
-           <Button
-             label="Close"
-             severity="secondary"
-             style={{
-               padding: '0.5rem',
-               
-             }}
-             onClick={() => setDisplayDetailsDialog(false)}
-           />
-         </div>
-       </Dialog>
      </div>
    );
  };

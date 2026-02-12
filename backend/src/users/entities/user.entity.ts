@@ -67,4 +67,11 @@ export class User {
     default: () => 'CURRENT_TIMESTAMP',
   })
   last_active: Date;
+
+  // for contractors only
+  @Column({ type: 'simple-array', nullable: true, name: 'contractor_type' })
+  contractor_types: string[] | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  category: string | null;
 }

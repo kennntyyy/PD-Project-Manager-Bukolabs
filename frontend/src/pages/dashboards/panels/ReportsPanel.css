@@ -402,20 +402,20 @@
 }
 
 .report-progress-bar :deep(.p-progressbar-value) {
-  background: #4f4d36 !important;
+  background: var(--progress-color, #4f4d36) !important;
   border-radius: 4px;
   transition: width 0.4s ease;
   box-shadow: none;
-  color: #4f4d36 !important;
-  caret-color: #4f4d36 !important;
+  color: var(--progress-color, #4f4d36) !important;
+  caret-color: var(--progress-color, #4f4d36) !important;
 }
 
 .report-progress-bar :deep(.p-progressbar span) {
-  background: #4f4d36 !important;
+  background: var(--progress-color, #4f4d36) !important;
 }
 
 .report-progress-bar :deep(div[style*='width']) {
-  background: #4f4d36 !important;
+  background: var(--progress-color, #4f4d36) !important;
 }
 
 /* Override PrimeReact theme colors */
@@ -425,7 +425,7 @@
 }
 
 .report-progress-bar :deep(.p-progressbar-value[style]) {
-  background: #4f4d36 !important;
+  background: var(--progress-color, #4f4d36) !important;
 }
 
 /* Completion Rate Slider - Professional Styling */

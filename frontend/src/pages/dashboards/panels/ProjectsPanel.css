@@ -175,13 +175,13 @@
 }
 
 .project-status-badge.status-done {
-  background-color: #10b981;
+  background-color: #16a34a;
 }
 
 .project-status-badge.status-hold {
-  background-color: #f59e0b;
+  background-color: #eab308;
 }
 
 .project-status-badge.status-ongoing {
-  background-color: #0284c7;
+  background-color: #f97316;
 }

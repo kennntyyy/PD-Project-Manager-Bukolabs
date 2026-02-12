@@ -169,7 +169,7 @@ export const ProjectReportPDF = ({
         <View style={styles.header}>
           <Text style={styles.title}>Project Report</Text>
           <Text style={styles.dateText}>
-            Period: {reportDates.reportStart} — {reportDates.reportEnd}
+            Project Duration: start: {reportDates.reportStart} —  end: {reportDates.reportEnd}
           </Text>
         </View>
 

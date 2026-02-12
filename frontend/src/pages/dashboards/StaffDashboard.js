@@ -97,7 +97,7 @@ const StaffDashboard = () => {
             </div>
           </div>
           <Button
-            className="logout-btn"
+            className="logout-btn p-button-sm"
             label="Logout"
             icon="pi pi-sign-out"
             onClick={logout}

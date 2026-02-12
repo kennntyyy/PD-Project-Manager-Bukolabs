@@ -910,7 +910,7 @@ const ReportsPanel = ({
         ['Client', getClientName(selectedProject.client_id)],
         ['Contractor', getContractorName(selectedProject.contractor_id)],
         ['Status', selectedProject.project_status || 'Ongoing'],
-        ['Report Period', `${reportRange.start} - ${reportRange.end}`],
+        ['Project Duration', `${reportRange.start} - ${reportRange.end}`],
         ['Total Reports', mainSummary.reportCount],
         ['Latest Progress', `${mainSummary.latestProgress}%`],
         ['Total Released', formatCurrency(mainSummary.totalReleased)],
@@ -919,7 +919,7 @@ const ReportsPanel = ({
         [
           'Subproject',
           'Status',
-          'Report Period',
+          'Project Duration',
           'Reports',
           'Latest Progress',
           'Total Released',
@@ -974,7 +974,7 @@ const ReportsPanel = ({
 
       const rows = [
         ['Project', project.project_name],
-        ['Report Period', `${formatDate(project.project_start_date)} - ${formatDate(project.project_deadline)}`],
+        ['Project Duration', `${formatDate(project.project_start_date)} - ${formatDate(project.project_deadline)}`],
         [],
         [
           'Report #',
@@ -1409,7 +1409,7 @@ const ReportsPanel = ({
                       <p className="m-0 text-sm">{mainSummary.reportCount}</p>
                     </div>
                     <div className="col-12 sm:col-6">
-                      <span className="font-bold text-xs">Report Period:</span>
+                      <span className="font-bold text-xs">Project Duration:</span>
                       <p className="m-0 text-sm">
                         {mainReportPeriod.start} - {mainReportPeriod.end}
                       </p>
@@ -1446,7 +1446,7 @@ const ReportsPanel = ({
                                 {renderStatusBadge(summary.project_status)}
                               </div>
                               <div className="text-xs text-color-secondary" style={{ marginTop: '6px' }}>
-                                Report Period: {summary.reportPeriod.start} - {summary.reportPeriod.end}
+                                Project Duration: {summary.reportPeriod.start} - {summary.reportPeriod.end}
                               </div>
                             </div>
                             <div className="text-right">
@@ -1491,7 +1491,7 @@ const ReportsPanel = ({
 
       <div style={{ marginTop: '-35px', paddingTop: 0 }}>
         <h3 style={{ marginTop: 0, marginBottom: '0.5rem', paddingTop: 0 }}>
-          Reports ({filteredReports.length})
+          Billings ({filteredReports.length})
         </h3>
         {filteredReports.length > 0 ? (
           <div className="grid">
@@ -1502,7 +1502,7 @@ const ReportsPanel = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="m-0">
-                          Report #{filteredReports.length - index}
+                          Billing #{filteredReports.length - index}
                         </h4>
                         <small className="text-color-secondary">
                           Generated:{' '}
@@ -1578,7 +1578,7 @@ const ReportsPanel = ({
 
                     <div className="grid">
                       <div className="col-6">
-                        <span className="font-bold">Period:</span>
+                        <span className="font-bold">Project Duration:</span>
                         <p className="m-0 text-sm">
                           {formatDate(report.start_date || report.report_date)}{' '}
                           - {formatDate(report.end_date || report.report_date)}
@@ -1667,13 +1667,13 @@ const ReportsPanel = ({
         ) : (
           <div className="text-center py-8">
             <i className="pi pi-file-excel text-6xl text-color-secondary mb-3" />
-            <h3>No Reports Yet</h3>
+            <h3>No Billings Yet</h3>
             <p className="text-color-secondary mb-4">
-              Generate the first report for this project
+              Generate the first billing for this project
             </p>
             {!isProjectLocked(selectedProject?.project_status) && (
               <Button
-                label="Generate First Report"
+                label="Generate First Billing"
                 icon="pi pi-file"
                 onClick={handleGenerateClick}
                 className="p-button-primary"
@@ -1893,7 +1893,7 @@ const ReportsPanel = ({
                 </div>
               </div>
 
-              {/* Row 4 - Report Period */}
+              {/* Row 4 - Project Duration */}
               <div>
                 <label
                   style={{

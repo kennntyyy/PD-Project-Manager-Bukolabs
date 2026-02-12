@@ -12,6 +12,7 @@ import { User } from './users/entities/user.entity';
 import { ReportsModule } from './reports/reports.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ContractorTypesModule } from './contractor-types/contractor-types.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CategoriesModule } from './categories/categories.module';
     ReportsModule,
     AuditLogsModule,
     CategoriesModule,
+    ContractorTypesModule,
   ],
   controllers: [AppController],
   providers: [AppService, CronService],

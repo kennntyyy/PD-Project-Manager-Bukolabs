@@ -7,8 +7,10 @@ import { Dialog } from 'primereact/dialog';
 import { InputText } from 'primereact/inputtext';
 import { Toast } from 'primereact/toast';
 import { Dropdown } from 'primereact/dropdown';
+import { MultiSelect } from 'primereact/multiselect';
 import { ConfirmDialog, confirmDialog } from 'primereact/confirmdialog';
 import { userService } from '../../../services/userService';
+import { categoryService } from '../../../services/categoryService';
 import { useAuth } from '../../../context/AuthContext';
 import './UserManagementPanel.css';
 
@@ -17,11 +19,36 @@ import './UserManagementPanel.css';
 // Handles: Create, Read, Update, Delete users
 // ============================================
 
-const UserManagementPanel = () => {
+const UserManagementPanel = ({
+  roleFilter = null,
+  roleFilters = null,
+  title = 'User Management',
+  description = 'Manage system users and their access levels',
+  entityLabel = 'User',
+  entityPluralLabel = 'Users',
+  defaultRole = 'client',
+  allowRoleSelect = true,
+  showRoleColumn = true,
+}) => {
   // ============================================
   // STATE
   // ============================================
   const { user: currentUser, refreshUser } = useAuth();
+  const normalizedRoleFilter = roleFilter
+    ? roleFilter.toLowerCase()
+    : null;
+  const normalizedRoleFilters = Array.isArray(roleFilters)
+    ? roleFilters
+        .map((value) => (value ? value.toLowerCase() : null))
+        .filter(Boolean)
+    : null;
+  const initialRole = normalizedRoleFilter || defaultRole;
+  const allowedRoles = normalizedRoleFilters?.length
+    ? normalizedRoleFilters
+    : null;
+  const initialRoleSafe = allowedRoles?.includes(initialRole)
+    ? initialRole
+    : allowedRoles?.[0] || initialRole;
   const [visible, setVisible] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -29,6 +56,7 @@ const UserManagementPanel = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
+  const [contractorTypes, setContractorTypes] = useState([]);
   const toast = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -39,7 +67,8 @@ const UserManagementPanel = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    user_role: 'client',
+    user_role: initialRoleSafe,
+    contractor_types: [],
     profile_pic: null,
   });
 
@@ -61,6 +90,7 @@ const UserManagementPanel = () => {
 
   useEffect(() => {
     loadUsers();
+    loadContractorTypes();
   }, []);
 
   // ============================================
@@ -69,43 +99,50 @@ const UserManagementPanel = () => {
 
   // Filter users based on search query
   const getFilteredUsers = () => {
+    const matchesViewMode = (user) => {
+      if (viewMode === 'deleted') {
+        return user.is_deleted === true;
+      }
+      return user.is_deleted === false || user.is_deleted === undefined;
+    };
+
+    const matchesRoleFilter = (user) => {
+      if (normalizedRoleFilter) {
+        return user.user_role?.toLowerCase() === normalizedRoleFilter;
+      }
+      if (allowedRoles) {
+        return allowedRoles.includes(user.user_role?.toLowerCase());
+      }
+      return true;
+    };
+
+    const baseFiltered = users.filter(
+      (user) => matchesViewMode(user) && matchesRoleFilter(user),
+    );
+
     if (!searchQuery.trim()) {
-      return users.filter((user) => {
-        if (viewMode === 'deleted') {
-          return user.is_deleted === true;
-        }
-        return user.is_deleted === false || user.is_deleted === undefined;
-      });
+      return baseFiltered;
     }
 
     const query = searchQuery.toLowerCase();
 
-    return users.filter((user) => {
-      // Check view mode filter first
-      if (viewMode === 'deleted' && user.is_deleted !== true) return false;
-      if (viewMode === 'active' && user.is_deleted === true) return false;
-
-      // Search in username
+    return baseFiltered.filter((user) => {
       if (user.username?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in email
       if (user.email?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in first name
       if (user.first_name?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in last name
       if (user.last_name?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in full name (combined)
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`
         .toLowerCase()
         .trim();
@@ -113,17 +150,14 @@ const UserManagementPanel = () => {
         return true;
       }
 
-      // Search in phone
       if (user.phone?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in role
       if (user.user_role?.toLowerCase().includes(query)) {
         return true;
       }
 
-      // Search in status
       const statusText = user.is_active ? 'active' : 'inactive';
       if (statusText.includes(query)) {
         return true;
@@ -162,6 +196,20 @@ const UserManagementPanel = () => {
     }
   };
 
+  const loadContractorTypes = async () => {
+    try {
+      const data = await categoryService.getAll();
+      setContractorTypes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Load contractor categories error:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load contractor categories',
+      });
+    }
+  };
+
   const openNewDialog = () => {
     setIsEditing(false);
     setSelectedUser(null);
@@ -173,7 +221,8 @@ const UserManagementPanel = () => {
       first_name: '',
       last_name: '',
       phone: '',
-      user_role: 'client',
+      user_role: initialRoleSafe,
+      contractor_types: [],
       profile_pic: null,
     });
     setProfilePicPreview(null);
@@ -191,7 +240,12 @@ const UserManagementPanel = () => {
       first_name: usr.first_name,
       last_name: usr.last_name,
       phone: usr.phone || '',
-      user_role: usr.user_role,
+      user_role: normalizedRoleFilter || usr.user_role,
+      contractor_types: Array.isArray(usr.contractor_types)
+        ? usr.contractor_types
+        : usr.contractor_type
+          ? [usr.contractor_type]
+          : [],
       profile_pic: usr.profile_pic || null, // Keep existing profile_pic reference
     });
     // Set profile picture preview if available
@@ -304,6 +358,10 @@ const UserManagementPanel = () => {
     try {
       setLoading(true);
 
+      const roleForSave = allowRoleSelect
+        ? formData.user_role
+        : normalizedRoleFilter || formData.user_role;
+
       let requestData;
 
       // Only use FormData if there's a profile picture FILE to upload
@@ -315,7 +373,13 @@ const UserManagementPanel = () => {
         requestData.append('first_name', formData.first_name);
         requestData.append('last_name', formData.last_name);
         requestData.append('phone', formData.phone || '');
-        requestData.append('user_role', formData.user_role);
+        requestData.append('user_role', roleForSave);
+        if (Array.isArray(formData.contractor_types)) {
+          requestData.append(
+            'contractor_types',
+            JSON.stringify(formData.contractor_types),
+          );
+        }
 
         // Add password only for new users
         if (!isEditing) {
@@ -338,8 +402,11 @@ const UserManagementPanel = () => {
           first_name: formData.first_name,
           last_name: formData.last_name,
           phone: formData.phone || '',
-          user_role: formData.user_role,
+          user_role: roleForSave,
         };
+        if (Array.isArray(formData.contractor_types)) {
+          requestData.contractor_types = formData.contractor_types;
+        }
 
         // Add password only for new users
         if (!isEditing) {
@@ -552,6 +619,21 @@ const UserManagementPanel = () => {
 
   // Get filtered users
   const filteredUsers = getFilteredUsers();
+  const recycleCount = users.filter((u) => {
+    const userRole = u.user_role?.toLowerCase();
+    const matchesRole = normalizedRoleFilter
+      ? userRole === normalizedRoleFilter
+      : allowedRoles
+        ? allowedRoles.includes(userRole)
+        : true;
+    return matchesRole && u.is_deleted;
+  }).length;
+  const baseRoleOptions = allowRoleSelect
+    ? roles
+    : roles.filter((role) => role.value === initialRoleSafe);
+  const roleDropdownOptions = allowedRoles
+    ? baseRoleOptions.filter((role) => allowedRoles.includes(role.value))
+    : baseRoleOptions;
 
   // ============================================
   // RENDER
@@ -573,9 +655,9 @@ const UserManagementPanel = () => {
           }}
         >
           <div>
-            <h2 className="m-0">User Management</h2>
+            <h2 className="m-0">{title}</h2>
             <p className="text-color-secondary m-0">
-              Manage system users and their access levels
+              {description}
             </p>
           </div>
           <div
@@ -586,7 +668,7 @@ const UserManagementPanel = () => {
             }}
           >
             <Button
-              label="Active Users"
+              label={`Active ${entityPluralLabel}`}
               icon="pi pi-users"
               severity={viewMode === 'active' ? 'info' : 'secondary'}
               onClick={() => {
@@ -602,7 +684,7 @@ const UserManagementPanel = () => {
               outlined={viewMode !== 'active'}
             />
             <Button
-              label={`Recycle Bin (${users.filter((u) => u.is_deleted).length})`}
+              label={`Recycle Bin (${recycleCount})`}
               icon="pi pi-trash"
               severity={viewMode === 'deleted' ? 'info' : 'secondary'}
               onClick={() => {
@@ -621,7 +703,7 @@ const UserManagementPanel = () => {
           <div className="reports-search-box">
             <i className="pi pi-search"></i>
             <InputText
-              placeholder="Search users..."
+              placeholder={`Search ${entityPluralLabel.toLowerCase()}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="reports-search-input"
@@ -649,11 +731,13 @@ const UserManagementPanel = () => {
           }}
         >
           <h3 className="card-title">
-            {viewMode === 'active' ? 'Active Users' : 'Recycle Bin'}
+            {viewMode === 'active'
+              ? `Active ${entityPluralLabel}`
+              : 'Recycle Bin'}
           </h3>
           {viewMode === 'active' && (
             <Button
-              label="Add New User"
+              label={`Add New ${entityLabel}`}
               icon="pi pi-plus"
               severity="info"
               onClick={openNewDialog}
@@ -671,9 +755,9 @@ const UserManagementPanel = () => {
           tableStyle={{ minWidth: '50rem' }}
           emptyMessage={
             searchQuery
-              ? 'No users match your search criteria.'
+              ? `No ${entityPluralLabel.toLowerCase()} match your search criteria.`
               : viewMode === 'active'
-                ? 'No users found.'
+                ? `No ${entityPluralLabel.toLowerCase()} found.`
                 : 'Recycle bin is empty.'
           }
           responsiveLayout="scroll"
@@ -720,25 +804,42 @@ const UserManagementPanel = () => {
           <Column field="email" header="Email" sortable />
           <Column field="first_name" header="First Name" />
           <Column field="last_name" header="Last Name" />
-          <Column
-            field="user_role"
-            header="Role"
-            body={(rowData) => (
-              <Tag
-                value={rowData.user_role}
-                style={{
-                  background:
-                    rowData.user_role === 'admin'
-                      ? '#404a17'
-                      : rowData.user_role === 'staff'
-                        ? '#556b2f'
-                        : rowData.user_role === 'client'
-                          ? '#10b981'
-                          : '#f59e0b',
-                }}
-              />
-            )}
-          />
+          {normalizedRoleFilter === 'contractor' && (
+            <Column
+              field="contractor_types"
+              header="Contractor Types"
+              body={(rowData) => {
+                if (Array.isArray(rowData.contractor_types)) {
+                  return rowData.contractor_types.join(', ');
+                }
+                if (rowData.contractor_type) {
+                  return rowData.contractor_type;
+                }
+                return '';
+              }}
+            />
+          )}
+          {showRoleColumn && (
+            <Column
+              field="user_role"
+              header="Role"
+              body={(rowData) => (
+                <Tag
+                  value={rowData.user_role}
+                  style={{
+                    background:
+                      rowData.user_role === 'admin'
+                        ? '#404a17'
+                        : rowData.user_role === 'staff'
+                          ? '#556b2f'
+                          : rowData.user_role === 'client'
+                            ? '#10b981'
+                            : '#f59e0b',
+                  }}
+                />
+              )}
+            />
+          )}
           <Column
             field="is_active"
             header="Status"
@@ -864,13 +965,37 @@ const UserManagementPanel = () => {
           <Dropdown
             id="user_role"
             value={formData.user_role}
-            options={roles}
+            options={roleDropdownOptions}
             onChange={handleRoleChange}
             optionLabel="label"
             optionValue="value"
             placeholder="Select role"
+            disabled={!allowRoleSelect}
           />
         </div>
+
+        {/* Contractor Type - show only for contractors */}
+        {formData.user_role === 'contractor' && (
+          <div className="field mt-3">
+            <label htmlFor="contractor_types">Contractor Types</label>
+            <MultiSelect
+              id="contractor_types"
+              value={formData.contractor_types}
+              options={contractorTypes.map((category) => ({
+                label: category.category_name,
+                value: category.category_name,
+              }))}
+              onChange={(e) =>
+                setFormData({ ...formData, contractor_types: e.value })
+              }
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Select contractor types"
+              display="chip"
+              showClear
+            />
+          </div>
+        )}
 
         {/* Profile Picture Section */}
         <div className="field mt-4">

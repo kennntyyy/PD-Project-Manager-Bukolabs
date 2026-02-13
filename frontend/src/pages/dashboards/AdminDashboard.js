@@ -54,6 +54,14 @@ const AdminDashboard = () => {
     const storedTab = localStorage.getItem('adminActiveTab') || '';
     return storedTab.startsWith('settings');
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('adminSidebarCollapsed');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return false;
+  });
+  const [isNarrow, setIsNarrow] = useState(false);
   const toast = useRef(null);
   const logoUrl = `${process.env.PUBLIC_URL}/logo.png`;
 
@@ -66,11 +74,26 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsNarrow(mediaQuery.matches);
+    handleChange();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('adminActiveTab', activeTab);
     localStorage.setItem('adminActiveNav', activeNav);
     localStorage.setItem('adminUsersOpen', usersOpen.toString());
     localStorage.setItem('adminSettingsOpen', settingsOpen.toString());
-  }, [activeTab, activeNav, usersOpen, settingsOpen]);
+    localStorage.setItem('adminSidebarCollapsed', sidebarCollapsed.toString());
+  }, [activeTab, activeNav, usersOpen, settingsOpen, sidebarCollapsed]);
 
   const loadUsers = async () => {
     try {
@@ -101,12 +124,20 @@ const AdminDashboard = () => {
     setActiveTab(tabName);
   };
 
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed((prev) => !prev);
+  };
+
+  const isSidebarCollapsed = isNarrow ? true : sidebarCollapsed;
+
   // ============================================
   // RENDER: MAIN LAYOUT
   // ============================================
 
   return (
-    <div className="dashboard-container">
+    <div
+      className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+    >
       <Toast ref={toast} />
 
       {/* Sidebar */}
@@ -117,6 +148,16 @@ const AdminDashboard = () => {
                width: '200%', height: '200%',
             }} />
           </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={handleSidebarToggle}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i
+              className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
+            ></i>
+          </button>
         </div>
 
         <div className="sidebar-nav">
@@ -125,6 +166,7 @@ const AdminDashboard = () => {
             onClick={() => handleNavClick('overview')}
             role="button"
             tabIndex={0}
+            title="Dashboard"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 handleNavClick('overview');
@@ -140,6 +182,7 @@ const AdminDashboard = () => {
             onClick={() => handleNavClick('project-dashboard')}
             role="button"
             tabIndex={0}
+            title="Project Dashboard"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 handleNavClick('project-dashboard');
@@ -155,6 +198,7 @@ const AdminDashboard = () => {
             onClick={() => handleNavClick('projects')}
             role="button"
             tabIndex={0}
+            title="Projects"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 handleNavClick('projects');
@@ -173,6 +217,7 @@ const AdminDashboard = () => {
             }}
             role="button"
             tabIndex={0}
+            title="User Management"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 setUsersOpen((prev) => !prev);
@@ -193,6 +238,7 @@ const AdminDashboard = () => {
               onClick={() => handleNavClick('users', 'clients')}
               role="button"
               tabIndex={0}
+              title="Clients"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   handleNavClick('users', 'clients');
@@ -209,6 +255,7 @@ const AdminDashboard = () => {
               onClick={() => handleNavClick('users', 'contractors')}
               role="button"
               tabIndex={0}
+              title="Contractors"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   handleNavClick('users', 'contractors');
@@ -246,6 +293,7 @@ const AdminDashboard = () => {
             }}
             role="button"
             tabIndex={0}
+            title="Settings"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 setSettingsOpen((prev) => !prev);
@@ -265,6 +313,7 @@ const AdminDashboard = () => {
               onClick={() => handleNavClick('settings', 'settings-categories')}
               role="button"
               tabIndex={0}
+              title="Categories"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   handleNavClick('settings', 'settings-categories');
@@ -281,6 +330,7 @@ const AdminDashboard = () => {
             onClick={() => handleNavClick('audit-logs')}
             role="button"
             tabIndex={0}
+            title="Audit Logs"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 handleNavClick('audit-logs');
@@ -292,7 +342,10 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="sidebar-footer flex flex-col" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div
+          className="sidebar-footer flex flex-col"
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+        >
           <div className="user-profile">
             <div className="user-avatar">
               {(() => {
@@ -322,7 +375,7 @@ const AdminDashboard = () => {
           </div>
           <Button
             className="logout-btn p-button-sm"
-            label="Logout"
+            label={isSidebarCollapsed ? '' : 'Logout'}
             icon="pi pi-sign-out"
             onClick={logout}
           />

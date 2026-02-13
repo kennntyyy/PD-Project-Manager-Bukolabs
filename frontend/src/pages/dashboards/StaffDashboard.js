@@ -19,6 +19,14 @@ const StaffDashboard = () => {
     const saved = localStorage.getItem('staffActiveNav');
     return allowedTabs.includes(saved) ? saved : 'projects';
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('staffSidebarCollapsed');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return false;
+  });
+  const [isNarrow, setIsNarrow] = useState(false);
   const toast = useRef(null);
   const logoUrl = `${process.env.PUBLIC_URL}/logo.png`;
 
@@ -31,10 +39,29 @@ const StaffDashboard = () => {
   React.useEffect(() => {
     localStorage.setItem('staffActiveTab', activeTab);
     localStorage.setItem('staffActiveNav', activeNav);
-  }, [activeTab, activeNav]);
+    localStorage.setItem('staffSidebarCollapsed', sidebarCollapsed.toString());
+  }, [activeTab, activeNav, sidebarCollapsed]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsNarrow(mediaQuery.matches);
+    handleChange();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  const isSidebarCollapsed = isNarrow ? true : sidebarCollapsed;
 
   return (
-    <div className="dashboard-container">
+    <div
+      className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+    >
       <Toast ref={toast} />
       <ConfirmDialog />
       <div className="dashboard-sidebar">
@@ -44,6 +71,16 @@ const StaffDashboard = () => {
                width: '200%', height: '200%',
             }} />
           </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((prev) => !prev)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i
+              className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
+            ></i>
+          </button>
         </div>
         <div className="sidebar-nav">
           {navItems.map((item) => (
@@ -56,6 +93,7 @@ const StaffDashboard = () => {
               }}
               role="button"
               tabIndex={0}
+              title={item.label}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   setActiveNav(item.key);
@@ -68,7 +106,7 @@ const StaffDashboard = () => {
             </div>
           ))}
         </div>
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div className="user-profile">
             <div className="user-avatar">
               {(() => {
@@ -98,7 +136,7 @@ const StaffDashboard = () => {
           </div>
           <Button
             className="logout-btn p-button-sm"
-            label="Logout"
+            label={isSidebarCollapsed ? '' : 'Logout'}
             icon="pi pi-sign-out"
             onClick={logout}
           />

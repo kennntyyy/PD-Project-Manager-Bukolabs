@@ -166,6 +166,14 @@ const ClientDashboard = () => {
   const [activeNav, setActiveNav] = useState(
     () => localStorage.getItem('clientActiveNav') || 'projects',
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('clientSidebarCollapsed');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    return false;
+  });
+  const [isNarrow, setIsNarrow] = useState(false);
   
 
   // Projects state
@@ -251,12 +259,27 @@ const ClientDashboard = () => {
   useEffect(() => {
     localStorage.setItem('clientActiveTab', activeTab);
     localStorage.setItem('clientActiveNav', activeNav);
+    localStorage.setItem('clientSidebarCollapsed', sidebarCollapsed.toString());
 
     if (activeTab === 'projects') {
       fetchMyProjects();
       fetchReports();
     }
-  }, [activeTab, activeNav]);
+  }, [activeTab, activeNav, sidebarCollapsed]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => setIsNarrow(mediaQuery.matches);
+    handleChange();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   // Handle opening project details
 
@@ -483,8 +506,12 @@ const ClientDashboard = () => {
     ? getDaysRemainingInfo(selectedProject, selectedCompletionRate)
     : { text: 'N/A', color: '#6b7280' };
 
+  const isSidebarCollapsed = isNarrow ? true : sidebarCollapsed;
+
   return (
-    <div className="dashboard-container">
+    <div
+      className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+    >
       <Toast ref={toast} />
       <ConfirmDialog />
       <div className="dashboard-sidebar">
@@ -494,6 +521,16 @@ const ClientDashboard = () => {
               width: '200%', height: '200%',
             }}/>
           </div>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((prev) => !prev)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <i
+              className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
+            ></i>
+          </button>
           {/* <div className="sidebar-title">
             <h3>Client</h3>
             <p>Control Panel</p>
@@ -508,13 +545,14 @@ const ClientDashboard = () => {
                 setActiveNav(item.key);
                 setActiveTab(item.key);
               }}
+              title={item.label}
             >
               <i className={item.icon}></i>
               <span>{item.label}</span>
             </div>
           ))}
-        </div>
-        <div className="sidebar-footer">
+        </div> 
+        <div className="sidebar-footer" style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
           <div className="sidebar-user-profile">
             <div className="sidebar-user-avatar">
               {user?.profile_pic ? (
@@ -535,7 +573,7 @@ const ClientDashboard = () => {
           </div>
           <Button
             className="logout-btn p-button-sm"
-            label="Logout"
+            label={isSidebarCollapsed ? '' : 'Logout'}
             icon="pi pi-sign-out"
             onClick={logout}
           />

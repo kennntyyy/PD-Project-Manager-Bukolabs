@@ -18,9 +18,11 @@ const CategoriesPanel = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [categoryName, setCategoryName] = useState('');
+  const [createDialogVisible, setCreateDialogVisible] = useState(false);
   const [editDialogVisible, setEditDialogVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editName, setEditName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const toast = useRef(null);
 
   useEffect(() => {
@@ -64,6 +66,7 @@ const CategoriesPanel = () => {
       setLoading(true);
       await categoryService.create({ category_name: trimmedName });
       setCategoryName('');
+      setCreateDialogVisible(false);
       toast.current?.show({
         severity: 'success',
         summary: 'Created',
@@ -182,50 +185,99 @@ const CategoriesPanel = () => {
     return parsed.toLocaleDateString();
   };
 
+  const getFilteredCategories = () => {
+    if (!searchQuery.trim()) {
+      return categories;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return categories.filter((category) => {
+      if (category.category_name?.toLowerCase().includes(query)) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const filteredCategories = getFilteredCategories();
+
   return (
-    <div className="categories-panel">
+    <div className="panel-container">
       <Toast ref={toast} />
       <ConfirmDialog />
 
-      <div className="dashboard-card">
-        <div className="card-header">
-          <h3 className="card-title">Create Category</h3>
-        </div>
-        <form className="categories-form" onSubmit={handleCreate}>
-          <div className="categories-field">
-            <label htmlFor="categoryName">Category Name</label>
-            <InputText
-              id="categoryName"
-              value={categoryName}
-              onChange={(e) => setCategoryName(e.target.value)}
-              placeholder="e.g. Renovation"
-              disabled={loading}
-            />
+      {/* Title Section */}
+      <div className="mb-6">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '2rem',
+          }}
+        >
+          <div>
+            <h2 className="m-0">Categories</h2>
+            <p className="text-color-secondary m-0">
+              Manage project categories
+            </p>
           </div>
-          <Button
-            type="submit"
-            label={loading ? 'Saving...' : 'Add Category'}
-            icon="pi pi-plus"
-            className="btn-primary"
-            disabled={loading}
-          />
-        </form>
+          <div className="reports-search-box">
+            <i className="pi pi-search"></i>
+            <InputText
+              placeholder="Search categories..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="reports-search-input"
+            />
+            {searchQuery && (
+              <i
+                className="pi pi-times"
+                style={{ color: '#9ca3af', cursor: 'pointer' }}
+                onClick={() => setSearchQuery('')}
+              ></i>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="dashboard-card">
-        <div className="card-header">
-          <h3 className="card-title">Existing Categories</h3>
+        <div
+          className="card-header"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+          }}
+        >
+          <h3 className="card-title">Categories</h3>
+          <Button
+            label="Add New Category"
+            icon="pi pi-plus"
+            severity="info"
+            onClick={() => {
+              setCategoryName('');
+              setCreateDialogVisible(true);
+            }}
+            className="add-user-btn"
+          />
         </div>
+
         <DataTable
-          value={categories}
+          value={filteredCategories}
           loading={loading}
-          emptyMessage="No categories found."
-          dataKey="category_id"
-          className="categories-table categories-table-compact"
           paginator
           rows={10}
           rowsPerPageOptions={[5, 10, 20, 50]}
-          paginatorTemplate="PrevPageLink PageLinks NextPageLink RowsPerPageDropdown"
+          tableStyle={{ minWidth: '50rem' }}
+          emptyMessage={
+            searchQuery
+              ? 'No categories match your search.'
+              : 'No categories found.'
+          }
+          responsiveLayout="scroll"
         >
           <Column field="category_name" header="Category" sortable />
           <Column
@@ -237,19 +289,17 @@ const CategoriesPanel = () => {
           <Column
             header="Actions"
             body={(row) => (
-              <div className="category-actions">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <Button
                   icon="pi pi-pencil"
-                  className="btn-secondary"
+                  className="p-button-rounded p-button-sm p-button-warning user-action-btn"
                   onClick={() => openEditDialog(row)}
-                  disabled={loading}
                   tooltip="Edit"
                 />
                 <Button
                   icon="pi pi-trash"
-                  className="btn-danger"
+                  className="p-button-rounded p-button-sm p-button-danger user-action-btn"
                   onClick={() => confirmDelete(row)}
-                  disabled={loading}
                   tooltip="Delete"
                 />
               </div>
@@ -259,14 +309,55 @@ const CategoriesPanel = () => {
       </div>
 
       <Dialog
-        header="Edit Category"
-        visible={editDialogVisible}
-        style={{ width: '420px' }}
-        onHide={() => setEditDialogVisible(false)}
-        className="categories-dialog"
+        visible={createDialogVisible}
+        style={{ width: '90vw', maxWidth: '500px' }}
+        header="Add New Category"
+        contentStyle={{ padding: '1.5rem 2rem' }}
+        modal
+        onHide={() => setCreateDialogVisible(false)}
+        className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#4A4A3A',
+          color: 'white',
+          padding: '1rem',
+        }}
       >
-        <div className="categories-field">
-          <label htmlFor="editCategoryName">Category Name</label>
+        <div className="field mt-3">
+          <label htmlFor="categoryName">Category Name *</label>
+          <InputText
+            id="categoryName"
+            value={categoryName}
+            onChange={(e) => setCategoryName(e.target.value)}
+            placeholder="e.g. Renovation"
+            disabled={loading}
+          />
+        </div>
+        <div className="flex justify-content-center mt-5">
+          <Button
+            label={loading ? 'Saving...' : 'Save Category'}
+            onClick={handleCreate}
+            loading={loading}
+            className="modal-primary-btn"
+          />
+        </div>
+      </Dialog>
+
+      <Dialog
+        visible={editDialogVisible}
+        style={{ width: '90vw', maxWidth: '500px' }}
+        header="Edit Category"
+        contentStyle={{ padding: '1.5rem 2rem' }}
+        modal
+        onHide={() => setEditDialogVisible(false)}
+        className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#4A4A3A',
+          color: 'white',
+          padding: '1rem',
+        }}
+      >
+        <div className="field mt-3">
+          <label htmlFor="editCategoryName">Category Name *</label>
           <InputText
             id="editCategoryName"
             value={editName}
@@ -275,18 +366,12 @@ const CategoriesPanel = () => {
             disabled={loading}
           />
         </div>
-        <div className="categories-dialog-actions">
-          <Button
-            label="Cancel"
-            className="btn-secondary"
-            onClick={() => setEditDialogVisible(false)}
-            disabled={loading}
-          />
+        <div className="flex justify-content-center mt-5">
           <Button
             label={loading ? 'Saving...' : 'Save Changes'}
-            className="btn-primary"
             onClick={handleUpdate}
-            disabled={loading}
+            loading={loading}
+            className="modal-primary-btn"
           />
         </div>
       </Dialog>

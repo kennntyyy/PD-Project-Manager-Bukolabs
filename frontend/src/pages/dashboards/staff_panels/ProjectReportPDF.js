@@ -12,11 +12,11 @@ const styles = StyleSheet.create({
     padding: 40,
     backgroundColor: '#FFFFFF',
     fontFamily: 'Helvetica',
-    color: '#404A17', // Primary text color
+    color: '#4A4A3A', // Primary text color
   },
   // Main Header
   header: {
-    borderBottom: '2pt solid #404A17',
+    borderBottom: '2pt solid #4A4A3A',
     marginBottom: 20,
     paddingBottom: 10,
     flexDirection: 'row',
@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#404A17',
+    color: '#4A4A3A',
     textTransform: 'uppercase',
   },
   dateText: {
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     marginBottom: 5,
-    color: '#404A17',
+    color: '#4A4A3A',
   },
   progressBarContainer: {
     height: 8,
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#404A17', // Match progress bar to theme
+    backgroundColor: '#4A4A3A', // Match progress bar to theme
     borderRadius: 4,
   },
 
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#404A17',
+    color: '#4A4A3A',
     borderBottom: '1pt solid #eee',
     marginBottom: 8,
     paddingBottom: 2,
@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 9,
-    color: '#404A17',
+    color: '#4A4A3A',
   },
   financialValue: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#404A17',
+    color: '#4A4A3A',
   },
 
   // Description
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 10,
     lineHeight: 1.5,
-    color: '#404A17',
+    color: '#4A4A3A',
   },
 
   // Images
@@ -130,9 +130,9 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 5,
     padding: 6,
-    color: '#404A17',
+    color: '#4A4A3A',
     fontStyle: 'italic',
-    borderLeft: '2pt solid #404A17', // Accent border match
+    borderLeft: '2pt solid #4A4A3A', // Accent border match
     backgroundColor: '#f9f9f9',
   },
 });
@@ -211,8 +211,8 @@ export const ProjectReportPDF = ({
               <Text style={styles.financialValue}>{formatAmount(totalSpent)}</Text>
             </View>
             <View style={[styles.infoBox, { marginTop: 4, paddingTop: 4, borderTop: '0.5pt solid #eee' }]}>
-              <Text style={[styles.label, { color: '#404A17' }]}>Balance:</Text>
-              <Text style={[styles.financialValue, { color: '#404A17' }]}>
+              <Text style={[styles.label, { color: '#4A4A3A' }]}>Balance:</Text>
+              <Text style={[styles.financialValue, { color: '#4A4A3A' }]}>
                 {formatAmount(contractAmt - totalSpent)}
               </Text>
             </View>

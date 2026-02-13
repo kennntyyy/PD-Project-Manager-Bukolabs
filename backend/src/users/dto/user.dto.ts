@@ -8,27 +8,6 @@ import {
 import { Transform } from 'class-transformer';
 import { UserRole } from '../entities/user.entity';
 
-const normalizeContractorTypes = (value: unknown) => {
-  if (value === undefined || value === null) return undefined;
-  if (value === '') return [];
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // Fallback to comma-separated string parsing.
-    }
-    return value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return value;
-};
-
 export class CreateUserDto {
   @IsString()
   username: string;
@@ -54,12 +33,6 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   user_role?: UserRole;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @Transform(({ value }) => normalizeContractorTypes(value))
-  contractor_types?: string[];
 
   @IsOptional()
   @IsString()
@@ -88,12 +61,6 @@ export class UpdateUserDto {
   @IsString()
   @Transform(({ value }) => value?.trim())
   last_name?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  @Transform(({ value }) => normalizeContractorTypes(value))
-  contractor_types?: string[];
 
   @IsOptional()
   @IsString()

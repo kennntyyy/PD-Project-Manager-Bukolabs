@@ -1204,7 +1204,7 @@ const StaffReportsPanel = () => {
         contentStyle={{ padding: '1.5rem 2rem' }}
         onHide={() => setShowReportModal(false)}
         headerStyle={{
-          backgroundColor: '#404a17',
+          background: 'linear-gradient(135deg, #4A4A3A 0%, #5A5A4A 100%)',
           color: 'white',
           padding: '1rem',
         }}
@@ -1540,7 +1540,7 @@ const StaffReportsPanel = () => {
                   </label>
                   <div
                     style={{
-                      backgroundColor: '#4f4d36',
+                      backgroundColor: '#4A4A3A',
                       color: 'white',
                       padding: '0.5rem 1rem',
                       borderRadius: '4px',

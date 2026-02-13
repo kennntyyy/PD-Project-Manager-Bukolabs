@@ -140,7 +140,7 @@ const LoginPage = () => {
                     right: '14px',
                     transform: 'translateY(-50%)',
                     cursor: 'pointer',
-                    color: '#404a17',
+                    color: '#4A4A3A',
                     fontSize: '18px',
                   }}
                   onClick={() => setShowPassword((prev) => !prev)}

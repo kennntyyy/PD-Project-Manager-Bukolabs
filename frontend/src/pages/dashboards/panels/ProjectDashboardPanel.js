@@ -9,6 +9,16 @@ import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Paginator } from 'primereact/paginator';
 import { Toast } from 'primereact/toast';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import ReportsPanel from './ReportsPanel';
 import api from '../../../services/api';
 import './ProjectDashboardPanel.css';
@@ -244,9 +254,7 @@ const ProjectDashboardPanel = () => {
     );
   };
 
-  const mainProjects = projects.filter(
-    (project) => !project.parent_project_id,
-  );
+  const mainProjects = projects.filter((project) => !project.parent_project_id);
 
   const filteredMainProjects = !searchQuery.trim()
     ? mainProjects
@@ -256,7 +264,9 @@ const ProjectDashboardPanel = () => {
           project.project_name?.toLowerCase().includes(query) ||
           project.project_description?.toLowerCase().includes(query) ||
           getClientName(project.client_id).toLowerCase().includes(query) ||
-          getContractorName(project.contractor_id).toLowerCase().includes(query);
+          getContractorName(project.contractor_id)
+            .toLowerCase()
+            .includes(query);
 
         if (mainMatch) return true;
 
@@ -346,6 +356,78 @@ const ProjectDashboardPanel = () => {
 
     return maxProgress;
   };
+
+  const getChartData = useMemo(() => {
+    if (!subProjects.length) return [];
+
+    // Get all start and end dates
+    const allDates = [];
+    subProjects.forEach((project) => {
+      if (project.project_start_date)
+        allDates.push(new Date(project.project_start_date));
+      if (project.project_deadline)
+        allDates.push(new Date(project.project_deadline));
+      if (project.created_at) allDates.push(new Date(project.created_at));
+    });
+
+    if (allDates.length === 0) return [];
+
+    // Find min and max dates
+    let minDate = new Date(Math.min(...allDates.map((d) => d.getTime())));
+    let maxDate = new Date(Math.max(...allDates.map((d) => d.getTime())));
+
+    // Ensure we show at least 6 months of range
+    const monthDiff =
+      (maxDate.getFullYear() - minDate.getFullYear()) * 12 +
+      (maxDate.getMonth() - minDate.getMonth());
+    if (monthDiff < 6) {
+      maxDate = new Date(minDate);
+      maxDate.setMonth(maxDate.getMonth() + 6);
+    }
+
+    // Generate array of months between min and max with year
+    const months = [];
+    const current = new Date(minDate);
+    current.setDate(1);
+
+    while (current <= maxDate) {
+      const monthStr = current.toLocaleString('default', {
+        month: 'short',
+      });
+      months.push({ label: monthStr, date: new Date(current) });
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    // Create line chart data - one entry per month showing average project count
+    const chartData = months.map(({ label, date }, monthIndex) => {
+      const monthDate = new Date(date);
+      monthDate.setDate(1);
+      const monthEndDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+      // Count projects active in this month
+      let activeProjectCount = 0;
+      subProjects.forEach((project) => {
+        const startDate = project.project_start_date
+          ? new Date(project.project_start_date)
+          : minDate;
+        const endDate = project.project_deadline
+          ? new Date(project.project_deadline)
+          : maxDate;
+
+        if (startDate <= monthEndDate && endDate >= monthDate) {
+          activeProjectCount++;
+        }
+      });
+
+      return {
+        month: label,
+        'Active Projects': activeProjectCount,
+        'Completion Avg': completionRate,
+      };
+    });
+
+    return chartData;
+  }, [subProjects, completionRate]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -488,46 +570,52 @@ const ProjectDashboardPanel = () => {
             Select a project to view its details and projects
           </p>
         </div>
-        <div className="project-dashboard-search-group">
-          <div className="project-dashboard-search project-dashboard-search-top">
-            <i className="pi pi-search" />
-            <InputText
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          {searchQuery.trim() && (
-            <div className="project-dashboard-results">
-              {filteredMainProjects.length === 0 ? (
-                <div className="project-dashboard-result-empty">
-                  No projects found.
-                </div>
-              ) : (
-                filteredMainProjects.slice(0, 6).map((project) => (
-                  <button
-                    key={project.project_id}
-                    type="button"
-                    className={`project-dashboard-result-item ${
-                      selectedProject?.project_id === project.project_id
-                        ? 'active'
-                        : ''
-                    }`}
-                    onClick={() => {
-                      setSelectedProject(project);
-                      setSearchQuery('');
-                    }}
-                  >
-                    <div className="result-title">{project.project_name}</div>
-                    <div className="result-subtitle">
-                      {getClientName(project.client_id)}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
+        <div className="reports-search-box">
+          <i className="pi pi-search"></i>
+          <InputText
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="reports-search-input"
+          />
+          {searchQuery && (
+            <i
+              className="pi pi-times"
+              style={{ color: '#9ca3af', cursor: 'pointer' }}
+              onClick={() => setSearchQuery('')}
+            ></i>
           )}
         </div>
+        {searchQuery.trim() && (
+          <div className="project-dashboard-results">
+            {filteredMainProjects.length === 0 ? (
+              <div className="project-dashboard-result-empty">
+                No projects found.
+              </div>
+            ) : (
+              filteredMainProjects.slice(0, 6).map((project) => (
+                <button
+                  key={project.project_id}
+                  type="button"
+                  className={`project-dashboard-result-item ${
+                    selectedProject?.project_id === project.project_id
+                      ? 'active'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    setSelectedProject(project);
+                    setSearchQuery('');
+                  }}
+                >
+                  <div className="result-title">{project.project_name}</div>
+                  <div className="result-subtitle">
+                    {getClientName(project.client_id)}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="project-dashboard-stack">
@@ -573,8 +661,10 @@ const ProjectDashboardPanel = () => {
                   <div className="metric-label">Days Remaining</div>
                   <div
                     style={{
-                      color: getDaysRemainingInfo(selectedProject, completionRate)
-                        .color,
+                      color: getDaysRemainingInfo(
+                        selectedProject,
+                        completionRate,
+                      ).color,
                     }}
                   >
                     {getDaysRemainingInfo(selectedProject, completionRate).text}
@@ -598,18 +688,128 @@ const ProjectDashboardPanel = () => {
 
               <div className="project-dashboard-divider" />
 
+              {getChartData && getChartData.length > 0 && (
+                <div
+                  style={{
+                    marginBottom: '2rem',
+                    padding: '1rem',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <div
+                    className="progress-header"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.375rem',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280',
+                        fontWeight: '500',
+                        fontFamily: '"Source Serif Pro", serif',
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      OVERALL PROGRESS
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '1.125rem',
+                        fontWeight: '700',
+                        color: '#1f2937',
+                        fontFamily: '"Source Serif Pro", serif',
+                      }}
+                    >
+                      {completionRate}%
+                    </div>
+                  </div>
+                  <div
+                    className="progress-bar-container"
+                    style={{
+                      width: '100%',
+                      height: '12px',
+                      background: '#e5e7eb',
+                      borderRadius: '6px',
+                      overflow: 'hidden',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
+                    <div
+                      className="progress-bar"
+                      style={{
+                        height: '100%',
+                        background: '#4f4d36',
+                        borderRadius: '6px',
+                        width: `${completionRate}%`,
+                        transition: 'width 0.3s ease',
+                      }}
+                    ></div>
+                  </div>
+                  <div
+                    className="chart-wrapper"
+                    style={{
+                      width: '100%',
+                      height: '200px',
+                    }}
+                  >
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={getChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                        <XAxis dataKey="month" stroke="#9CA3AF" />
+                        <YAxis stroke="#9CA3AF" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#F3F4F6',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '4px',
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="Active Projects"
+                          stroke="#10B981"
+                          strokeWidth={2}
+                          dot={{ fill: '#10B981', r: 5 }}
+                          activeDot={{ r: 6 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="Completion Avg"
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          dot={{ fill: '#F59E0B', r: 5 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              <div className="project-dashboard-divider" />
+
               <div className="project-dashboard-card-header">
                 <div>
                   <h4>Projects</h4>
-                  <span className="text-muted">
-                    {subProjects.length} total
-                  </span>
+                  <span className="text-muted">{subProjects.length} total</span>
                 </div>
                 <Button
                   label="Add Project"
                   icon="pi pi-plus"
                   severity="info"
                   onClick={openSubProjectDialog}
+                  style={{
+                    backgroundColor: '#4A4A3A',
+                    color: '#ffffff',
+                  }}
                   className="p-button-sm"
                 />
               </div>
@@ -646,8 +846,8 @@ const ProjectDashboardPanel = () => {
                             className="report-progress-bar"
                             style={{
                               height: '12px',
-                              '--progress-color': getStatusMeta(subproject)
-                                .color,
+                              '--progress-color':
+                                getStatusMeta(subproject).color,
                             }}
                           />
                           <div className="subproject-progress-text">
@@ -691,7 +891,10 @@ const ProjectDashboardPanel = () => {
                             label="Billings"
                             severity="secondary"
                             className="p-button-sm"
-                            style={{ backgroundColor: '#404a17', color: '#ffffff' }}
+                            style={{
+                              backgroundColor: '#4A4A3A',
+                              color: '#ffffff',
+                            }}
                             onClick={() => {
                               setReportsProject(subproject);
                               setDisplayReportsDialog(true);
@@ -734,6 +937,10 @@ const ProjectDashboardPanel = () => {
                     setReportsProject(selectedProject);
                     setDisplayReportsDialog(true);
                   }}
+                  style={{
+                    backgroundColor: '#4A4A3A',
+                    color: '#ffffff',
+                  }}
                   className="p-button-sm"
                 />
               </div>
@@ -774,7 +981,9 @@ const ProjectDashboardPanel = () => {
                           <h4>{selectedClientGroup.clientName}</h4>
                           <span className="text-muted">
                             {selectedClientGroup.projects.length} project
-                            {selectedClientGroup.projects.length !== 1 ? 's' : ''}
+                            {selectedClientGroup.projects.length !== 1
+                              ? 's'
+                              : ''}
                           </span>
                         </div>
                         <Button
@@ -804,7 +1013,9 @@ const ProjectDashboardPanel = () => {
                             </p>
                             <div className="project-card-meta">
                               <div>
-                                <span className="metric-label">Contract Amount</span>
+                                <span className="metric-label">
+                                  Contract Amount
+                                </span>
                                 <div>{amountTemplate(project)}</div>
                               </div>
                               <div>
@@ -833,7 +1044,7 @@ const ProjectDashboardPanel = () => {
         onHide={() => setDisplaySubProjectDialog(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -841,7 +1052,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-2">
           <label
             htmlFor="parent-project"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Parent Project
           </label>
@@ -856,7 +1067,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-name"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Name *
           </label>
@@ -874,7 +1085,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-description"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Description
           </label>
@@ -896,7 +1107,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-amount"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Contract Amount
           </label>
@@ -918,7 +1129,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-category"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Category
           </label>
@@ -939,7 +1150,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-due-date"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Due Date
           </label>
@@ -960,7 +1171,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-contractor"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Contractor
           </label>
@@ -981,7 +1192,7 @@ const ProjectDashboardPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Client
           </label>
@@ -1023,7 +1234,7 @@ const ProjectDashboardPanel = () => {
         }}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}

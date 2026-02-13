@@ -2,7 +2,7 @@
 @import 'primereact/resources/primereact.min.css';
 @import 'primeicons/primeicons.css';
 @import 'primeflex/primeflex.css';
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Source+Serif+Pro:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
 
 * {
   margin: 0;
@@ -11,7 +11,7 @@
 }
 
 body {
-  font-family: 'Source Serif Pro', serif;
+  font-family: 'Inter', sans-serif;
   background-color: var(--surface-ground);
   color: var(--text-color);
 }
@@ -27,19 +27,19 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--primary-color);
+  background: #4a4a3a;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-600);
+  background: #5a5a4a;
 }
 
 /* Override PrimeReact and all elements to use custom fonts */
 *:not(.pi),
 *:not(.pi)::before,
 *:not(.pi)::after {
-  font-family: 'Source Serif Pro', serif !important;
+  font-family: 'Inter', sans-serif !important;
 }
 
 /* Preserve icon fonts */
@@ -66,7 +66,7 @@ button {
   font-family: 'Bebas Neue', sans-serif !important;
 }
 
-/* Keep input fields in Source Serif Pro */
+/* Keep input fields in Inter */
 .p-inputtext {
-  font-family: 'Source Serif Pro', serif !important;
+  font-family: 'Inter', sans-serif !important;
 }

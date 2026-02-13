@@ -11,17 +11,17 @@ const styles = StyleSheet.create({
     padding: 40,
     backgroundColor: '#FFFFFF',
     fontFamily: 'Helvetica',
-    color: '#404A17',
+    color: '#4A4A3A',
   },
   header: {
-    borderBottom: '2pt solid #404A17',
+    borderBottom: '2pt solid #4A4A3A',
     marginBottom: 16,
     paddingBottom: 10,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#404A17',
+    color: '#4A4A3A',
     textTransform: 'uppercase',
   },
   subtitle: {
@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#404A17',
+    color: '#4A4A3A',
     borderBottom: '1pt solid #eee',
     marginBottom: 8,
     paddingBottom: 2,
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 9,
-    color: '#404A17',
+    color: '#4A4A3A',
   },
   table: {
     marginTop: 6,

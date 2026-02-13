@@ -292,7 +292,7 @@
 
 .p-password .p-icon-field > .p-icon:hover,
 .p-password .p-icon-wrapper > .p-icon:hover {
-  color: #556b2f !important;
+  color: #6A6A5A !important;
 }
 
 /* Custom styling for the eye icon outside the password input */
@@ -310,7 +310,7 @@
 }
 
 .custom-eye-icon:hover {
-  color: #556b2f;
+  color: #6A6A5A;
 }
 
 /* ===== Error Message ===== */
@@ -500,12 +500,12 @@
 
 /* Staff Button */
 .demo-btn.staff-btn {
-  border-color: #556b2f;
-  color: #556b2f;
+  border-color: #6A6A5A;
+  color: #6A6A5A;
 }
 
 .demo-btn.staff-btn:hover:not(:disabled) {
-  background: #556b2f;
+  background: #6A6A5A;
   color: white;
   box-shadow: 0 8px 20px rgba(85, 107, 47, 0.3);
 }
@@ -524,12 +524,12 @@
 
 /* Contractor Button */
 .demo-btn.contractor-btn {
-  border-color: #556b2f;
-  color: #556b2f;
+  border-color: #6A6A5A;
+  color: #6A6A5A;
 }
 
 .demo-btn.contractor-btn:hover:not(:disabled) {
-  background: #556b2f;
+  background: #6A6A5A;
   color: white;
   box-shadow: 0 8px 20px rgba(85, 107, 47, 0.3);
 }

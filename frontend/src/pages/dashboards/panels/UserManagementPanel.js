@@ -34,9 +34,7 @@ const UserManagementPanel = ({
   // STATE
   // ============================================
   const { user: currentUser, refreshUser } = useAuth();
-  const normalizedRoleFilter = roleFilter
-    ? roleFilter.toLowerCase()
-    : null;
+  const normalizedRoleFilter = roleFilter ? roleFilter.toLowerCase() : null;
   const normalizedRoleFilters = Array.isArray(roleFilters)
     ? roleFilters
         .map((value) => (value ? value.toLowerCase() : null))
@@ -56,7 +54,6 @@ const UserManagementPanel = ({
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
-  const [contractorTypes, setContractorTypes] = useState([]);
   const toast = useRef(null);
 
   const [formData, setFormData] = useState({
@@ -68,7 +65,6 @@ const UserManagementPanel = ({
     last_name: '',
     phone: '',
     user_role: initialRoleSafe,
-    contractor_types: [],
     profile_pic: null,
   });
 
@@ -90,7 +86,6 @@ const UserManagementPanel = ({
 
   useEffect(() => {
     loadUsers();
-    loadContractorTypes();
   }, []);
 
   // ============================================
@@ -196,20 +191,6 @@ const UserManagementPanel = ({
     }
   };
 
-  const loadContractorTypes = async () => {
-    try {
-      const data = await categoryService.getAll();
-      setContractorTypes(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Load contractor categories error:', error);
-      toast.current?.show({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to load contractor categories',
-      });
-    }
-  };
-
   const openNewDialog = () => {
     setIsEditing(false);
     setSelectedUser(null);
@@ -222,7 +203,6 @@ const UserManagementPanel = ({
       last_name: '',
       phone: '',
       user_role: initialRoleSafe,
-      contractor_types: [],
       profile_pic: null,
     });
     setProfilePicPreview(null);
@@ -241,11 +221,6 @@ const UserManagementPanel = ({
       last_name: usr.last_name,
       phone: usr.phone || '',
       user_role: normalizedRoleFilter || usr.user_role,
-      contractor_types: Array.isArray(usr.contractor_types)
-        ? usr.contractor_types
-        : usr.contractor_type
-          ? [usr.contractor_type]
-          : [],
       profile_pic: usr.profile_pic || null, // Keep existing profile_pic reference
     });
     // Set profile picture preview if available
@@ -374,12 +349,6 @@ const UserManagementPanel = ({
         requestData.append('last_name', formData.last_name);
         requestData.append('phone', formData.phone || '');
         requestData.append('user_role', roleForSave);
-        if (Array.isArray(formData.contractor_types)) {
-          requestData.append(
-            'contractor_types',
-            JSON.stringify(formData.contractor_types),
-          );
-        }
 
         // Add password only for new users
         if (!isEditing) {
@@ -404,9 +373,6 @@ const UserManagementPanel = ({
           phone: formData.phone || '',
           user_role: roleForSave,
         };
-        if (Array.isArray(formData.contractor_types)) {
-          requestData.contractor_types = formData.contractor_types;
-        }
 
         // Add password only for new users
         if (!isEditing) {
@@ -656,9 +622,7 @@ const UserManagementPanel = ({
         >
           <div>
             <h2 className="m-0">{title}</h2>
-            <p className="text-color-secondary m-0">
-              {description}
-            </p>
+            <p className="text-color-secondary m-0">{description}</p>
           </div>
           <div
             style={{
@@ -804,21 +768,6 @@ const UserManagementPanel = ({
           <Column field="email" header="Email" sortable />
           <Column field="first_name" header="First Name" />
           <Column field="last_name" header="Last Name" />
-          {normalizedRoleFilter === 'contractor' && (
-            <Column
-              field="contractor_types"
-              header="Contractor Types"
-              body={(rowData) => {
-                if (Array.isArray(rowData.contractor_types)) {
-                  return rowData.contractor_types.join(', ');
-                }
-                if (rowData.contractor_type) {
-                  return rowData.contractor_type;
-                }
-                return '';
-              }}
-            />
-          )}
           {showRoleColumn && (
             <Column
               field="user_role"
@@ -829,9 +778,9 @@ const UserManagementPanel = ({
                   style={{
                     background:
                       rowData.user_role === 'admin'
-                        ? '#404a17'
+                        ? '#4A4A3A'
                         : rowData.user_role === 'staff'
-                          ? '#556b2f'
+                          ? '#6A6A5A'
                           : rowData.user_role === 'client'
                             ? '#10b981'
                             : '#f59e0b',
@@ -840,16 +789,6 @@ const UserManagementPanel = ({
               )}
             />
           )}
-          <Column
-            field="is_active"
-            header="Status"
-            body={(rowData) => (
-              <Tag
-                value={rowData.is_active ? 'Active' : 'Inactive'}
-                severity={rowData.is_active ? 'success' : 'danger'}
-              />
-            )}
-          />
           <Column
             header="Actions"
             body={(rowData) => (
@@ -899,7 +838,7 @@ const UserManagementPanel = ({
         onHide={() => setVisible(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          background: 'linear-gradient(135deg, #4A4A3A 0%, #5A5A4A 100%)',
           color: 'white',
           padding: '1rem',
         }}
@@ -973,29 +912,6 @@ const UserManagementPanel = ({
             disabled={!allowRoleSelect}
           />
         </div>
-
-        {/* Contractor Type - show only for contractors */}
-        {formData.user_role === 'contractor' && (
-          <div className="field mt-3">
-            <label htmlFor="contractor_types">Contractor Types</label>
-            <MultiSelect
-              id="contractor_types"
-              value={formData.contractor_types}
-              options={contractorTypes.map((category) => ({
-                label: category.category_name,
-                value: category.category_name,
-              }))}
-              onChange={(e) =>
-                setFormData({ ...formData, contractor_types: e.value })
-              }
-              optionLabel="label"
-              optionValue="value"
-              placeholder="Select contractor types"
-              display="chip"
-              showClear
-            />
-          </div>
-        )}
 
         {/* Profile Picture Section */}
         <div className="field mt-4">
@@ -1097,7 +1013,7 @@ const UserManagementPanel = ({
                   right: '14px',
                   transform: 'translateY(-50%)',
                   cursor: 'pointer',
-                  color: '#404a17',
+                  color: '#4A4A3A',
                   fontSize: '18px',
                 }}
                 onClick={() => setShowPassword((prev) => !prev)}
@@ -1128,7 +1044,7 @@ const UserManagementPanel = ({
                   right: '14px',
                   transform: 'translateY(-50%)',
                   cursor: 'pointer',
-                  color: '#404a17',
+                  color: '#4A4A3A',
                   fontSize: '18px',
                 }}
                 onClick={() => setShowConfirmPassword((prev) => !prev)}

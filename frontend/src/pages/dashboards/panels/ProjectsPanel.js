@@ -748,7 +748,7 @@ const ProjectsPanel = () => {
             paddingRight: '16px',
           }}
         >
-          <h3 className="card-title" style={{ color: '#404a17', margin: 0 }}>
+          <h3 className="card-title" style={{ color: '#4A4A3A', margin: 0 }}>
             {viewMode === 'active' ? 'Active Projects' : 'Recycle Bin'}
           </h3>
           {viewMode === 'active' && (
@@ -882,7 +882,7 @@ const ProjectsPanel = () => {
         onHide={() => setDisplayDialog(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -890,7 +890,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="project-name"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Name *
           </label>
@@ -908,7 +908,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="project-description"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Description
           </label>
@@ -927,7 +927,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="project-amount"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Amount
           </label>
@@ -949,7 +949,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="project-due-date"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Due Date
           </label>
@@ -968,7 +968,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Client
           </label>
@@ -1005,7 +1005,7 @@ const ProjectsPanel = () => {
         onHide={() => setDisplaySubProjectDialog(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -1013,7 +1013,7 @@ const ProjectsPanel = () => {
         <div className="field mt-2">
           <label
             htmlFor="parent-project"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Parent Project
           </label>
@@ -1028,7 +1028,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-name"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Name *
           </label>
@@ -1046,7 +1046,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-description"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Description
           </label>
@@ -1068,7 +1068,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-amount"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Amount
           </label>
@@ -1090,7 +1090,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-due-date"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Due Date
           </label>
@@ -1111,7 +1111,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-contractor"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Contractor
           </label>
@@ -1132,7 +1132,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="sub-project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Client
           </label>
@@ -1169,7 +1169,7 @@ const ProjectsPanel = () => {
         onHide={() => setDisplayProjectDashboard(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -1296,7 +1296,7 @@ const ProjectsPanel = () => {
         onHide={() => setDisplayEditDialog(false)}
         className="p-fluid"
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -1304,7 +1304,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-name"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Name *
           </label>
@@ -1322,7 +1322,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-description"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Description
           </label>
@@ -1344,7 +1344,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-amount"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Project Amount
           </label>
@@ -1366,7 +1366,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-due-date"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Due Date
           </label>
@@ -1387,7 +1387,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-contractor"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Contractor
           </label>
@@ -1408,7 +1408,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-status"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Status
           </label>
@@ -1433,7 +1433,7 @@ const ProjectsPanel = () => {
         <div className="field mt-3">
           <label
             htmlFor="edit-project-client"
-            style={{ color: '#404a17', fontWeight: '600' }}
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
             Client
           </label>

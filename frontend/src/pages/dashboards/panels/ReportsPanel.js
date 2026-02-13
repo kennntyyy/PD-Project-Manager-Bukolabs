@@ -940,9 +940,7 @@ const ReportsPanel = ({
       });
 
       const csvContent = rows.map((row) => row.join(',')).join('\n');
-      const encodedUri = encodeURI(
-        'data:text/csv;charset=utf-8,' + csvContent,
-      );
+      const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
       link.setAttribute(
@@ -974,7 +972,10 @@ const ReportsPanel = ({
 
       const rows = [
         ['Project', project.project_name],
-        ['Project Duration', `${formatDate(project.project_start_date)} - ${formatDate(project.project_deadline)}`],
+        [
+          'Project Duration',
+          `${formatDate(project.project_start_date)} - ${formatDate(project.project_deadline)}`,
+        ],
         [],
         [
           'Report #',
@@ -1005,9 +1006,7 @@ const ReportsPanel = ({
         });
 
       const csvContent = rows.map((row) => row.join(',')).join('\n');
-      const encodedUri = encodeURI(
-        'data:text/csv;charset=utf-8,' + csvContent,
-      );
+      const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
       link.setAttribute(
@@ -1409,14 +1408,20 @@ const ReportsPanel = ({
                       <p className="m-0 text-sm">{mainSummary.reportCount}</p>
                     </div>
                     <div className="col-12 sm:col-6">
-                      <span className="font-bold text-xs">Project Duration:</span>
+                      <span className="font-bold text-xs">
+                        Project Duration:
+                      </span>
                       <p className="m-0 text-sm">
                         {mainReportPeriod.start} - {mainReportPeriod.end}
                       </p>
                     </div>
                     <div className="col-12 sm:col-6">
-                      <span className="font-bold text-xs">Latest Progress:</span>
-                      <p className="m-0 text-sm">{mainSummary.latestProgress}%</p>
+                      <span className="font-bold text-xs">
+                        Latest Progress:
+                      </span>
+                      <p className="m-0 text-sm">
+                        {mainSummary.latestProgress}%
+                      </p>
                     </div>
                     <div className="col-12 sm:col-6">
                       <span className="font-bold text-xs">Total Released:</span>
@@ -1435,7 +1440,10 @@ const ReportsPanel = ({
                         <div
                           key={summary.project_id}
                           className="col-12"
-                          style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}
+                          style={{
+                            borderBottom: '1px solid #e5e7eb',
+                            paddingBottom: '10px',
+                          }}
                         >
                           <div className="flex justify-between items-start gap-3">
                             <div>
@@ -1445,8 +1453,12 @@ const ReportsPanel = ({
                               <div style={{ marginTop: '4px' }}>
                                 {renderStatusBadge(summary.project_status)}
                               </div>
-                              <div className="text-xs text-color-secondary" style={{ marginTop: '6px' }}>
-                                Project Duration: {summary.reportPeriod.start} - {summary.reportPeriod.end}
+                              <div
+                                className="text-xs text-color-secondary"
+                                style={{ marginTop: '6px' }}
+                              >
+                                Project Duration: {summary.reportPeriod.start} -{' '}
+                                {summary.reportPeriod.end}
                               </div>
                             </div>
                             <div className="text-right">
@@ -1689,13 +1701,15 @@ const ReportsPanel = ({
     <div className="reports-container">
       <Toast ref={toast} />
 
-      {embedded
-        ? selectedProject
-          ? <ProjectDetailView />
-          : null
-        : !selectedProject
-          ? renderProjectListView()
-          : <ProjectDetailView />}
+      {embedded ? (
+        selectedProject ? (
+          <ProjectDetailView />
+        ) : null
+      ) : !selectedProject ? (
+        renderProjectListView()
+      ) : (
+        <ProjectDetailView />
+      )}
 
       {/* Report Generation Modal */}
       <Dialog
@@ -1705,7 +1719,7 @@ const ReportsPanel = ({
         contentStyle={{ padding: '1.5rem 2rem' }}
         onHide={() => setShowReportModal(false)}
         headerStyle={{
-          backgroundColor: '#404a17',
+          backgroundColor: '#4A4A3A',
           color: 'white',
           padding: '1rem',
         }}
@@ -1948,28 +1962,48 @@ const ReportsPanel = ({
 
               {/* Row 5 - Amount to Release */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label
+                <div
                   style={{
-                    fontWeight: 'bold',
-                    display: 'block',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
                     marginBottom: '0.5rem',
-                    fontSize: '12px',
                   }}
                 >
-                  Amount to be Released *
-                </label>
+                  <label
+                    style={{
+                      fontWeight: 'bold',
+                      display: 'block',
+                      fontSize: '12px',
+                    }}
+                  >
+                    Amount to be Released * (Auto-calculated from Completion %)
+                  </label>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    Adjusted by completion rate slider above
+                  </span>
+                </div>
                 <InputNumber
                   value={releasedAmount}
                   onValueChange={(e) => {
                     const newAmount = Number(e.value || 0);
                     setReleasedAmount(newAmount);
 
-                    const contractAmount = Number(selectedProject?.total_amount) || 0;
-                    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                    const contractAmount =
+                      Number(selectedProject?.total_amount) || 0;
+                    const totalReleased =
+                      Number(selectedProject?.total_amount_released) || 0;
                     const unreleasedBudget = contractAmount - totalReleased;
 
                     if (unreleasedBudget > 0) {
-                      const calculatedRate = (newAmount / unreleasedBudget) * 100;
+                      const calculatedRate =
+                        (newAmount / unreleasedBudget) * 100;
                       const clampedRate = Math.min(
                         100,
                         Math.max(calculatedRate, minCompletionRate),
@@ -2056,19 +2090,41 @@ const ReportsPanel = ({
                   }}
                 >
                   <label style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                    Completion Rate
+                    Completion Rate & Amount to Release
                   </label>
                   <div
                     style={{
-                      backgroundColor: '#4f4d36',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      fontWeight: 'bold',
-                      fontSize: '14px',
+                      display: 'flex',
+                      gap: '1rem',
+                      alignItems: 'center',
                     }}
                   >
-                    {Number(completionRate || 0).toFixed(2)}%
+                    <div
+                      style={{
+                        backgroundColor: '#4A4A3A',
+                        color: 'white',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {Number(completionRate || 0).toFixed(2)}%
+                    </div>
+                    <div
+                      style={{
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        minWidth: '140px',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {formatCurrency(releasedAmount || 0)}
+                    </div>
                   </div>
                 </div>
                 <Slider
@@ -2078,8 +2134,10 @@ const ReportsPanel = ({
                     const roundedRate = Number(newRate.toFixed(2));
                     setCompletionRate(roundedRate);
                     // Calculate unreleased budget
-                    const contractAmount = Number(selectedProject?.total_amount) || 0;
-                    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                    const contractAmount =
+                      Number(selectedProject?.total_amount) || 0;
+                    const totalReleased =
+                      Number(selectedProject?.total_amount_released) || 0;
                     const unreleasedBudget = contractAmount - totalReleased;
                     // Set releasedAmount to the corresponding percentage of unreleased budget
                     const newAmount = Number(

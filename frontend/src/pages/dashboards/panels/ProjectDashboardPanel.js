@@ -49,7 +49,8 @@ const ProjectDashboardPanel = () => {
     name: '',
     description: '',
     amount: '',
-    dueDate: null,
+    startDate: null,
+    endDate: null,
     contractor_id: null,
     client_id: null,
     category_id: null,
@@ -180,9 +181,18 @@ const ProjectDashboardPanel = () => {
     })}`;
   };
 
-  const dateTemplate = (rowData) => {
-    if (!rowData.project_deadline) return 'N/A';
-    return new Date(rowData.project_deadline).toLocaleDateString();
+  const formatDateValue = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString();
+  };
+
+  const getProjectDateRange = (rowData) => {
+    const startText = formatDateValue(rowData?.project_start_date);
+    const endText = formatDateValue(rowData?.project_deadline);
+    if (startText === 'N/A' && endText === 'N/A') return 'N/A';
+    return `${startText} - ${endText}`;
   };
 
   const isProjectCompleted = (rowData, completionValue) => {
@@ -459,7 +469,8 @@ const ProjectDashboardPanel = () => {
       name: '',
       description: '',
       amount: '',
-      dueDate: null,
+      startDate: null,
+      endDate: null,
       contractor_id: null,
       client_id: selectedProject.client_id || null,
       category_id: null,
@@ -494,20 +505,55 @@ const ProjectDashboardPanel = () => {
       return;
     }
 
-    if (newSubProject.dueDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(newSubProject.dueDate);
-      selectedDate.setHours(0, 0, 0, 0);
+    if (!newSubProject.startDate || !newSubProject.endDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Start date and end date are required',
+      });
+      return;
+    }
 
-      if (selectedDate < today) {
-        toast.current?.show({
-          severity: 'warn',
-          summary: 'Warning',
-          detail: 'Due date cannot be before today',
-        });
-        return;
-      }
+    const startDate = new Date(newSubProject.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(newSubProject.endDate);
+    endDate.setHours(0, 0, 0, 0);
+
+    const parentStartDate = selectedProject?.project_start_date
+      ? new Date(selectedProject.project_start_date)
+      : null;
+    const parentEndDate = selectedProject?.project_deadline
+      ? new Date(selectedProject.project_deadline)
+      : null;
+
+    if (!parentStartDate || !parentEndDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Parent project must have start and end dates',
+      });
+      return;
+    }
+
+    parentStartDate.setHours(0, 0, 0, 0);
+    parentEndDate.setHours(0, 0, 0, 0);
+
+    if (startDate < parentStartDate || endDate > parentEndDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Sub-project dates must be within the parent project dates',
+      });
+      return;
+    }
+
+    if (endDate < startDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'End date cannot be before start date',
+      });
+      return;
     }
 
     try {
@@ -516,7 +562,8 @@ const ProjectDashboardPanel = () => {
         project_name: newSubProject.name,
         project_description: newSubProject.description,
         total_amount: newSubProject.amount,
-        project_deadline: newSubProject.dueDate,
+        project_start_date: newSubProject.startDate,
+        project_deadline: newSubProject.endDate,
         contractor_id: newSubProject.contractor_id,
         client_id: newSubProject.client_id,
         category_id: newSubProject.category_id,
@@ -529,7 +576,8 @@ const ProjectDashboardPanel = () => {
         name: '',
         description: '',
         amount: '',
-        dueDate: null,
+        startDate: null,
+        endDate: null,
         contractor_id: null,
         client_id: null,
         category_id: null,
@@ -654,8 +702,16 @@ const ProjectDashboardPanel = () => {
                   <div>{amountTemplate(selectedProject)}</div>
                 </div>
                 <div>
-                  <div className="metric-label">Due Date</div>
-                  <div>{dateTemplate(selectedProject)}</div>
+                  <div className="metric-label">Start Date</div>
+                  <div>
+                    {formatDateValue(selectedProject?.project_start_date)}
+                  </div>
+                </div>
+                <div>
+                  <div className="metric-label">End Date</div>
+                  <div>
+                    {formatDateValue(selectedProject?.project_deadline)}
+                  </div>
                 </div>
                 <div>
                   <div className="metric-label">Days Remaining</div>
@@ -870,8 +926,16 @@ const ProjectDashboardPanel = () => {
                             <div>{amountTemplate(subproject)}</div>
                           </div>
                           <div>
-                            <div className="metric-label">Due Date</div>
-                            <div>{dateTemplate(subproject)}</div>
+                            <div className="metric-label">Start Date</div>
+                            <div>
+                              {formatDateValue(subproject?.project_start_date)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="metric-label">End Date</div>
+                            <div>
+                              {formatDateValue(subproject?.project_deadline)}
+                            </div>
                           </div>
                           <div>
                             <div className="metric-label">Days Remaining</div>
@@ -1019,8 +1083,8 @@ const ProjectDashboardPanel = () => {
                                 <div>{amountTemplate(project)}</div>
                               </div>
                               <div>
-                                <span className="metric-label">Due Date</span>
-                                <div>{dateTemplate(project)}</div>
+                                <span className="metric-label">Date Range</span>
+                                <div>{getProjectDateRange(project)}</div>
                               </div>
                             </div>
                           </button>
@@ -1149,22 +1213,62 @@ const ProjectDashboardPanel = () => {
 
         <div className="field mt-3">
           <label
-            htmlFor="sub-project-due-date"
+            htmlFor="sub-project-start-date"
             style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
-            Due Date
+            Start Date
           </label>
           <Calendar
-            id="sub-project-due-date"
-            value={newSubProject.dueDate}
+            id="sub-project-start-date"
+            value={newSubProject.startDate}
             onChange={(e) =>
-              setNewSubProject({ ...newSubProject, dueDate: e.value })
+              setNewSubProject({ ...newSubProject, startDate: e.value })
             }
             dateFormat="mm/dd/yy"
-            placeholder="Select due date"
+            placeholder="Select start date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-            minDate={new Date()}
+            minDate={
+              selectedProject?.project_start_date
+                ? new Date(selectedProject.project_start_date)
+                : null
+            }
+            maxDate={
+              selectedProject?.project_deadline
+                ? new Date(selectedProject.project_deadline)
+                : null
+            }
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-end-date"
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
+          >
+            End Date
+          </label>
+          <Calendar
+            id="sub-project-end-date"
+            value={newSubProject.endDate}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, endDate: e.value })
+            }
+            dateFormat="mm/dd/yy"
+            placeholder="Select end date"
+            style={{ borderColor: '#cbd5e1' }}
+            className="w-full"
+            minDate={
+              newSubProject.startDate ||
+              (selectedProject?.project_start_date
+                ? new Date(selectedProject.project_start_date)
+                : null)
+            }
+            maxDate={
+              selectedProject?.project_deadline
+                ? new Date(selectedProject.project_deadline)
+                : null
+            }
           />
         </div>
 

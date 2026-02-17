@@ -39,7 +39,8 @@ const ProjectsPanel = () => {
     name: '',
     description: '',
     amount: '',
-    dueDate: null,
+    startDate: null,
+    endDate: null,
     client_id: null,
     project_status: 'Ongoing',
   });
@@ -49,7 +50,8 @@ const ProjectsPanel = () => {
     name: '',
     description: '',
     amount: '',
-    dueDate: null,
+    startDate: null,
+    endDate: null,
     contractor_id: null,
     client_id: null,
     project_status: 'Ongoing',
@@ -61,7 +63,8 @@ const ProjectsPanel = () => {
     name: '',
     description: '',
     amount: '',
-    dueDate: null,
+    startDate: null,
+    endDate: null,
     contractor_id: null,
     client_id: null,
     project_status: 'Ongoing',
@@ -261,21 +264,27 @@ const ProjectsPanel = () => {
       return;
     }
 
-    // Validate due date is not before today
-    if (newProject.dueDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(newProject.dueDate);
-      selectedDate.setHours(0, 0, 0, 0);
+    if (!newProject.startDate || !newProject.endDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Start date and end date are required',
+      });
+      return;
+    }
 
-      if (selectedDate < today) {
-        toast.current?.show({
-          severity: 'warn',
-          summary: 'Warning',
-          detail: 'Due date cannot be before today',
-        });
-        return;
-      }
+    const startDate = new Date(newProject.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(newProject.endDate);
+    endDate.setHours(0, 0, 0, 0);
+
+    if (endDate < startDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'End date cannot be before start date',
+      });
+      return;
     }
 
     try {
@@ -284,7 +293,8 @@ const ProjectsPanel = () => {
         project_name: newProject.name,
         project_description: newProject.description,
         total_amount: newProject.amount,
-        project_deadline: newProject.dueDate,
+        project_start_date: newProject.startDate,
+        project_deadline: newProject.endDate,
         client_id: newProject.client_id,
         project_status: 'Ongoing',
       });
@@ -294,7 +304,8 @@ const ProjectsPanel = () => {
         name: '',
         description: '',
         amount: '',
-        dueDate: null,
+        startDate: null,
+        endDate: null,
         client_id: null,
         project_status: 'Ongoing',
       });
@@ -327,7 +338,8 @@ const ProjectsPanel = () => {
       name: '',
       description: '',
       amount: '',
-      dueDate: null,
+      startDate: null,
+      endDate: null,
       contractor_id: null,
       client_id: parentProject?.client_id || null,
       project_status: 'Ongoing',
@@ -352,21 +364,55 @@ const ProjectsPanel = () => {
       return;
     }
 
-    // Validate due date is not before today
-    if (newSubProject.dueDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(newSubProject.dueDate);
-      selectedDate.setHours(0, 0, 0, 0);
+    if (!newSubProject.startDate || !newSubProject.endDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Start date and end date are required',
+      });
+      return;
+    }
 
-      if (selectedDate < today) {
-        toast.current?.show({
-          severity: 'warn',
-          summary: 'Warning',
-          detail: 'Due date cannot be before today',
-        });
-        return;
-      }
+    const startDate = new Date(newSubProject.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(newSubProject.endDate);
+    endDate.setHours(0, 0, 0, 0);
+
+    const parentStartDate = subProjectParent?.project_start_date
+      ? new Date(subProjectParent.project_start_date)
+      : null;
+    const parentEndDate = subProjectParent?.project_deadline
+      ? new Date(subProjectParent.project_deadline)
+      : null;
+
+    if (!parentStartDate || !parentEndDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Parent project must have start and end dates',
+      });
+      return;
+    }
+
+    parentStartDate.setHours(0, 0, 0, 0);
+    parentEndDate.setHours(0, 0, 0, 0);
+
+    if (startDate < parentStartDate || endDate > parentEndDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Sub-project dates must be within the parent project dates',
+      });
+      return;
+    }
+
+    if (endDate < startDate) {
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'End date cannot be before start date',
+      });
+      return;
     }
 
     try {
@@ -375,7 +421,8 @@ const ProjectsPanel = () => {
         project_name: newSubProject.name,
         project_description: newSubProject.description,
         total_amount: newSubProject.amount,
-        project_deadline: newSubProject.dueDate,
+        project_start_date: newSubProject.startDate,
+        project_deadline: newSubProject.endDate,
         contractor_id: newSubProject.contractor_id,
         client_id: newSubProject.client_id,
         project_status: 'Ongoing',
@@ -388,7 +435,8 @@ const ProjectsPanel = () => {
         name: '',
         description: '',
         amount: '',
-        dueDate: null,
+        startDate: null,
+        endDate: null,
         contractor_id: null,
         client_id: null,
         project_status: 'Ongoing',
@@ -455,7 +503,10 @@ const ProjectsPanel = () => {
       name: project.project_name,
       description: project.project_description,
       amount: project.total_amount,
-      dueDate: project.project_deadline
+      startDate: project.project_start_date
+        ? new Date(project.project_start_date)
+        : null,
+      endDate: project.project_deadline
         ? new Date(project.project_deadline)
         : null,
       contractor_id: project.contractor_id,
@@ -482,7 +533,8 @@ const ProjectsPanel = () => {
         project_name: editingProject.name,
         project_description: editingProject.description,
         total_amount: editingProject.amount,
-        project_deadline: editingProject.dueDate,
+        project_start_date: editingProject.startDate,
+        project_deadline: editingProject.endDate,
         client_id: editingProject.client_id,
         contractor_id: editingProject.contractor_id,
         project_status: editingProject.project_status,
@@ -616,9 +668,19 @@ const ProjectsPanel = () => {
   };
 
   // Format date
-  const dateTemplate = (rowData) => {
-    if (!rowData.project_deadline) return 'N/A';
-    return new Date(rowData.project_deadline).toLocaleDateString();
+  const formatDateValue = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString();
+  };
+
+  const startDateTemplate = (rowData) => {
+    return formatDateValue(rowData?.project_start_date);
+  };
+
+  const endDateTemplate = (rowData) => {
+    return formatDateValue(rowData?.project_deadline);
   };
 
   // Get filtered projects
@@ -823,9 +885,15 @@ const ProjectsPanel = () => {
             style={{ color: '#059669', fontWeight: '600' }}
           />
           <Column
+            field="project_start_date"
+            header="Start Date"
+            body={startDateTemplate}
+            sortable
+          />
+          <Column
             field="project_deadline"
-            header="Due Date"
-            body={dateTemplate}
+            header="End Date"
+            body={endDateTemplate}
             sortable
           />
 
@@ -948,20 +1016,40 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
-            htmlFor="project-due-date"
+            htmlFor="project-start-date"
             style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
-            Due Date
+            Start Date
           </label>
           <Calendar
-            id="project-due-date"
-            value={newProject.dueDate}
-            onChange={(e) => setNewProject({ ...newProject, dueDate: e.value })}
+            id="project-start-date"
+            value={newProject.startDate}
+            onChange={(e) =>
+              setNewProject({ ...newProject, startDate: e.value })
+            }
             dateFormat="mm/dd/yy"
-            placeholder="Select due date"
+            placeholder="Select start date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-            minDate={new Date()}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="project-end-date"
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
+          >
+            End Date
+          </label>
+          <Calendar
+            id="project-end-date"
+            value={newProject.endDate}
+            onChange={(e) => setNewProject({ ...newProject, endDate: e.value })}
+            dateFormat="mm/dd/yy"
+            placeholder="Select end date"
+            style={{ borderColor: '#cbd5e1' }}
+            className="w-full"
+            minDate={newProject.startDate || new Date()}
           />
         </div>
 
@@ -1080,7 +1168,7 @@ const ProjectsPanel = () => {
             }
             placeholder="Enter project amount"
             prefix="₱ "
-            thousandSeparator="," 
+            thousandSeparator=","
             minFractionDigits={2}
             maxFractionDigits={2}
             style={{ borderColor: '#cbd5e1' }}
@@ -1089,22 +1177,62 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
-            htmlFor="sub-project-due-date"
+            htmlFor="sub-project-start-date"
             style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
-            Due Date
+            Start Date
           </label>
           <Calendar
-            id="sub-project-due-date"
-            value={newSubProject.dueDate}
+            id="sub-project-start-date"
+            value={newSubProject.startDate}
             onChange={(e) =>
-              setNewSubProject({ ...newSubProject, dueDate: e.value })
+              setNewSubProject({ ...newSubProject, startDate: e.value })
             }
             dateFormat="mm/dd/yy"
-            placeholder="Select due date"
+            placeholder="Select start date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-            minDate={new Date()}
+            minDate={
+              subProjectParent?.project_start_date
+                ? new Date(subProjectParent.project_start_date)
+                : null
+            }
+            maxDate={
+              subProjectParent?.project_deadline
+                ? new Date(subProjectParent.project_deadline)
+                : null
+            }
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="sub-project-end-date"
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
+          >
+            End Date
+          </label>
+          <Calendar
+            id="sub-project-end-date"
+            value={newSubProject.endDate}
+            onChange={(e) =>
+              setNewSubProject({ ...newSubProject, endDate: e.value })
+            }
+            dateFormat="mm/dd/yy"
+            placeholder="Select end date"
+            style={{ borderColor: '#cbd5e1' }}
+            className="w-full"
+            minDate={
+              newSubProject.startDate ||
+              (subProjectParent?.project_start_date
+                ? new Date(subProjectParent.project_start_date)
+                : null)
+            }
+            maxDate={
+              subProjectParent?.project_deadline
+                ? new Date(subProjectParent.project_deadline)
+                : null
+            }
           />
         </div>
 
@@ -1219,9 +1347,15 @@ const ProjectsPanel = () => {
               </div>
               <div>
                 <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
-                  Due Date
+                  Start Date
                 </div>
-                <div>{dateTemplate(selectedProject)}</div>
+                <div>{startDateTemplate(selectedProject)}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                  End Date
+                </div>
+                <div>{endDateTemplate(selectedProject)}</div>
               </div>
             </div>
 
@@ -1273,9 +1407,14 @@ const ProjectsPanel = () => {
                 body={amountTemplate}
               />
               <Column
+                field="project_start_date"
+                header="Start Date"
+                body={startDateTemplate}
+              />
+              <Column
                 field="project_deadline"
-                header="Due Date"
-                body={dateTemplate}
+                header="End Date"
+                body={endDateTemplate}
               />
             </DataTable>
           </>
@@ -1365,22 +1504,42 @@ const ProjectsPanel = () => {
 
         <div className="field mt-3">
           <label
-            htmlFor="edit-project-due-date"
+            htmlFor="edit-project-start-date"
             style={{ color: '#4A4A3A', fontWeight: '600' }}
           >
-            Due Date
+            Start Date
           </label>
           <Calendar
-            id="edit-project-due-date"
-            value={editingProject.dueDate}
+            id="edit-project-start-date"
+            value={editingProject.startDate}
             onChange={(e) =>
-              setEditingProject({ ...editingProject, dueDate: e.value })
+              setEditingProject({ ...editingProject, startDate: e.value })
             }
             dateFormat="mm/dd/yy"
-            placeholder="Select due date"
+            placeholder="Select start date"
             style={{ borderColor: '#cbd5e1' }}
             className="w-full"
-            minDate={new Date()}
+          />
+        </div>
+
+        <div className="field mt-3">
+          <label
+            htmlFor="edit-project-end-date"
+            style={{ color: '#4A4A3A', fontWeight: '600' }}
+          >
+            End Date
+          </label>
+          <Calendar
+            id="edit-project-end-date"
+            value={editingProject.endDate}
+            onChange={(e) =>
+              setEditingProject({ ...editingProject, endDate: e.value })
+            }
+            dateFormat="mm/dd/yy"
+            placeholder="Select end date"
+            style={{ borderColor: '#cbd5e1' }}
+            className="w-full"
+            minDate={editingProject.startDate}
           />
         </div>
 

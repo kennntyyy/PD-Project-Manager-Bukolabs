@@ -4,6 +4,7 @@ import {
   Text,
   View,
   StyleSheet,
+  Image
 } from '@react-pdf/renderer';
 
 const styles = StyleSheet.create({
@@ -17,6 +18,13 @@ const styles = StyleSheet.create({
     borderBottom: '2pt solid #4A4A3A',
     marginBottom: 16,
     paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logo: {
+    width: 48,
+    height: 48,
+    marginRight: 16,
   },
   title: {
     fontSize: 20,
@@ -105,10 +113,13 @@ export const ProjectReportsListPDF = ({
   <Document>
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
-        <Text style={styles.title}>Project Reports</Text>
-        <Text style={styles.subtitle}>
-          Report Period: {reportPeriod.start} — {reportPeriod.end}
-        </Text>
+        <Image style={styles.logo} src="/home/angelo/Documents/PD-Project-Manager-Bukolabs/frontend/public/logo.png" />
+        <View>
+          <Text style={styles.title}>Project Reports</Text>
+          <Text style={styles.subtitle}>
+            Report Period: {reportPeriod.start} — {reportPeriod.end}
+          </Text>
+        </View>
       </View>
 
       <Text style={styles.sectionHeader}>Project Details</Text>

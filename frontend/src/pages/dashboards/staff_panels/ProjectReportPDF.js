@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Image,
 } from '@react-pdf/renderer';
+const myLogo = '/logo.png';
+
 
 const styles = StyleSheet.create({
   page: {
@@ -28,6 +30,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4A4A3A',
     textTransform: 'uppercase',
+    marginLeft: 0
   },
   dateText: {
     fontSize: 9,
@@ -121,10 +124,11 @@ const styles = StyleSheet.create({
     break: 'inside', 
   },
   image: {
-    width: '100%',
-    height: 220,
-    objectFit: 'cover',
-    borderRadius: 6,
+     width: '100%',
+     height: 220,
+     objectFit: 'cover',
+     borderRadius: 6,
+     border: '1pt solid #4A4A3A', // Add border for visibility
   },
   imageComment: {
     fontSize: 9,
@@ -134,6 +138,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     borderLeft: '2pt solid #4A4A3A', // Accent border match
     backgroundColor: '#f9f9f9',
+  },
+  logo: {
+    width: 48,
+    height: 48,
+    marginRight: 16,
+    objectFit: 'contain',
   },
 });
 
@@ -167,6 +177,7 @@ export const ProjectReportPDF = ({
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
+          <Image src={myLogo} style={{width: '40px', height: '40px'}}></Image>
           <Text style={styles.title}>Project Report</Text>
           <Text style={styles.dateText}>
             Project Duration: start: {reportDates.reportStart} —  end: {reportDates.reportEnd}

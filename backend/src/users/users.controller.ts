@@ -67,9 +67,13 @@ export class UsersController {
     @UploadedFile() file?: Express.Multer.File,
     @CurrentUser() currentUser?: any,
   ): Promise<User> {
+    const dtoToLog = { ...createUserDto };
+    if (dtoToLog.profile_pic) {
+      dtoToLog.profile_pic = `[BASE64 DATA - ${dtoToLog.profile_pic.length} chars]`;
+    }
     console.log(
       '[UsersController] POST /users - create with body:',
-      createUserDto,
+      dtoToLog,
       'file:',
       file?.filename,
     );
@@ -109,7 +113,11 @@ export class UsersController {
         createUserDto,
         currentUser,
       );
-      console.log('[UsersController] Create success:', result);
+      const resultToLog = { ...result };
+      if (resultToLog.profile_pic) {
+        resultToLog.profile_pic = `[BASE64 DATA - ${resultToLog.profile_pic.length} chars]`;
+      }
+      console.log('[UsersController] Create success:', resultToLog);
       return result;
     } catch (error) {
       console.error('[UsersController] Create error:', error.message);
@@ -173,11 +181,15 @@ export class UsersController {
     @UploadedFile() file?: Express.Multer.File,
     @CurrentUser() currentUser?: any,
   ): Promise<User> {
+    const dtoToLog = { ...updateUserDto };
+    if (dtoToLog.profile_pic) {
+      dtoToLog.profile_pic = `[BASE64 DATA - ${dtoToLog.profile_pic.length} chars]`;
+    }
     console.log(
       '[UsersController] PUT /users/:id - update:',
       id,
       'body:',
-      updateUserDto,
+      dtoToLog,
       'file:',
       file?.filename,
     );
@@ -218,7 +230,11 @@ export class UsersController {
         updateUserDto,
         currentUser,
       );
-      console.log('[UsersController] Update success:', result);
+      const resultToLog = { ...result };
+      if (resultToLog.profile_pic) {
+        resultToLog.profile_pic = `[BASE64 DATA - ${resultToLog.profile_pic.length} chars]`;
+      }
+      console.log('[UsersController] Update success:', resultToLog);
       return result;
     } catch (error) {
       console.error('[UsersController] Update error:', error.message);

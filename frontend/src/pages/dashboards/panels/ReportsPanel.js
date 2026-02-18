@@ -457,6 +457,11 @@ const ReportsPanel = ({
         'Updated',
         checked ? 'Marked as Paid' : 'Marked as Pending',
       );
+
+      // Refresh parent reports to update project overview stats
+      if (onReportsChanged) {
+        onReportsChanged();
+      }
     } catch (error) {
       console.error('Error updating payment status:', error);
       showToast('error', 'Error', 'Failed to update payment status');
@@ -1254,12 +1259,14 @@ const ReportsPanel = ({
     <div>
       <div className="mb-6">
         {!embedded && (
-          <Button
-            label="Back to Projects"
-            icon="pi pi-arrow-left"
-            className="p-button-text mb-3"
-            onClick={handleBackToList}
-          />
+          <div className="back-button-row">
+            <Button
+              label="Back to Projects"
+              icon="pi pi-arrow-left"
+              className="p-button-text"
+              onClick={handleBackToList}
+            />
+          </div>
         )}
 
         <div className="flex justify-between items-start gap-4">
@@ -1273,7 +1280,7 @@ const ReportsPanel = ({
             <div className="flex gap-2" style={{ marginTop: '1rem' }}>
               {!isProjectLocked(selectedProject?.project_status) && (
                 <Button
-                  label="Generate New Report"
+                  label="Generate New Billing"
                   onClick={handleGenerateClick}
                   className="p-button-primary"
                 />

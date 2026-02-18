@@ -18,13 +18,14 @@ import './ProjectsPanel.css';
 // Handles: Create, Read, Update, Delete projects
 // ============================================
 
-const ProjectsPanel = () => {
+const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
   // ============================================
   // STATE
   // ============================================
   const [projects, setProjects] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [clients, setClients] = useState([]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [displayDialog, setDisplayDialog] = useState(false);
   const [displayEditDialog, setDisplayEditDialog] = useState(false);
@@ -34,6 +35,18 @@ const ProjectsPanel = () => {
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'deleted'
   const [searchQuery, setSearchQuery] = useState(''); // Search query state
   const toast = useRef(null);
+
+  const normalizeStatus = (status) => {
+    const normalized = String(status || '').toLowerCase().trim();
+    if (['done', 'completed', 'cancelled'].includes(normalized)) return 'done';
+    if (['hold', 'on_hold', 'on hold'].includes(normalized)) return 'hold';
+    return 'ongoing';
+  };
+
+  const matchesStatusFilter = (project) => {
+    if (!statusFilter) return true;
+    return normalizeStatus(project.project_status) === statusFilter;
+  };
 
   const [newProject, setNewProject] = useState({
     name: '',
@@ -113,9 +126,10 @@ const ProjectsPanel = () => {
       return projects.filter((project) => {
         if (project.parent_project_id) return false;
         if (viewMode === 'deleted') {
-          return project.isDeleted === true;
+          return project.isDeleted === true && matchesStatusFilter(project);
         }
-        return project.isDeleted === false || project.isDeleted === undefined;
+        if (project.isDeleted === true) return false;
+        return matchesStatusFilter(project);
       });
     }
 
@@ -126,6 +140,7 @@ const ProjectsPanel = () => {
       // Check view mode filter first
       if (viewMode === 'deleted' && project.isDeleted !== true) return false;
       if (viewMode === 'active' && project.isDeleted === true) return false;
+      if (!matchesStatusFilter(project)) return false;
 
       // Search in project name
       if (project.project_name?.toLowerCase().includes(query)) {
@@ -348,8 +363,45 @@ const ProjectsPanel = () => {
     setDisplaySubProjectDialog(true);
   };
 
-  const openProjectDashboard = (project) => {
+  const fetchReports = async () => {
+    try {
+      const response = await api.get('/reports');
+      setReports(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch reports:', error);
+    }
+  };
+
+  const calculateProjectFinancials = (project) => {
+    if (!project || !reports.length) {
+      return { totalValue: 0, totalPaid: 0, totalPending: 0, totalUnpaid: 0 };
+    }
+
+    const projectReports = reports.filter(
+      (r) => r.project_id === project.project_id && !r.isDeleted
+    );
+
+    let totalPaid = 0;
+    let totalPending = 0;
+
+    projectReports.forEach((report) => {
+      const amount = Number(report.payment_requested || 0);
+      if (report.payment_triggered) {
+        totalPaid += amount;
+      } else {
+        totalPending += amount;
+      }
+    });
+
+    const totalValue = Number(project.total_amount || 0);
+    const totalUnpaid = Math.max(0, totalValue - totalPaid);
+
+    return { totalValue, totalPaid, totalPending, totalUnpaid };
+  };
+
+  const openProjectDashboard = async (project) => {
     setSelectedProject(project);
+    await fetchReports();
     setDisplayProjectDashboard(true);
   };
 
@@ -780,20 +832,35 @@ const ProjectsPanel = () => {
               outlined={viewMode !== 'deleted'}
             />
           </div>
-          <div className="reports-search-box">
-            <i className="pi pi-search"></i>
-            <InputText
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="reports-search-input"
-            />
-            {searchQuery && (
-              <i
-                className="pi pi-times"
-                style={{ color: '#9ca3af', cursor: 'pointer' }}
-                onClick={() => setSearchQuery('')}
-              ></i>
+          <div className="projects-search-area">
+            <div className="reports-search-box">
+              <i className="pi pi-search"></i>
+              <InputText
+                placeholder="Search projects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="reports-search-input"
+              />
+              {searchQuery && (
+                <i
+                  className="pi pi-times"
+                  style={{ color: '#9ca3af', cursor: 'pointer' }}
+                  onClick={() => setSearchQuery('')}
+                ></i>
+              )}
+            </div>
+            {statusFilter && (
+              <button
+                type="button"
+                className="status-filter-pill"
+                onClick={() => onStatusFilterClear?.()}
+                title="Clear status filter"
+              >
+                <span>
+                  Status: {statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                </span>
+                <i className="pi pi-times"></i>
+              </button>
             )}
           </div>
         </div>
@@ -845,11 +912,11 @@ const ProjectsPanel = () => {
           }}
         >
           <Column field="project_name" header="Project Name" sortable />
-          <Column
+          {/* <Column
             field="parent_project_id"
             header="Parent Project"
             body={parentProjectTemplate}
-          />
+          /> */}
           <Column
             field="project_status"
             header="Status"
@@ -1304,11 +1371,11 @@ const ProjectsPanel = () => {
       >
         {selectedProject ? (
           <>
-            <div className="mb-4">
-              <h3 style={{ margin: 0, color: '#111827' }}>
+            <div className="mb-3">
+              <h3 style={{ margin: 0, color: '#111827', fontSize: '1.25rem' }}>
                 {selectedProject.project_name}
               </h3>
-              <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>
+              <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
                 {selectedProject.project_description || 'No description'}
               </p>
             </div>
@@ -1316,46 +1383,72 @@ const ProjectsPanel = () => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '1rem',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '0.75rem',
                 marginBottom: '1.5rem',
               }}
             >
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
                   Status
                 </div>
-                <div>{selectedProject.project_status || 'Ongoing'}</div>
+                <div style={{ fontSize: '0.95rem' }}>{selectedProject.project_status || 'Ongoing'}</div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
                   Client
                 </div>
-                <div>{clientTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>{clientTemplate(selectedProject)}</div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
                   Contractor
                 </div>
-                <div>{contractorTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>{contractorTemplate(selectedProject)}</div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
-                  Amount
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                  Total Value
                 </div>
-                <div>{amountTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#111827' }}>
+                  {formatCurrency(calculateProjectFinancials(selectedProject).totalValue)}
+                </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                  Paid
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#10B981' }}>
+                  {formatCurrency(calculateProjectFinancials(selectedProject).totalPaid)}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                  Pending
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#F59E0B' }}>
+                  {formatCurrency(calculateProjectFinancials(selectedProject).totalPending)}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                  Unpaid
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#EF4444' }}>
+                  {formatCurrency(calculateProjectFinancials(selectedProject).totalUnpaid)}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
                   Start Date
                 </div>
-                <div>{startDateTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>{startDateTemplate(selectedProject)}</div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.85rem' }}>
+                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
                   End Date
                 </div>
-                <div>{endDateTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>{endDateTemplate(selectedProject)}</div>
               </div>
             </div>
 
@@ -1364,10 +1457,10 @@ const ProjectsPanel = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '0.75rem',
+                marginBottom: '0.5rem',
               }}
             >
-              <h4 style={{ margin: 0 }}>Sub-Projects</h4>
+              <h4 style={{ margin: 0, fontSize: '1rem' }}>Sub-Projects</h4>
               <Button
                 label="Add Sub-Project"
                 icon="pi pi-plus"

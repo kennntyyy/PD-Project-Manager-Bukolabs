@@ -45,6 +45,9 @@ const ProjectDashboardPanel = () => {
   const [reportsProject, setReportsProject] = useState(null);
   const [subProjectFirst, setSubProjectFirst] = useState(0);
   const [subProjectRows, setSubProjectRows] = useState(6);
+  const [displayHistoryDialog, setDisplayHistoryDialog] = useState(false);
+  const [projectHistory, setProjectHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [newSubProject, setNewSubProject] = useState({
     name: '',
     description: '',
@@ -139,6 +142,10 @@ const ProjectDashboardPanel = () => {
       const response = await api.get('/reports');
       setReports(response.data);
       setReportsVersion((prev) => prev + 1);
+      // Refresh project history if dialog is open
+      if (displayHistoryDialog && selectedProject) {
+        fetchProjectHistory(selectedProject.project_id);
+      }
     } catch (error) {
       console.error('Failed to fetch reports:', error);
       toast.current?.show({
@@ -149,6 +156,34 @@ const ProjectDashboardPanel = () => {
     }
   };
 
+  const fetchProjectHistory = async (projectId) => {
+    try {
+      setHistoryLoading(true);
+      // Use project_id parameter to get all project-related logs including subprojects and reports
+      const response = await api.get(`/audit-logs?project_id=${projectId}`);
+      // Handle different response formats
+      let historyData = [];
+      if (Array.isArray(response.data)) {
+        historyData = response.data;
+      } else if (response.data?.data && Array.isArray(response.data.data)) {
+        historyData = response.data.data;
+      } else if (response.data?.logs && Array.isArray(response.data.logs)) {
+        historyData = response.data.logs;
+      }
+      setProjectHistory(historyData);
+    } catch (error) {
+      console.error('Failed to fetch project history:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load project history',
+      });
+      setProjectHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const getClientName = (clientId) => {
     if (!clientId) return 'N/A';
     const client = clients?.find((c) => c?.user_id === clientId);
@@ -156,6 +191,36 @@ const ProjectDashboardPanel = () => {
       ? `${client.first_name} ${client.last_name}`
       : 'N/A';
   };
+
+  const getClientById = (clientId) =>
+    clients?.find((client) =>
+      normalizeId(client?.user_id) === normalizeId(clientId),
+    ) || null;
+
+  const getClientDisplayName = (client) => {
+    if (!client) return 'Unassigned';
+    const first = client?.first_name?.trim() || '';
+    const last = client?.last_name?.trim() || '';
+    const fullName = `${first} ${last}`.trim();
+    if (fullName) return fullName;
+    return client?.username || client?.email || 'Client';
+  };
+
+  const getClientInitials = (client) => {
+    const displayName = getClientDisplayName(client);
+    const parts = displayName.split(' ').filter(Boolean);
+    const initials = parts
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join('')
+      .toUpperCase();
+    return initials || 'U';
+  };
+
+  const getClientProfileSrc = (client) =>
+    client?.profile_pic && typeof client.profile_pic === 'string'
+      ? `data:image/jpeg;base64,${client.profile_pic}`
+      : '';
 
   const getContractorName = (contractorId) => {
     if (!contractorId) return 'N/A';
@@ -179,6 +244,41 @@ const ProjectDashboardPanel = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '₱0.00';
+    return `₱${Number(amount).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const calculateProjectFinancials = (project) => {
+    if (!project || !reports.length) {
+      return { totalValue: 0, totalPaid: 0, totalPending: 0, totalUnpaid: 0 };
+    }
+
+    const projectReports = reports.filter(
+      (r) => r.project_id === project.project_id && !r.isDeleted
+    );
+
+    let totalPaid = 0;
+    let totalPending = 0;
+
+    projectReports.forEach((report) => {
+      const amount = Number(report.payment_requested || 0);
+      if (report.payment_triggered) {
+        totalPaid += amount;
+      } else {
+        totalPending += amount;
+      }
+    });
+
+    const totalValue = Number(project.total_amount || 0);
+    const totalUnpaid = Math.max(0, totalValue - totalPaid);
+
+    return { totalValue, totalPaid, totalPending, totalUnpaid };
   };
 
   const formatDateValue = (value) => {
@@ -264,6 +364,36 @@ const ProjectDashboardPanel = () => {
     );
   };
 
+  const getSubProjectStatusCounts = () => {
+    let ongoing = 0;
+    let onhold = 0;
+    let completed = 0;
+
+    subProjects.forEach((project) => {
+      const normalized = String(project?.project_status || 'Ongoing')
+        .toLowerCase()
+        .trim();
+      if (normalized === 'done' || normalized === 'completed') {
+        completed++;
+      } else if (normalized === 'hold' || normalized === 'on hold') {
+        onhold++;
+      } else {
+        ongoing++;
+      }
+    });
+
+    return { ongoing, onhold, completed };
+  };
+
+  const getRemainingBalance = () => {
+    const parentTotal = Number(selectedProject?.total_amount || 0);
+    const allocatedTotal = subProjects.reduce(
+      (sum, project) => sum + Number(project.total_amount || 0),
+      0,
+    );
+    return Math.max(0, parentTotal - allocatedTotal);
+  };
+
   const mainProjects = projects.filter((project) => !project.parent_project_id);
 
   const filteredMainProjects = !searchQuery.trim()
@@ -297,16 +427,21 @@ const ProjectDashboardPanel = () => {
     const grouped = new Map();
 
     filteredMainProjects.forEach((project) => {
-      const clientName = getClientName(project.client_id) || 'Unassigned';
-      if (!grouped.has(clientName)) {
-        grouped.set(clientName, []);
+      const client = getClientById(project.client_id);
+      const clientKey = client ? normalizeId(client.user_id) : 'unassigned';
+      if (!grouped.has(clientKey)) {
+        grouped.set(clientKey, { client, projects: [] });
       }
-      grouped.get(clientName).push(project);
+      grouped.get(clientKey).projects.push(project);
     });
 
-    return Array.from(grouped.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([clientName, projects]) => ({ clientName, projects }));
+    return Array.from(grouped.values())
+      .map((group) => ({
+        client: group.client,
+        clientName: getClientDisplayName(group.client),
+        projects: group.projects,
+      }))
+      .sort((a, b) => a.clientName.localeCompare(b.clientName));
   }, [filteredMainProjects, clients]);
 
   const subProjects = selectedProject
@@ -408,36 +543,70 @@ const ProjectDashboardPanel = () => {
       current.setMonth(current.getMonth() + 1);
     }
 
-    // Create line chart data - one entry per month showing average project count
+    // Track last known progress for each subproject to create flat lines
+    const lastProgress = {};
+    subProjects.forEach((project) => {
+      lastProgress[project.project_id] = null;
+    });
+
+    // Create line chart data - one entry per month showing each subproject's progress
     const chartData = months.map(({ label, date }, monthIndex) => {
       const monthDate = new Date(date);
       monthDate.setDate(1);
       const monthEndDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-      // Count projects active in this month
-      let activeProjectCount = 0;
-      subProjects.forEach((project) => {
-        const startDate = project.project_start_date
-          ? new Date(project.project_start_date)
-          : minDate;
-        const endDate = project.project_deadline
-          ? new Date(project.project_deadline)
-          : maxDate;
+      const dataPoint = { month: label };
 
-        if (startDate <= monthEndDate && endDate >= monthDate) {
-          activeProjectCount++;
+      // For each subproject, check if a report was generated IN this specific month
+      subProjects.forEach((project) => {
+        const projectReports = reports.filter(
+          (r) => r.project_id === project.project_id && !r.isDeleted
+        );
+
+        // Find reports generated specifically in this month
+        const monthReports = projectReports.filter((r) => {
+          const reportDate = r.end_date ? new Date(r.end_date) : r.created_at ? new Date(r.created_at) : null;
+          if (!reportDate) return false;
+          
+          // Check if report is within this specific month
+          return (
+            reportDate >= monthDate && 
+            reportDate <= monthEndDate
+          );
+        });
+
+        const startDate = project.project_start_date ? new Date(project.project_start_date) : null;
+        const hasStarted = startDate && startDate <= monthEndDate;
+
+        if (monthReports.length > 0) {
+          // Report(s) generated this month - use the latest one
+          const sortedReports = monthReports.sort((a, b) => {
+            const dateA = a.end_date ? new Date(a.end_date) : new Date(a.created_at);
+            const dateB = b.end_date ? new Date(b.end_date) : new Date(b.created_at);
+            return dateB - dateA;
+          });
+          const latestReport = sortedReports[0];
+          const progress = Number(latestReport.current_progress || 0);
+          lastProgress[project.project_id] = progress;
+          dataPoint[project.project_name] = progress;
+        } else if (hasStarted) {
+          // Project has started but no report this month - use last known progress (flat line)
+          if (lastProgress[project.project_id] !== null) {
+            dataPoint[project.project_name] = lastProgress[project.project_id];
+          } else {
+            // Project started but no reports yet - show 0
+            lastProgress[project.project_id] = 0;
+            dataPoint[project.project_name] = 0;
+          }
         }
+        // If project hasn't started yet, don't add data point (will show gap in line)
       });
 
-      return {
-        month: label,
-        'Active Projects': activeProjectCount,
-        'Completion Avg': completionRate,
-      };
+      return dataPoint;
     });
 
     return chartData;
-  }, [subProjects, completionRate]);
+  }, [subProjects, reports]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -592,6 +761,10 @@ const ProjectDashboardPanel = () => {
       });
 
       fetchProjects();
+      // Refresh project history if dialog is open
+      if (displayHistoryDialog && selectedProject) {
+        fetchProjectHistory(selectedProject.project_id);
+      }
     } catch (error) {
       console.error('Create sub-project error:', error);
       toast.current?.show({
@@ -613,9 +786,9 @@ const ProjectDashboardPanel = () => {
 
       <div className="project-dashboard-header mb-6">
         <div>
-          <h2 className="m-0">Project Dashboard</h2>
+          <h2 className="m-0">Client Dashboard</h2>
           <p className="text-color-secondary m-0">
-            Select a project to view its details and projects
+            Select a client to view their details and projects
           </p>
         </div>
         <div className="reports-search-box">
@@ -670,7 +843,7 @@ const ProjectDashboardPanel = () => {
         <div className="project-dashboard-content">
           {selectedProject ? (
             <div className="project-dashboard-card project-dashboard-card-linked">
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div className="back-button-row">
                 <Button
                   label="Back to Projects"
                   icon="pi pi-arrow-left"
@@ -692,14 +865,6 @@ const ProjectDashboardPanel = () => {
                 <div>
                   <div className="metric-label">Client</div>
                   <div>{getClientName(selectedProject.client_id)}</div>
-                </div>
-                {/* <div>
-                  <div className="metric-label">Contractor</div>
-                  <div>{getContractorName(selectedProject.contractor_id)}</div>
-                </div> */}
-                <div>
-                  <div className="metric-label">Contract Amount</div>
-                  <div>{amountTemplate(selectedProject)}</div>
                 </div>
                 <div>
                   <div className="metric-label">Start Date</div>
@@ -724,6 +889,160 @@ const ProjectDashboardPanel = () => {
                     }}
                   >
                     {getDaysRemainingInfo(selectedProject, completionRate).text}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Metrics */}
+              <div className="project-dashboard-metrics" style={{ marginTop: '1rem' }}>
+                <div
+                  style={{
+                    padding: '0.65rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Total Value
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#111827', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {formatCurrency(calculateProjectFinancials(selectedProject).totalValue)}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '0.65rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Paid
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#10B981', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {formatCurrency(calculateProjectFinancials(selectedProject).totalPaid)}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '0.65rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Pending
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#F59E0B', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {formatCurrency(calculateProjectFinancials(selectedProject).totalPending)}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '0.65rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Unpaid
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#EF4444', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {formatCurrency(calculateProjectFinancials(selectedProject).totalUnpaid)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Project Status Metrics */}
+              <div className="project-dashboard-metrics" style={{ marginTop: '1.5rem' }}>
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Ongoing
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f97316', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {getSubProjectStatusCounts().ongoing}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    On Hold
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#eab308', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {getSubProjectStatusCounts().onhold}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Completed
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#16a34a', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                    {getSubProjectStatusCounts().completed}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #e5e7eb',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Unallocated Balance
+                  </div>
+                  <div style={{ 
+                    fontSize: '1.25rem', 
+                    fontWeight: '700', 
+                    color: '#4f4d36', 
+                    marginTop: '0.5rem',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    overflow: 'hidden',
+                    lineHeight: '1.2'
+                  }}>
+                    ₱{getRemainingBalance().toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </div>
                 </div>
               </div>
@@ -773,7 +1092,7 @@ const ProjectDashboardPanel = () => {
                         textTransform: 'uppercase',
                       }}
                     >
-                      OVERALL PROGRESS
+                      SUBPROJECT PROGRESS BY MONTH
                     </div>
                     <div
                       style={{
@@ -819,7 +1138,7 @@ const ProjectDashboardPanel = () => {
                       <LineChart data={getChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                         <XAxis dataKey="month" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" />
+                        <YAxis stroke="#9CA3AF" label={{ value: 'Progress (%)', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: '#F3F4F6',
@@ -828,22 +1147,35 @@ const ProjectDashboardPanel = () => {
                           }}
                         />
                         <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="Active Projects"
-                          stroke="#10B981"
-                          strokeWidth={2}
-                          dot={{ fill: '#10B981', r: 5 }}
-                          activeDot={{ r: 6 }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="Completion Avg"
-                          stroke="#F59E0B"
-                          strokeWidth={2}
-                          dot={{ fill: '#F59E0B', r: 5 }}
-                          activeDot={{ r: 6 }}
-                        />
+                        {subProjects.map((project, index) => {
+                          // Generate distinct colors for each subproject
+                          const colors = [
+                            '#10B981', // Green
+                            '#F59E0B', // Amber
+                            '#3B82F6', // Blue
+                            '#EF4444', // Red
+                            '#8B5CF6', // Purple
+                            '#EC4899', // Pink
+                            '#14B8A6', // Teal
+                            '#F97316', // Orange
+                            '#6366F1', // Indigo
+                            '#06B6D4', // Cyan
+                          ];
+                          const color = colors[index % colors.length];
+                          
+                          return (
+                            <Line
+                              key={project.project_id}
+                              type="monotone"
+                              dataKey={project.project_name}
+                              stroke={color}
+                              strokeWidth={2}
+                              dot={{ fill: color, r: 4 }}
+                              activeDot={{ r: 6 }}
+                              connectNulls
+                            />
+                          );
+                        })}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -893,7 +1225,15 @@ const ProjectDashboardPanel = () => {
                           </h5>
                           {statusTemplate(subproject)}
                         </div>
-                        <p className="subproject-desc">
+                        <p className="subproject-desc" style={{ 
+                          fontSize: '0.875rem', 
+                          maxHeight: '3em', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical' 
+                        }}>
                           {subproject.project_description || 'No description'}
                         </p>
                         <div className="subproject-progress">
@@ -910,37 +1250,38 @@ const ProjectDashboardPanel = () => {
                             {rate}% complete
                           </div>
                         </div>
-                        <div className="subproject-meta">
+                        <div className="subproject-meta" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <div>
                             <div className="metric-label">Contractor</div>
-                            <div>
+                            <div style={{ fontSize: '0.875rem' }}>
                               {getContractorName(subproject.contractor_id)}
                             </div>
                           </div>
                           <div>
                             <div className="metric-label">Category</div>
-                            <div>{getCategoryName(subproject.category_id)}</div>
+                            <div style={{ fontSize: '0.875rem' }}>{getCategoryName(subproject.category_id)}</div>
                           </div>
-                          <div>
+                          <div style={{ gridColumn: '1 / -1' }}>
                             <div className="metric-label">Contract Amount</div>
-                            <div>{amountTemplate(subproject)}</div>
+                            <div style={{ fontSize: '0.875rem' }}>{amountTemplate(subproject)}</div>
                           </div>
                           <div>
                             <div className="metric-label">Start Date</div>
-                            <div>
+                            <div style={{ fontSize: '0.875rem' }}>
                               {formatDateValue(subproject?.project_start_date)}
                             </div>
                           </div>
                           <div>
                             <div className="metric-label">End Date</div>
-                            <div>
+                            <div style={{ fontSize: '0.875rem' }}>
                               {formatDateValue(subproject?.project_deadline)}
                             </div>
                           </div>
-                          <div>
+                          <div style={{ gridColumn: '1 / -1' }}>
                             <div className="metric-label">Days Remaining</div>
                             <div
                               style={{
+                                fontSize: '0.875rem',
                                 color: getDaysRemainingInfo(subproject, rate)
                                   .color,
                               }}
@@ -993,20 +1334,36 @@ const ProjectDashboardPanel = () => {
                     Generate and review project billing
                   </span>
                 </div>
-                <Button
-                  label="Open Billings"
-                  icon="pi pi-file"
-                  severity="info"
-                  onClick={() => {
-                    setReportsProject(selectedProject);
-                    setDisplayReportsDialog(true);
-                  }}
-                  style={{
-                    backgroundColor: '#4A4A3A',
-                    color: '#ffffff',
-                  }}
-                  className="p-button-sm"
-                />
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <Button
+                    label="View History"
+                    icon="pi pi-history"
+                    severity="info"
+                    onClick={() => {
+                      fetchProjectHistory(selectedProject.project_id);
+                      setDisplayHistoryDialog(true);
+                    }}
+                    style={{
+                      backgroundColor: '#4A4A3A',
+                      color: '#ffffff',
+                    }}
+                    className="p-button-sm"
+                  />
+                  <Button
+                    label="Open Billings"
+                    icon="pi pi-file"
+                    severity="info"
+                    onClick={() => {
+                      setReportsProject(selectedProject);
+                      setDisplayReportsDialog(true);
+                    }}
+                    style={{
+                      backgroundColor: '#4A4A3A',
+                      color: '#ffffff',
+                    }}
+                    className="p-button-sm"
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -1021,20 +1378,36 @@ const ProjectDashboardPanel = () => {
                     <div className="project-dashboard-grid">
                       {groupedMainProjects.map((group) => (
                         <button
-                          key={group.clientName}
+                          key={group.client?.user_id || group.clientName}
                           type="button"
                           className="project-dashboard-card project-dashboard-client-card"
                           onClick={() => setSelectedClientGroup(group)}
                         >
-                          <div className="project-card-header">
-                            <h4 className="project-card-title">
-                              {group.clientName}
-                            </h4>
+                          <div className="project-dashboard-client-identity">
+                            <div className="project-dashboard-client-avatar">
+                              {group.client ? (
+                                getClientProfileSrc(group.client) ? (
+                                  <img
+                                    src={getClientProfileSrc(group.client)}
+                                    alt={group.clientName}
+                                  />
+                                ) : (
+                                  <i className="pi pi-user project-dashboard-client-icon" />
+                                )
+                              ) : (
+                                <i className="pi pi-user project-dashboard-client-icon" />
+                              )}
+                            </div>
+                            <div className="project-dashboard-client-meta">
+                              <h4 className="project-card-title">
+                                {group.clientName}
+                              </h4>
+                              <span className="project-dashboard-client-count">
+                                {group.projects.length} project
+                                {group.projects.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
                           </div>
-                          <p className="project-card-desc">
-                            {group.projects.length} project
-                            {group.projects.length !== 1 ? 's' : ''}
-                          </p>
                         </button>
                       ))}
                     </div>
@@ -1352,6 +1725,358 @@ const ProjectDashboardPanel = () => {
         ) : (
           <p style={{ margin: 0 }}>Select a project to view billing.</p>
         )}
+      </Dialog>
+
+      <Dialog
+        visible={displayHistoryDialog}
+        style={{ width: '95vw', maxWidth: '1000px' }}
+        header={`Audit Log - ${selectedProject?.project_name || 'Project'}`}
+        contentStyle={{ padding: '1.5rem' }}
+        modal
+        onHide={() => setDisplayHistoryDialog(false)}
+        className="p-fluid"
+        headerStyle={{
+          backgroundColor: '#4A4A3A',
+          color: 'white',
+          padding: '1rem',
+        }}
+      >
+        <div style={{ maxHeight: '700px', overflowY: 'auto' }}>
+          {historyLoading ? (
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem', color: '#4A4A3A' }}></i>
+              <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.9rem' }}>
+                Loading audit log...
+              </p>
+            </div>
+          ) : projectHistory.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '3rem',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '0.5rem',
+                color: '#9ca3af',
+              }}
+            >
+              <i className="pi pi-info-circle" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
+              <p>No audit records for this project.</p>
+            </div>
+          ) : (
+            <div>
+              {/* Header row */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '60px 120px 140px 150px 1fr 100px',
+                  gap: '1rem',
+                  padding: '0.75rem 1rem',
+                  backgroundColor: '#4A4A3A',
+                  color: 'white',
+                  borderRadius: '0.375rem',
+                  marginBottom: '1rem',
+                  fontWeight: '600',
+                  fontSize: '0.85rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                }}
+              >
+                <div>#</div>
+                <div>Timestamp</div>
+                <div>Action</div>
+                <div>User</div>
+                <div>Details</div>
+                <div>Status</div>
+              </div>
+
+              {/* Log entries */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {projectHistory.map((log, index) => {
+                  const timestamp = log.timestamp
+                    ? new Date(log.timestamp).toLocaleString('en-US', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })
+                    : 'N/A';
+
+                  const actionType = (log.action || 'UPDATE')
+                    .replace(/_/g, ' ')
+                    .toUpperCase();
+                  const userName = log.userName || 'System';
+                  const status = log.status || 'Success';
+
+                  // Format details text based on action and resource
+                  let detailsText = '';
+                  try {
+                    const details = log.details ? JSON.parse(log.details) : {};
+                    const resource = log.resource || '';
+                    const action = log.action || '';
+
+                    if (resource === 'PROJECT' && action === 'CREATE') {
+                      const projectName = details.project_name || 'project';
+                      if (details.parent_project_id) {
+                        const parentProject = projects.find(p => p.project_id === details.parent_project_id);
+                        const parentName = parentProject ? ` under "${parentProject.project_name}"` : '';
+                        detailsText = `Created subproject "${projectName}"${parentName}`;
+                      } else {
+                        detailsText = `Created project "${projectName}"`;
+                      }
+                      
+                      // Add contractor/client info if available
+                      const extraInfo = [];
+                      if (details.contractor_id) {
+                        const contractor = contractors.find(c => c.user_id === details.contractor_id);
+                        if (contractor) extraInfo.push(`Contractor: ${contractor.username}`);
+                      }
+                      if (details.client_id) {
+                        const client = clients.find(c => c.user_id === details.client_id);
+                        if (client) extraInfo.push(`Client: ${client.username}`);
+                      }
+                      if (extraInfo.length > 0) {
+                        detailsText += ` (${extraInfo.join(', ')})`;
+                      }
+                    } else if (resource === 'PROJECT' && action === 'UPDATE') {
+                      const fields = details.updatedFields || [];
+                      if (fields.length > 0) {
+                        // Format field names for better readability
+                        const formattedFields = fields.map(f => 
+                          f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        );
+                        detailsText = `Updated ${formattedFields.join(', ')}`;
+                      } else {
+                        detailsText = 'Updated project';
+                      }
+                    } else if (resource === 'PROJECT' && action === 'DELETE') {
+                      detailsText = details.permanentDelete ? 'Permanently deleted project' : 'Deleted project';
+                    } else if (resource === 'PROJECT' && action === 'RESTORE') {
+                      detailsText = 'Restored project';
+                    } else if (resource === 'REPORT' && action === 'CREATE') {
+                      const payment = details.payment_requested;
+                      const progress = details.current_progress;
+                      detailsText = `Generated billing report`;
+                      if (payment) detailsText += ` with ₱${Number(payment).toLocaleString()} payment`;
+                      if (progress) detailsText += ` (${progress}% progress)`;
+                    } else if (resource === 'REPORT' && action === 'UPDATE') {
+                      const changes = details.changes || {};
+                      if (changes.payment_triggered !== undefined) {
+                        const amount = details.payment_requested || 0;
+                        if (changes.payment_triggered) {
+                          detailsText = `Marked report payment as paid`;
+                          if (amount) detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                        } else {
+                          detailsText = `Marked report payment as pending`;
+                          if (amount) detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                        }
+                      } else {
+                        const fields = details.updatedFields || [];
+                        if (fields.length > 0) {
+                          const formattedFields = fields.map(f => 
+                            f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          );
+                          detailsText = `Updated report: ${formattedFields.join(', ')}`;
+                        } else {
+                          detailsText = 'Updated report';
+                        }
+                      }
+                    } else if (resource === 'REPORT' && action === 'DELETE') {
+                      detailsText = 'Deleted report';
+                    } else {
+                      detailsText = `${action} ${resource}`.toLowerCase();
+                    }
+                  } catch (e) {
+                    detailsText = log.details || '';
+                  }
+
+                  const statusColor =
+                    status === 'Success' || status === 'success'
+                      ? '#16a34a'
+                      : status === 'Failed' || status === 'failed'
+                        ? '#dc2626'
+                        : '#f59e0b';
+
+                  return (
+                    <div
+                      key={log.log_id || index}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '60px 120px 140px 150px 1fr 100px',
+                        gap: '1rem',
+                        padding: '1rem',
+                        backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #e5e7eb',
+                        alignItems: 'start',
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      {/* Entry Number */}
+                      <div
+                        style={{
+                          fontWeight: '600',
+                          color: '#4A4A3A',
+                          fontSize: '0.9rem',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {projectHistory.length - index}
+                      </div>
+
+                      {/* Timestamp */}
+                      <div style={{ color: '#6b7280', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                        {timestamp}
+                      </div>
+
+                      {/* Action Type */}
+                      <div
+                        style={{
+                          fontWeight: '600',
+                          color: '#1f2937',
+                          padding: '0.35rem 0.65rem',
+                          backgroundColor: '#e5e7eb',
+                          borderRadius: '0.25rem',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {actionType}
+                      </div>
+
+                      {/* User */}
+                      <div style={{ color: '#374151', whiteSpace: 'nowrap' }}>
+                        {userName}
+                      </div>
+
+                      {/* Details */}
+                      <div
+                        style={{
+                          color: '#6b7280',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxHeight: '2.4em',
+                          lineHeight: '1.2em',
+                        }}
+                        title={detailsText}
+                      >
+                        {detailsText || '—'}
+                      </div>
+
+                      {/* Status Badge */}
+                      <div
+                        style={{
+                          padding: '0.35rem 0.65rem',
+                          backgroundColor: statusColor,
+                          color: 'white',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {status}
+                      </div>
+
+                      {/* Expandable details section */}
+                      {log.details && (() => {
+                        try {
+                          const details = JSON.parse(log.details);
+                          const hasDetails = details && Object.keys(details).length > 0;
+                          
+                          // Helper function to format display values
+                          const formatValue = (key, value) => {
+                            if (typeof value === 'object' && value !== null) {
+                              return JSON.stringify(value, null, 2);
+                            }
+                            
+                            // Map IDs to names
+                            if (key === 'contractor_id') {
+                              const contractor = contractors.find(c => c.user_id === value);
+                              return contractor ? contractor.username : value;
+                            }
+                            if (key === 'client_id') {
+                              const client = clients.find(c => c.user_id === value);
+                              return client ? client.username : value;
+                            }
+                            if (key === 'category_id') {
+                              const category = categories.find(c => c.category_id === value);
+                              return category ? category.category_name : value;
+                            }
+                            if (key === 'parent_project_id') {
+                              const parentProject = projects.find(p => p.project_id === value);
+                              return parentProject ? parentProject.project_name : value;
+                            }
+                            
+                            return String(value);
+                          };
+                          
+                          // Format key names for better readability
+                          const formatKey = (key) => {
+                            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                          };
+                          
+                          return hasDetails && (
+                            <div
+                              style={{
+                                gridColumn: '1 / -1',
+                                marginTop: '0.75rem',
+                                paddingTop: '0.75rem',
+                                borderTop: '1px solid #d1d5db',
+                                fontSize: '0.8rem',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontWeight: '600',
+                                  color: '#4A4A3A',
+                                  marginBottom: '0.5rem',
+                                  textTransform: 'uppercase',
+                                  fontSize: '0.7rem',
+                                  letterSpacing: '0.05em',
+                                }}
+                              >
+                                Additional Details
+                              </div>
+                              <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                                gap: '0.75rem',
+                                color: '#374151' 
+                              }}>
+                                {Object.entries(details).map(([key, value]) => (
+                                  <div
+                                    key={key}
+                                    style={{
+                                      padding: '0.5rem',
+                                      backgroundColor: '#f3f4f6',
+                                      borderRadius: '0.25rem',
+                                    }}
+                                  >
+                                    <strong style={{ color: '#4A4A3A' }}>{formatKey(key)}:</strong>{' '}
+                                    {formatValue(key, value)}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        } catch (e) {
+                          return null;
+                        }
+                      })()}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </Dialog>
     </div>
   );

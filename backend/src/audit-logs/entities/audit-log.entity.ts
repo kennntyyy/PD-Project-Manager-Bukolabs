@@ -25,7 +25,7 @@ export class AuditLog {
   @Column({ nullable: true })
   resourceId: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'longtext', nullable: true })
   details: string; // JSON string with additional details
 
   @Column({ nullable: true })

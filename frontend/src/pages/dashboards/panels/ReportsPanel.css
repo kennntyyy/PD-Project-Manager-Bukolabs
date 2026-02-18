@@ -258,6 +258,40 @@
   border-bottom: none;
 }
 
+@media (max-width: 1024px) {
+  .reports-container {
+    padding: 1.25rem 1.5rem 1.75rem;
+  }
+
+  .reports-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .reports-container {
+    padding: 1.25rem;
+  }
+
+  .reports-section-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .reports-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-container {
+    padding: 1rem;
+  }
+
+  .reports-card {
+    padding: 1.25rem;
+  }
+}
+
 .reports-info-label {
   font-family: 'Bebas Neue', sans-serif;
   font-weight: 600;

@@ -17,6 +17,8 @@ export class AuditLogsController {
     @Query('userId') userId?: string,
     @Query('action') action?: string,
     @Query('resource') resource?: string,
+    @Query('search') search?: string,
+    @Query('project_id') projectId?: string,
   ) {
     try {
       const pageNum = page ? parseInt(page, 10) : 1;
@@ -28,6 +30,8 @@ export class AuditLogsController {
         userId,
         action,
         resource,
+        search,
+        projectId,
       );
     } catch (error) {
       console.error('AuditLogs findAll error:', error);

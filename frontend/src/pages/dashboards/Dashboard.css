@@ -295,6 +295,7 @@
   padding: 0;
   background: #f5f5f5;
   transition: margin-left 0.25s ease;
+  min-width: 0;
 }
 
 /* ===== Collapsed Sidebar ===== */
@@ -428,6 +429,13 @@
 .dashboard-body {
   padding: 0;
   margin: 0;
+  min-width: 0;
+}
+
+.back-button-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
 }
 
 /* ===== Tabs Navigation ===== */
@@ -728,6 +736,55 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   }
 
+  .dashboard-container.sidebar-collapsed .dashboard-sidebar {
+    width: 100%;
+  }
+
+  .sidebar-header {
+    position: sticky;
+    top: 0;
+    background: inherit;
+    z-index: 2;
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .sidebar-logo img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sidebar-nav {
+    padding: 8px 12px 12px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-item,
+  .nav-subitem {
+    flex: 0 0 auto;
+    border-left: none;
+    border-radius: 12px;
+    padding: 10px 12px;
+    justify-content: center;
+    min-width: 48px;
+  }
+
+  .nav-subitem {
+    padding-left: 12px;
+  }
+
+  .nav-item span,
+  .nav-subitem span,
+  .nav-caret {
+    display: none;
+  }
+
   .sidebar-footer {
     position: static;
     padding: 15px 20px;
@@ -736,6 +793,24 @@
 
   .dashboard-content {
     margin-left: 0;
+  }
+
+  .dashboard-container.sidebar-collapsed .dashboard-content {
+    margin-left: 0;
+  }
+
+  .dashboard-container.sidebar-collapsed .sidebar-user-info,
+  .dashboard-container.sidebar-collapsed .user-info {
+    display: flex;
+  }
+
+  .dashboard-container.sidebar-collapsed .logout-btn {
+    width: auto;
+    padding: 8px 12px !important;
+  }
+
+  .dashboard-container.sidebar-collapsed .logout-btn .p-button-label {
+    display: inline;
   }
 
   .dashboard-header {
@@ -788,10 +863,19 @@
     font-size: 13px;
   }
 
+  .sidebar-nav {
+    gap: 4px;
+  }
+
   .tab-button {
     padding: 10px 14px;
     font-size: 12px;
   }
+}
+
+.p-datatable-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* ===== Scrollbar Styling ===== */

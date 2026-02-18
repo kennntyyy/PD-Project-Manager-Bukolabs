@@ -9,6 +9,7 @@ import { Tag } from 'primereact/tag';
 import { Card } from 'primereact/card';
 
 import { auditLogService } from '../../../services/auditLogService';
+import api from '../../../services/api';
 import '../Dashboard.css';
 import './AuditLogsPanel.css';
 
@@ -17,13 +18,27 @@ const AuditLogsPanel = () => {
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [userLookup, setUserLookup] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('auditLogUserLookup');
+      return cached ? JSON.parse(cached) : {};
+    } catch (error) {
+      return {};
+    }
+  });
+  const [projectLookup, setProjectLookup] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('auditLogProjectLookup');
+      return cached ? JSON.parse(cached) : {};
+    } catch (error) {
+      return {};
+    }
+  });
   const [lazyParams, setLazyParams] = useState({
     first: 0,
     rows: 50,
     page: 1,
-    filters: {
-      search: '',
-    },
+    search: '',
   });
   const [globalSearch, setGlobalSearch] = useState('');
   const toast = useRef(null);
@@ -47,6 +62,54 @@ const AuditLogsPanel = () => {
     loadAuditLogs();
   }, [lazyParams]);
 
+  useEffect(() => {
+    loadResourceLookups();
+  }, []);
+
+  const loadResourceLookups = async () => {
+    try {
+      const [usersResponse, projectsResponse] = await Promise.all([
+        api.get('/users'),
+        api.get('/projects'),
+      ]);
+
+      const users = usersResponse.data || [];
+      const projects = projectsResponse.data || [];
+
+      const usersMap = users.reduce((acc, user) => {
+        if (!user?.user_id) return acc;
+        const firstName = user.first_name?.trim() || '';
+        const lastName = user.last_name?.trim() || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        acc[user.user_id] = fullName || user.username || user.email || 'User';
+        return acc;
+      }, {});
+
+      const projectsMap = projects.reduce((acc, project) => {
+        if (!project?.project_id) return acc;
+        acc[project.project_id] =
+          project.project_name || project.project_title || 'Project';
+        return acc;
+      }, {});
+
+      setUserLookup(usersMap);
+      setProjectLookup(projectsMap);
+      sessionStorage.setItem('auditLogUserLookup', JSON.stringify(usersMap));
+      sessionStorage.setItem(
+        'auditLogProjectLookup',
+        JSON.stringify(projectsMap),
+      );
+    } catch (error) {
+      console.error('Load audit log resource lookup error:', error);
+      toast.current?.show({
+        severity: 'warn',
+        summary: 'Warning',
+        detail: 'Failed to load resource names for audit logs',
+        life: 3000,
+      });
+    }
+  };
+
   const loadAuditLogs = async () => {
     try {
       setLoading(true);
@@ -55,9 +118,14 @@ const AuditLogsPanel = () => {
         limit: lazyParams.rows,
       };
 
+      if (lazyParams.search) {
+        params.search = lazyParams.search;
+      }
+
       const response = await auditLogService.getAll(params);
-      setAuditLogs(response.data || []);
-      setFilteredLogs(response.data || []);
+      const logs = response.data || [];
+      setAuditLogs(logs);
+      setFilteredLogs(logs);
       setTotalRecords(response.total || 0);
     } catch (error) {
       console.error('Load audit logs error:', error);
@@ -78,22 +146,12 @@ const AuditLogsPanel = () => {
 
   const handleSearch = (value) => {
     setGlobalSearch(value);
-    if (!value) {
-      setFilteredLogs(auditLogs);
-      return;
-    }
-
-    const searchLower = value.toLowerCase();
-    const filtered = auditLogs.filter((log) => {
-      return (
-        log.action?.toLowerCase().includes(searchLower) ||
-        log.resource?.toLowerCase().includes(searchLower) ||
-        log.userName?.toLowerCase().includes(searchLower) ||
-        log.resourceId?.toLowerCase().includes(searchLower) ||
-        log.details?.toLowerCase().includes(searchLower)
-      );
+    setLazyParams({
+      ...lazyParams,
+      first: 0,
+      page: 1,
+      search: value,
     });
-    setFilteredLogs(filtered);
   };
 
   const onPage = (event) => {
@@ -110,16 +168,18 @@ const AuditLogsPanel = () => {
       ...lazyParams,
       first: 0,
       page: 1,
-      filters: {
-        ...lazyParams.filters,
-        [field]: value,
-      },
+      [field]: value,
     });
   };
 
   const resetFilters = () => {
     setGlobalSearch('');
-    setFilteredLogs(auditLogs);
+    setLazyParams({
+      ...lazyParams,
+      first: 0,
+      page: 1,
+      search: '',
+    });
   };
 
   // Template functions
@@ -156,38 +216,107 @@ const AuditLogsPanel = () => {
   };
 
   const detailsBodyTemplate = (rowData) => {
-    if (!rowData.details) return '-';
+    return getLogSummary(rowData);
+  };
 
+  const parseDetails = (details) => {
+    if (!details) return null;
+    if (typeof details === 'object') return details;
     try {
-      const details =
-        typeof rowData.details === 'string'
-          ? JSON.parse(rowData.details)
-          : rowData.details;
-
-      const formatValue = (value) => {
-        if (value === null || value === undefined) return 'null';
-        if (typeof value === 'object') return JSON.stringify(value);
-        return String(value);
-      };
-
-      return (
-        <div
-          style={{
-            maxWidth: '300px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {Object.entries(details).map(([key, value]) => (
-            <div key={key} style={{ fontSize: '0.85rem' }}>
-              <strong>{key}:</strong> {formatValue(value)}
-            </div>
-          ))}
-        </div>
-      );
+      return JSON.parse(details);
     } catch (error) {
-      return rowData.details;
+      return null;
     }
+  };
+
+  const getResourceDisplay = (rowData) => {
+    const details = parseDetails(rowData.details);
+    const resource = rowData.resource;
+    const resourceId = rowData.resourceId;
+
+    if (resource === 'USER') {
+      if (resourceId && userLookup[resourceId]) {
+        return userLookup[resourceId];
+      }
+      return (
+        details?.username ||
+        details?.email ||
+        details?.changes?.username ||
+        details?.changes?.email ||
+        rowData.resourceId ||
+        'User'
+      );
+    }
+
+    if (resource === 'PROJECT') {
+      if (resourceId && projectLookup[resourceId]) {
+        return projectLookup[resourceId];
+      }
+      return (
+        details?.project_name ||
+        details?.projectName ||
+        details?.name ||
+        rowData.resourceId ||
+        'Project'
+      );
+    }
+
+    if (resource === 'REPORT') {
+      return (
+        details?.report_name ||
+        details?.reportName ||
+        details?.title ||
+        rowData.resourceId ||
+        'Report'
+      );
+    }
+
+    if (resource === 'AUTH') {
+      return details?.username || rowData.userName || 'Auth';
+    }
+
+    return rowData.resourceId || '-';
+  };
+
+  const getLogSummary = (rowData) => {
+    const details = parseDetails(rowData.details);
+    const resourceLabel = rowData.resource
+      ? rowData.resource.toLowerCase()
+      : 'resource';
+    const resourceDisplay = getResourceDisplay(rowData);
+    const updatedFields = Array.isArray(details?.updatedFields)
+      ? details.updatedFields
+      : [];
+
+    if (rowData.action === 'LOGIN') {
+      return `Logged in as ${resourceDisplay}`;
+    }
+
+    if (rowData.action === 'UPDATE') {
+      if (updatedFields.includes('profile_pic')) {
+        return `Updated profile picture for ${resourceLabel}: ${resourceDisplay}`;
+      }
+
+      if (updatedFields.length > 0) {
+        return `Updated ${resourceLabel} (${updatedFields.join(', ')}) for ${resourceDisplay}`;
+      }
+
+      return `Updated ${resourceLabel}: ${resourceDisplay}`;
+    }
+
+    if (rowData.action === 'CREATE') {
+      return `Created ${resourceLabel}: ${resourceDisplay}`;
+    }
+
+    if (rowData.action === 'DELETE') {
+      return `Deleted ${resourceLabel}: ${resourceDisplay}`;
+    }
+
+    if (rowData.action === 'RESTORE') {
+      return `Restored ${resourceLabel}: ${resourceDisplay}`;
+    }
+
+    return `${rowData.action || 'Action'} ${resourceLabel}: ${resourceDisplay}`;
   };
 
   const userBodyTemplate = (rowData) => {
@@ -283,6 +412,7 @@ const AuditLogsPanel = () => {
           <Column
             field="resourceId"
             header="Resource ID"
+            body={(rowData) => getResourceDisplay(rowData)}
             style={{ width: '120px' }}
           />
           <Column

@@ -100,6 +100,41 @@
   
 }
 
+@media (max-width: 1024px) {
+  .login-content {
+    width: 60%;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+    padding: 24px 0;
+  }
+
+  .background-gradient {
+    min-height: 100vh;
+  }
+
+  .login-content {
+    width: 92%;
+    height: auto;
+    max-height: none;
+  }
+
+  .login-card {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-content {
+    width: 94%;
+  }
+}
+
 /* ===== Login Card ===== */
 .login-card {
   padding: 20px;

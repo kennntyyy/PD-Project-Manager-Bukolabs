@@ -928,12 +928,14 @@ const StaffReportsPanel = () => {
   const ProjectDetailView = () => (
     <div>
       <div className="mb-6">
-        <Button
-          label="Back to Projects"
-          icon="pi pi-arrow-left"
-          className="p-button-text mb-3"
-          onClick={handleBackToList}
-        />
+        <div className="back-button-row">
+          <Button
+            label="Back to Projects"
+            icon="pi pi-arrow-left"
+            className="p-button-text"
+            onClick={handleBackToList}
+          />
+        </div>
 
         <div className="flex justify-between items-start gap-4">
           <div style={{ textAlign: 'left' }}>

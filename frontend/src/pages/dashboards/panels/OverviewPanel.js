@@ -17,7 +17,7 @@ import api from '../../../services/api';
 // Displays: Welcome, stats, financial highlights, and overall progress
 // ============================================
 
-const OverviewPanel = ({ users }) => {
+const OverviewPanel = ({ users, onStatClick }) => {
   const [chartData] = useState([
     { month: 'Jan', 'Year Close Year Great Gain': 4, accomplished: 2 },
     { month: 'Feb', 'Year Close Year Great Gain': 5, accomplished: 3 },
@@ -95,26 +95,35 @@ const OverviewPanel = ({ users }) => {
       label: 'Total Projects',
       icon: 'pi-folder',
       bgColor: '#DBEAFE',
+      statusFilter: null,
     },
     {
       value: projectStats.ongoing,
       label: 'Ongoing',
       icon: 'pi-arrow-up-right',
       bgColor: '#FEF3C7',
+      statusFilter: 'ongoing',
     },
     {
       value: projectStats.done,
       label: 'Done',
       icon: 'pi-check-circle',
       bgColor: '#F3F4F6',
+      statusFilter: 'done',
     },
     {
       value: projectStats.hold,
       label: 'Hold',
       icon: 'pi-pause-circle',
       bgColor: '#FEE2E2',
+      statusFilter: 'hold',
     },
   ];
+
+  const handleStatClick = (stat) => {
+    if (!onStatClick) return;
+    onStatClick({ statusFilter: stat.statusFilter });
+  };
 
   const formatCurrency = (value) =>
     `₱ ${Number(value || 0).toLocaleString(undefined, {
@@ -133,6 +142,7 @@ const OverviewPanel = ({ users }) => {
 
     projects.forEach((project) => {
       if (project.isDeleted) return;
+      if (project.parent_project_id) return;
       totals.totalValue += Number(project.total_amount || 0);
     });
 
@@ -221,7 +231,12 @@ const OverviewPanel = ({ users }) => {
       {/* Stats Grid */}
       <div className="stats-row">
         {stats.map((stat, index) => (
-          <div key={index} className="stat-box">
+          <button
+            key={index}
+            type="button"
+            className="stat-box stat-box-action"
+            onClick={() => handleStatClick(stat)}
+          >
             <div
               className="stat-icon-wrapper"
               style={{ backgroundColor: stat.bgColor }}
@@ -230,7 +245,7 @@ const OverviewPanel = ({ users }) => {
             </div>
             <div className="stat-value">{stat.value}</div>
             <div className="stat-label">{stat.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 

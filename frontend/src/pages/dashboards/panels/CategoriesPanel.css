@@ -48,3 +48,18 @@
   justify-content: flex-end;
   gap: 12px;
 }
+
+@media (max-width: 768px) {
+  .categories-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .categories-field {
+    min-width: 0;
+  }
+
+  .category-actions {
+    flex-wrap: wrap;
+  }
+}

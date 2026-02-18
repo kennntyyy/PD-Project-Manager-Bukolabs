@@ -171,6 +171,8 @@ export class ReportsService {
         resource: 'REPORT',
         resourceId: id,
         details: {
+          project_id: existingReport.project_id,
+          payment_requested: existingReport.payment_requested,
           updatedFields: Object.keys(actualChanges),
           changes: actualChanges,
         },

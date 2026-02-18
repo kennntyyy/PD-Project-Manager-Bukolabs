@@ -726,7 +726,7 @@ const ClientDashboard = () => {
                   className="project-dashboard-card project-dashboard-card-linked"
                   style={{ marginTop: '1rem' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="back-button-row">
                     <Button
                       label="Back to Projects"
                       icon="pi pi-arrow-left"

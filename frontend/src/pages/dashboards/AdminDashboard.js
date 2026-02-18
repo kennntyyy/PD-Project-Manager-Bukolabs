@@ -28,6 +28,7 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [projectStatusFilter, setProjectStatusFilter] = useState(null);
   const [activeTab, setActiveTab] = useState(
     () => localStorage.getItem('adminActiveTab') || 'overview',
   );
@@ -124,6 +125,11 @@ const AdminDashboard = () => {
     setActiveTab(tabName);
   };
 
+  const handleOverviewStatClick = ({ statusFilter }) => {
+    setProjectStatusFilter(statusFilter || null);
+    handleNavClick('projects');
+  };
+
   const handleSidebarToggle = () => {
     setSidebarCollapsed((prev) => !prev);
   };
@@ -195,12 +201,16 @@ const AdminDashboard = () => {
 
           <div
             className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
-            onClick={() => handleNavClick('projects')}
+            onClick={() => {
+              setProjectStatusFilter(null);
+              handleNavClick('projects');
+            }}
             role="button"
             tabIndex={0}
             title="Projects"
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
+                setProjectStatusFilter(null);
                 handleNavClick('projects');
               }
             }}
@@ -386,7 +396,12 @@ const AdminDashboard = () => {
       <div className="dashboard-content">
         {/* Body - Render appropriate panel based on activeTab */}
         <div className="dashboard-body">
-          {activeTab === 'overview' && <OverviewPanel users={users} />}
+          {activeTab === 'overview' && (
+            <OverviewPanel
+              users={users}
+              onStatClick={handleOverviewStatClick}
+            />
+          )}
           {activeTab === 'users' && (
             <UserManagementPanel roleFilters={['admin', 'staff']} />
           )}
@@ -395,7 +410,12 @@ const AdminDashboard = () => {
           {activeTab === 'reports' && <ReportsPanel />}
           {activeTab === 'settings' && <SettingsPanel />}
           {activeTab === 'settings-categories' && <CategoriesPanel />}
-          {activeTab === 'projects' && <ProjectsPanel />}
+          {activeTab === 'projects' && (
+            <ProjectsPanel
+              statusFilter={projectStatusFilter}
+              onStatusFilterClear={() => setProjectStatusFilter(null)}
+            />
+          )}
           {activeTab === 'project-dashboard' && <ProjectDashboardPanel />}
           {activeTab === 'audit-logs' && <AuditLogsPanel />}
         </div>

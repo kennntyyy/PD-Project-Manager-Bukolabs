@@ -31,8 +31,8 @@ export class UsersService {
           typeof user.profile_pic,
           'isBuffer:',
           Buffer.isBuffer(user.profile_pic),
-          'value:',
-          user.profile_pic,
+          'length:',
+          user.profile_pic?.length || 0,
         );
         if (Buffer.isBuffer(user.profile_pic)) {
           profilePic = user.profile_pic.toString('utf-8');
@@ -204,11 +204,15 @@ export class UsersService {
   }
 
   async update(id: string, updateData: any, currentUser?: any): Promise<User> {
+    const dataToLog = { ...updateData };
+    if (dataToLog.profile_pic) {
+      dataToLog.profile_pic = `[BASE64 DATA - ${dataToLog.profile_pic.length} chars]`;
+    }
     console.log(
       '[UsersService.update] Updating user:',
       id,
       'with data:',
-      updateData,
+      dataToLog,
     );
 
     const user = await this.findById(id);
@@ -239,7 +243,11 @@ export class UsersService {
     }
 
     Object.assign(user, updateData);
-    console.log('[UsersService.update] Saving updated user:', user);
+    const userToLog = { ...user };
+    if (userToLog.profile_pic) {
+      userToLog.profile_pic = `[BASE64 DATA - ${userToLog.profile_pic.length} chars]`;
+    }
+    console.log('[UsersService.update] Saving updated user:', userToLog);
 
     // Store original values before save to detect actual changes
     const originalUser = await this.usersRepository.findOne({
@@ -260,8 +268,12 @@ export class UsersService {
         (originalUser as any)[key] !== updateData[key]
       ) {
         if (key !== 'password') {
-          // Don't log password values
-          actualChanges[key] = updateData[key];
+          // Don't log password values or large blobs
+          if (key === 'profile_pic') {
+            actualChanges[key] = '[UPDATED]';
+          } else {
+            actualChanges[key] = updateData[key];
+          }
         } else {
           actualChanges[key] = '[CHANGED]';
         }

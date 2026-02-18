@@ -2107,9 +2107,57 @@ const ReportsPanel = ({
                         borderRadius: '4px',
                         fontWeight: 'bold',
                         fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
                       }}
                     >
-                      {Number(completionRate || 0).toFixed(2)}%
+                      <input
+                        type="number"
+                        value={completionRate === '' ? '' : (typeof completionRate === 'string' ? completionRate : Number(completionRate).toFixed(2))}
+                        min={minCompletionRate}
+                        max={100}
+                        step={0.01}
+                        style={{
+                          width: '90px',
+                          fontSize: '1rem',
+                          color: 'black',
+                          background: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '2px 10px',
+                          textAlign: 'right',
+                          MozAppearance: 'textfield',
+                        }}
+                        onChange={e => {
+                          setCompletionRate(e.target.value);
+                        }}
+                        onBlur={e => {
+                          let val = e.target.value;
+                          if (val === '' || isNaN(Number(val))) {
+                            val = minCompletionRate;
+                          }
+                          let newRate = Number(val);
+                          if (newRate < minCompletionRate) newRate = minCompletionRate;
+                          if (newRate > 100) newRate = 100;
+                          const roundedRate = Number(newRate.toFixed(2));
+                          setCompletionRate(roundedRate);
+                          // Calculate unreleased budget
+                          const contractAmount = Number(selectedProject?.total_amount) || 0;
+                          const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                          const unreleasedBudget = contractAmount - totalReleased;
+                          // Set releasedAmount to the corresponding percentage of unreleased budget
+                          const newAmount = Number(((unreleasedBudget * roundedRate) / 100).toFixed(2));
+                          setReleasedAmount(newAmount);
+                        }}
+                        onWheel={e => e.target.blur()}
+                        onKeyDown={e => {
+                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.preventDefault();
+                          }
+                        }}
+                      />
+                      <span style={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>%</span>
                     </div>
                     <div
                       style={{
@@ -2127,30 +2175,28 @@ const ReportsPanel = ({
                     </div>
                   </div>
                 </div>
-                <Slider
-                  value={completionRate}
-                  onChange={(e) => {
-                    const newRate = Math.max(e.value, minCompletionRate);
-                    const roundedRate = Number(newRate.toFixed(2));
-                    setCompletionRate(roundedRate);
-                    // Calculate unreleased budget
-                    const contractAmount =
-                      Number(selectedProject?.total_amount) || 0;
-                    const totalReleased =
-                      Number(selectedProject?.total_amount_released) || 0;
-                    const unreleasedBudget = contractAmount - totalReleased;
-                    // Set releasedAmount to the corresponding percentage of unreleased budget
-                    const newAmount = Number(
-                      ((unreleasedBudget * roundedRate) / 100).toFixed(2),
-                    );
-                    setReleasedAmount(newAmount);
-                  }}
-                  min={minCompletionRate}
-                  max={100}
-                  step={0.01}
-                  className="completion-rate-slider"
-                  style={{ height: '6px' }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                  <Slider
+                    value={completionRate}
+                    onChange={(e) => {
+                      const newRate = Math.max(e.value, minCompletionRate);
+                      const roundedRate = Number(newRate.toFixed(2));
+                      setCompletionRate(roundedRate);
+                      // Calculate unreleased budget
+                      const contractAmount = Number(selectedProject?.total_amount) || 0;
+                      const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                      const unreleasedBudget = contractAmount - totalReleased;
+                      // Set releasedAmount to the corresponding percentage of unreleased budget
+                      const newAmount = Number(((unreleasedBudget * roundedRate) / 100).toFixed(2));
+                      setReleasedAmount(newAmount);
+                    }}
+                    min={minCompletionRate}
+                    max={100}
+                    step={0.01}
+                    className="completion-rate-slider"
+                    style={{ height: '6px', flex: 1 }}
+                  />
+                </div>
               </div>
 
               {/* Photo Section */}

@@ -59,6 +59,7 @@ const ReportsPanel = ({
   const [selectedReportImages, setSelectedReportImages] = useState([]);
   const [selectedImageComments, setSelectedImageComments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingReport, setEditingReport] = useState(null);
   const toast = useRef(null);
   const menuRefs = useRef({});
   const statusSyncRef = useRef(new Set());
@@ -336,6 +337,7 @@ const ReportsPanel = ({
       );
       return;
     }
+    setEditingReport(null);
     resetForm();
     // Get the highest completion rate from previous reports for this project
     const projectReports = recentReports.filter(
@@ -378,6 +380,22 @@ const ReportsPanel = ({
     setReportImages([]);
     setImagePreviews([]);
     setImageComments([]);
+    setEditingReport(null);
+  };
+
+  const startEditReport = (report) => {
+    setEditingReport(report);
+    setMinCompletionRate(0);
+    setCompletionRate(Number(report.current_progress || 0));
+    setReleasedAmount(Number(report.payment_requested || 0));
+    setReportValue(report.report_description || '');
+    setReportStartDate(report.start_date ? new Date(report.start_date) : null);
+    setReportEndDate(report.end_date ? new Date(report.end_date) : null);
+    setIsPaymentTriggered(!!report.payment_triggered);
+    setReportImages([]);
+    setImagePreviews([]);
+    setImageComments([]);
+    setShowReportModal(true);
   };
 
   const handleImageSelect = (e) => {
@@ -538,7 +556,10 @@ const ReportsPanel = ({
     const contractAmount = Number(selectedProject?.total_amount) || 0;
     const totalReleased = Number(selectedProject?.total_amount_released) || 0;
     const amountToRelease = Number(releasedAmount) || 0;
-    const remainingBalance = contractAmount - totalReleased;
+    const currentPayment = editingReport
+      ? Number(editingReport.payment_requested || 0)
+      : 0;
+    const remainingBalance = contractAmount - totalReleased + currentPayment;
     if (amountToRelease > remainingBalance) {
       showToast(
         'error',
@@ -552,7 +573,56 @@ const ReportsPanel = ({
       setIsGenerating(true);
 
       // Save the report to database
-      await logReportGeneration();
+      if (editingReport) {
+        const startDateStr = reportStartDate
+          ? reportStartDate.toISOString().split('T')[0]
+          : null;
+        const endDateStr = reportEndDate
+          ? reportEndDate.toISOString().split('T')[0]
+          : null;
+
+        await api.patch(`/reports/${editingReport.report_id}`, {
+          start_date: startDateStr,
+          end_date: endDateStr,
+          current_progress: completionRate,
+          report_description: reportValue,
+          payment_requested: releasedAmount,
+          payment_triggered: isPaymentTriggered,
+        });
+
+        if (Number(completionRate) >= 100) {
+          try {
+            await api.patch(`/projects/${selectedProject.project_id}`, {
+              project_status: 'Done',
+            });
+            setSelectedProject((prev) =>
+              prev ? { ...prev, project_status: 'Done' } : prev,
+            );
+            fetchProjects();
+          } catch (error) {
+            console.error('Error updating project status:', error);
+          }
+        }
+
+        setRecentReports((prev) =>
+          prev.map((report) =>
+            report.report_id === editingReport.report_id
+              ? {
+                  ...report,
+                  start_date: startDateStr,
+                  end_date: endDateStr,
+                  current_progress: completionRate,
+                  report_description: reportValue,
+                  payment_requested: releasedAmount,
+                  payment_triggered: isPaymentTriggered,
+                }
+              : report,
+          ),
+        );
+      } else {
+        // Save the report to database
+        await logReportGeneration();
+      }
 
       // Close the input modal
       setShowReportModal(false);
@@ -728,8 +798,8 @@ const ReportsPanel = ({
       formData.append('report_description', reportValue);
 
       // Append multiple images with their comments
-      reportImages.forEach((image, index) => {
-        formData.append(`images`, image);
+      reportImages.forEach((image) => {
+        formData.append('images', image);
       });
 
       // Append image comments as JSON
@@ -812,29 +882,19 @@ const ReportsPanel = ({
       separator: true,
     },
     {
-      label: 'Regenerate',
-      icon: 'pi pi-refresh',
+      label: 'Edit Billing',
+      icon: 'pi pi-pencil',
       disabled: isProjectLocked(selectedProject?.project_status),
       command: () => {
         if (isProjectLocked(selectedProject?.project_status)) {
           showToast(
             'warn',
             'Not Allowed',
-            'Reports cannot be generated for projects on Hold or Done.',
+            'Reports cannot be edited for projects on Hold or Done.',
           );
           return;
         }
-        setCompletionRate(report.current_progress || 0);
-        setReleasedAmount(report.payment_requested || 0);
-        setReportValue(report.report_description || '');
-        setReportStartDate(
-          report.start_date ? new Date(report.start_date) : null,
-        );
-        setReportEndDate(report.end_date ? new Date(report.end_date) : null);
-        setIsPaymentTriggered(!!report.payment_triggered);
-        setReportImages([]);
-        setImagePreviews([]);
-        setShowReportModal(true);
+        startEditReport(report);
       },
     },
     {
@@ -1305,7 +1365,7 @@ const ReportsPanel = ({
             className="flex flex-column gap-3 items-end flex-shrink-0"
             style={{ marginLeft: 'auto' }}
           >
-            <Card className="p-1" style={{ minWidth: '520px' }}>
+            <Card className="p-1" style={{ minWidth: '640px' }}>
               <h4
                 className="m-0"
                 style={{ fontSize: '12px', marginBottom: '4px' }}
@@ -1315,7 +1375,7 @@ const ReportsPanel = ({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr',
+                  gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr',
                   gap: '8px',
                 }}
               >
@@ -1329,6 +1389,20 @@ const ReportsPanel = ({
                   <span className="font-bold text-xs">Budget:</span>
                   <p className="m-0 text-xs font-bold text-primary">
                     {formatCurrency(selectedProject.total_amount)}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Billed Amount:</span>
+                  <p className="m-0 text-xs font-bold text-green-600">
+                    {formatCurrency(getTotalReleased(filteredReports))}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-xs">Remaining Balance:</span>
+                  <p className="m-0 text-xs font-bold text-orange-600">
+                    {formatCurrency(
+                      (Number(selectedProject.total_amount) || 0) - getTotalReleased(filteredReports)
+                    )}
                   </p>
                 </div>
                 <div>
@@ -1643,13 +1717,13 @@ const ReportsPanel = ({
 
                     <div className="flex gap-2 mt-3">
                       <Button
-                        label="Download PDF"
+                        label="Print PDF"
                         icon="pi pi-file-pdf"
                         className="p-button-outlined p-button-sm p-button-danger"
                         onClick={() => downloadReportPDF(report)}
                       />
                       <Button
-                        label="Download CSV"
+                        label="Print CSV"
                         icon="pi pi-file-excel"
                         className="p-button-outlined p-button-sm p-button-success"
                         onClick={() => downloadReportCSV(report)}
@@ -1720,11 +1794,14 @@ const ReportsPanel = ({
 
       {/* Report Generation Modal */}
       <Dialog
-        header="Generate New Report"
+        header={editingReport ? 'Edit Billing' : 'Generate New Report'}
         visible={showReportModal}
         style={{ width: '70vw', maxHeight: '90vh' }}
         contentStyle={{ padding: '1.5rem 2rem' }}
-        onHide={() => setShowReportModal(false)}
+        onHide={() => {
+          setShowReportModal(false);
+          setEditingReport(null);
+        }}
         headerStyle={{
           backgroundColor: '#4A4A3A',
           color: 'white',
@@ -1934,9 +2011,11 @@ const ReportsPanel = ({
                   showIcon
                   style={{ width: '100%' }}
                   minDate={
-                    getLastReportEndDate()
-                      ? new Date(getLastReportEndDate().getTime() + 86400000)
-                      : undefined
+                    editingReport
+                      ? undefined
+                      : getLastReportEndDate()
+                        ? new Date(getLastReportEndDate().getTime() + 86400000)
+                        : undefined
                   }
                 />
               </div>
@@ -1959,10 +2038,12 @@ const ReportsPanel = ({
                   showIcon
                   style={{ width: '100%' }}
                   minDate={
-                    reportStartDate ||
-                    (getLastReportEndDate()
-                      ? new Date(getLastReportEndDate().getTime() + 86400000)
-                      : undefined)
+                    editingReport
+                      ? reportStartDate || undefined
+                      : reportStartDate ||
+                        (getLastReportEndDate()
+                          ? new Date(getLastReportEndDate().getTime() + 86400000)
+                          : undefined)
                   }
                 />
               </div>
@@ -2230,6 +2311,7 @@ const ReportsPanel = ({
                   accept="image/*"
                   multiple
                   onChange={handleImageSelect}
+                  disabled={!!editingReport}
                   style={{ width: '100%' }}
                 />
                 <small
@@ -2239,7 +2321,9 @@ const ReportsPanel = ({
                     marginTop: '0.5rem',
                   }}
                 >
-                  Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image)
+                  {editingReport
+                    ? 'Image updates are not available while editing an existing billing.'
+                    : 'Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image)'}
                 </small>
               </div>
 
@@ -2337,7 +2421,15 @@ const ReportsPanel = ({
               }}
             >
               <Button
-                label={isGenerating ? 'Generating...' : 'Generate Report'}
+                label={
+                  isGenerating
+                    ? editingReport
+                      ? 'Saving...'
+                      : 'Generating...'
+                    : editingReport
+                      ? 'Save Changes'
+                      : 'Generate Report'
+                }
                 icon={isGenerating ? 'pi pi-spinner pi-spin' : 'pi pi-check'}
                 onClick={handleSubmitReport}
                 disabled={isGenerating}

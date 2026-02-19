@@ -41,6 +41,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   profile_pic?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
 
 export class UpdateUserDto {
@@ -80,6 +84,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   profile_pic?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
 
 export class ChangePasswordDto {

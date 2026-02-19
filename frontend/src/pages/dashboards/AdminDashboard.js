@@ -196,7 +196,7 @@ const AdminDashboard = () => {
             }}
           >
             <i className="pi pi-briefcase"></i>
-            <span>Project Dashboard</span>
+            <span>Client Dashboard</span>
           </div>
 
           <div

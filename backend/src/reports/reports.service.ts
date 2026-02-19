@@ -163,7 +163,7 @@ export class ReportsService {
     });
 
     // Only log if there were actual changes
-    if (Object.keys(actualChanges).length > 0) {
+    if (Object.keys(actualChanges).length > 0 && existingReport) {
       await this.auditLogsService.create({
         userId: currentUser?.userId,
         userName: currentUser?.username,

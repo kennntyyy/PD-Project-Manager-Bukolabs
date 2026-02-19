@@ -39,6 +39,8 @@ const ProjectDashboardPanel = () => {
   const [reports, setReports] = useState([]);
   const [reportsVersion, setReportsVersion] = useState(0);
   const [completionRate, setCompletionRate] = useState(0);
+  const [isEditingTotalValue, setIsEditingTotalValue] = useState(false);
+  const [totalValueDraft, setTotalValueDraft] = useState(0);
   const [selectedClientGroup, setSelectedClientGroup] = useState(null);
   const [displaySubProjectDialog, setDisplaySubProjectDialog] = useState(false);
   const [displayReportsDialog, setDisplayReportsDialog] = useState(false);
@@ -627,6 +629,65 @@ const ProjectDashboardPanel = () => {
   }, [selectedProject?.project_id]);
 
   useEffect(() => {
+    if (!selectedProject) {
+      setIsEditingTotalValue(false);
+      setTotalValueDraft(0);
+      return;
+    }
+    setIsEditingTotalValue(false);
+    setTotalValueDraft(Number(selectedProject.total_amount || 0));
+  }, [selectedProject?.project_id]);
+
+  const startEditTotalValue = () => {
+    if (!selectedProject) return;
+    setTotalValueDraft(Number(selectedProject.total_amount || 0));
+    setIsEditingTotalValue(true);
+  };
+
+  const cancelEditTotalValue = () => {
+    setIsEditingTotalValue(false);
+    setTotalValueDraft(Number(selectedProject?.total_amount || 0));
+  };
+
+  const handleSaveTotalValue = async () => {
+    if (!selectedProject) return;
+    const nextValue = Number(totalValueDraft || 0);
+
+    try {
+      setLoading(true);
+      await api.patch(`/projects/${selectedProject.project_id}`, {
+        total_amount: nextValue,
+      });
+
+      setSelectedProject((prev) =>
+        prev ? { ...prev, total_amount: nextValue } : prev,
+      );
+      setIsEditingTotalValue(false);
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Success',
+        detail: 'Total value updated',
+      });
+      fetchProjects();
+      if (displayHistoryDialog && selectedProject) {
+        fetchProjectHistory(selectedProject.project_id);
+      }
+    } catch (error) {
+      console.error('Update total value error:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail:
+          error.response?.data?.message ||
+          error.message ||
+          'Failed to update total value',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (subProjectFirst >= subProjects.length && subProjects.length > 0) {
       setSubProjectFirst(0);
     }
@@ -904,11 +965,87 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
                     Total Value
+                    {!isEditingTotalValue && (
+                      <Button
+                        icon="pi pi-pencil"
+                        className="p-button-text p-button-sm"
+                        style={{ padding: 0, minWidth: 'auto', color: '#6b7280' }}
+                        onClick={startEditTotalValue}
+                        tooltip="Edit total value"
+                        tooltipOptions={{ position: 'top' }}
+                      />
+                    )}
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#111827', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
-                    {formatCurrency(calculateProjectFinancials(selectedProject).totalValue)}
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '700',
+                      color: '#111827',
+                      marginTop: '0.35rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {isEditingTotalValue ? (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                        }}
+                      >
+                        <InputNumber
+                          value={totalValueDraft}
+                          onValueChange={(e) =>
+                            setTotalValueDraft(e.value ?? 0)
+                          }
+                          prefix="₱ "
+                          thousandSeparator=","
+                          minFractionDigits={2}
+                          maxFractionDigits={2}
+                          min={0}
+                          inputStyle={{ width: '140px', textAlign: 'center' }}
+                        />
+                        <Button
+                          icon="pi pi-check"
+                          className="p-button-text p-button-sm"
+                          style={{ padding: 0, minWidth: 'auto', color: '#16a34a' }}
+                          onClick={handleSaveTotalValue}
+                          disabled={loading}
+                          tooltip="Save"
+                          tooltipOptions={{ position: 'top' }}
+                        />
+                        <Button
+                          icon="pi pi-times"
+                          className="p-button-text p-button-sm"
+                          style={{ padding: 0, minWidth: 'auto', color: '#6b7280' }}
+                          onClick={cancelEditTotalValue}
+                          disabled={loading}
+                          tooltip="Cancel"
+                          tooltipOptions={{ position: 'top' }}
+                        />
+                      </div>
+                    ) : (
+                      formatCurrency(
+                        calculateProjectFinancials(selectedProject).totalValue,
+                      )
+                    )}
                   </div>
                 </div>
 
@@ -1402,6 +1539,11 @@ const ProjectDashboardPanel = () => {
                               <h4 className="project-card-title">
                                 {group.clientName}
                               </h4>
+                              {group.client?.address && (
+                                <p style={{ fontSize: '0.85rem', color: '#999', margin: '4px 0 8px 0' }}>
+                                  {group.client.address}
+                                </p>
+                              )}
                               <span className="project-dashboard-client-count">
                                 {group.projects.length} project
                                 {group.projects.length !== 1 ? 's' : ''}

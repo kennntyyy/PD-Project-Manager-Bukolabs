@@ -64,6 +64,7 @@ const UserManagementPanel = ({
     first_name: '',
     last_name: '',
     phone: '',
+    address: '',
     user_role: initialRoleSafe,
     profile_pic: null,
   });
@@ -149,6 +150,10 @@ const UserManagementPanel = ({
         return true;
       }
 
+      if (user.address?.toLowerCase().includes(query)) {
+        return true;
+      }
+
       if (user.user_role?.toLowerCase().includes(query)) {
         return true;
       }
@@ -202,6 +207,7 @@ const UserManagementPanel = ({
       first_name: '',
       last_name: '',
       phone: '',
+      address: '',
       user_role: initialRoleSafe,
       profile_pic: null,
     });
@@ -220,6 +226,7 @@ const UserManagementPanel = ({
       first_name: usr.first_name,
       last_name: usr.last_name,
       phone: usr.phone || '',
+      address: usr.address || '',
       user_role: normalizedRoleFilter || usr.user_role,
       profile_pic: usr.profile_pic || null, // Keep existing profile_pic reference
     });
@@ -348,6 +355,7 @@ const UserManagementPanel = ({
         requestData.append('first_name', formData.first_name);
         requestData.append('last_name', formData.last_name);
         requestData.append('phone', formData.phone || '');
+        requestData.append('address', formData.address || '');
         requestData.append('user_role', roleForSave);
 
         // Add password only for new users
@@ -371,6 +379,7 @@ const UserManagementPanel = ({
           first_name: formData.first_name,
           last_name: formData.last_name,
           phone: formData.phone || '',
+          address: formData.address || '',
           user_role: roleForSave,
         };
 
@@ -768,6 +777,9 @@ const UserManagementPanel = ({
           <Column field="email" header="Email" sortable />
           <Column field="first_name" header="First Name" />
           <Column field="last_name" header="Last Name" />
+          {(normalizedRoleFilter === 'client' || !normalizedRoleFilter) && (
+            <Column field="address" header="Address" />
+          )}
           {showRoleColumn && (
             <Column
               field="user_role"
@@ -898,6 +910,19 @@ const UserManagementPanel = ({
             placeholder="Enter phone number"
           />
         </div>
+
+        {(normalizedRoleFilter === 'client' || formData.user_role === 'client') && (
+          <div className="field mt-3">
+            <label htmlFor="address">Address</label>
+            <InputText
+              id="address"
+              name="address"
+              value={formData.address}
+              onChange={handleFormChange}
+              placeholder="Enter address"
+            />
+          </div>
+        )}
 
         <div className="field mt-3">
           <label htmlFor="user_role">Role *</label>

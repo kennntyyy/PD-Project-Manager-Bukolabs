@@ -909,6 +909,44 @@ const ReportsPanel = ({
         );
       },
     },
+    {
+      separator: true,
+    },
+    {
+      label: 'Delete',
+      icon: 'pi pi-trash',
+      className: 'p-menuitem-danger',
+      disabled: isProjectLocked(selectedProject?.project_status),
+      command: () => {
+        if (isProjectLocked(selectedProject?.project_status)) {
+          showToast(
+            'warn',
+            'Not Allowed',
+            'Reports cannot be deleted for projects on Hold or Done.',
+          );
+          return;
+        }
+        confirmDialog({
+          message: `Delete this report (₱${Number(report.payment_requested || 0).toLocaleString()})? This can be restored from the recycle bin.`,
+          header: 'Confirm Delete',
+          icon: 'pi pi-exclamation-triangle',
+          accept: async () => {
+            try {
+              await api.delete(`/reports/${report.report_id}`);
+              showToast('success', 'Success', 'Report moved to recycle bin');
+              fetchRecentReports();
+            } catch (error) {
+              console.error('Delete report error:', error);
+              showToast(
+                'error',
+                'Error',
+                error.response?.data?.message || 'Failed to delete report',
+              );
+            }
+          },
+        });
+      },
+    },
   ];
 
   const getProjectReports = (projectId) =>
@@ -1401,7 +1439,8 @@ const ReportsPanel = ({
                   <span className="font-bold text-xs">Remaining Balance:</span>
                   <p className="m-0 text-xs font-bold text-orange-600">
                     {formatCurrency(
-                      (Number(selectedProject.total_amount) || 0) - getTotalReleased(filteredReports)
+                      (Number(selectedProject.total_amount) || 0) -
+                        getTotalReleased(filteredReports),
                     )}
                   </p>
                 </div>
@@ -2042,7 +2081,9 @@ const ReportsPanel = ({
                       ? reportStartDate || undefined
                       : reportStartDate ||
                         (getLastReportEndDate()
-                          ? new Date(getLastReportEndDate().getTime() + 86400000)
+                          ? new Date(
+                              getLastReportEndDate().getTime() + 86400000,
+                            )
                           : undefined)
                   }
                 />
@@ -2202,7 +2243,13 @@ const ReportsPanel = ({
                     >
                       <input
                         type="number"
-                        value={completionRate === '' ? '' : (typeof completionRate === 'string' ? completionRate : Number(completionRate).toFixed(2))}
+                        value={
+                          completionRate === ''
+                            ? ''
+                            : typeof completionRate === 'string'
+                              ? completionRate
+                              : Number(completionRate).toFixed(2)
+                        }
                         min={minCompletionRate}
                         max={100}
                         step={0.01}
@@ -2217,35 +2264,49 @@ const ReportsPanel = ({
                           textAlign: 'right',
                           MozAppearance: 'textfield',
                         }}
-                        onChange={e => {
+                        onChange={(e) => {
                           setCompletionRate(e.target.value);
                         }}
-                        onBlur={e => {
+                        onBlur={(e) => {
                           let val = e.target.value;
                           if (val === '' || isNaN(Number(val))) {
                             val = minCompletionRate;
                           }
                           let newRate = Number(val);
-                          if (newRate < minCompletionRate) newRate = minCompletionRate;
+                          if (newRate < minCompletionRate)
+                            newRate = minCompletionRate;
                           if (newRate > 100) newRate = 100;
                           const roundedRate = Number(newRate.toFixed(2));
                           setCompletionRate(roundedRate);
                           // Calculate unreleased budget
-                          const contractAmount = Number(selectedProject?.total_amount) || 0;
-                          const totalReleased = Number(selectedProject?.total_amount_released) || 0;
-                          const unreleasedBudget = contractAmount - totalReleased;
+                          const contractAmount =
+                            Number(selectedProject?.total_amount) || 0;
+                          const totalReleased =
+                            Number(selectedProject?.total_amount_released) || 0;
+                          const unreleasedBudget =
+                            contractAmount - totalReleased;
                           // Set releasedAmount to the corresponding percentage of unreleased budget
-                          const newAmount = Number(((unreleasedBudget * roundedRate) / 100).toFixed(2));
+                          const newAmount = Number(
+                            ((unreleasedBudget * roundedRate) / 100).toFixed(2),
+                          );
                           setReleasedAmount(newAmount);
                         }}
-                        onWheel={e => e.target.blur()}
-                        onKeyDown={e => {
+                        onWheel={(e) => e.target.blur()}
+                        onKeyDown={(e) => {
                           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                             e.preventDefault();
                           }
                         }}
                       />
-                      <span style={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>%</span>
+                      <span
+                        style={{
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          color: 'white',
+                        }}
+                      >
+                        %
+                      </span>
                     </div>
                     <div
                       style={{
@@ -2263,7 +2324,14 @@ const ReportsPanel = ({
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    marginBottom: '1rem',
+                  }}
+                >
                   <Slider
                     value={completionRate}
                     onChange={(e) => {
@@ -2271,11 +2339,15 @@ const ReportsPanel = ({
                       const roundedRate = Number(newRate.toFixed(2));
                       setCompletionRate(roundedRate);
                       // Calculate unreleased budget
-                      const contractAmount = Number(selectedProject?.total_amount) || 0;
-                      const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+                      const contractAmount =
+                        Number(selectedProject?.total_amount) || 0;
+                      const totalReleased =
+                        Number(selectedProject?.total_amount_released) || 0;
                       const unreleasedBudget = contractAmount - totalReleased;
                       // Set releasedAmount to the corresponding percentage of unreleased budget
-                      const newAmount = Number(((unreleasedBudget * roundedRate) / 100).toFixed(2));
+                      const newAmount = Number(
+                        ((unreleasedBudget * roundedRate) / 100).toFixed(2),
+                      );
                       setReleasedAmount(newAmount);
                     }}
                     min={minCompletionRate}

@@ -5,6 +5,7 @@ import { InputNumber } from 'primereact/inputnumber';
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
 import { Dialog } from 'primereact/dialog';
+import { confirmDialog, ConfirmDialog } from 'primereact/confirmdialog';
 import { Button } from 'primereact/button';
 import { ProgressBar } from 'primereact/progressbar';
 import { Paginator } from 'primereact/paginator';
@@ -43,8 +44,10 @@ const ProjectDashboardPanel = () => {
   const [totalValueDraft, setTotalValueDraft] = useState(0);
   const [selectedClientGroup, setSelectedClientGroup] = useState(null);
   const [displaySubProjectDialog, setDisplaySubProjectDialog] = useState(false);
+  const [editingSubProject, setEditingSubProject] = useState(null);
   const [displayReportsDialog, setDisplayReportsDialog] = useState(false);
   const [reportsProject, setReportsProject] = useState(null);
+  const [subProjectViewMode, setSubProjectViewMode] = useState('active');
   const [subProjectFirst, setSubProjectFirst] = useState(0);
   const [subProjectRows, setSubProjectRows] = useState(6);
   const [displayHistoryDialog, setDisplayHistoryDialog] = useState(false);
@@ -64,10 +67,45 @@ const ProjectDashboardPanel = () => {
   });
   const toast = useRef(null);
 
+  const getEmptySubProjectState = (parent = null) => ({
+    name: '',
+    description: '',
+    amount: '',
+    startDate: null,
+    endDate: null,
+    contractor_id: null,
+    client_id: parent?.client_id || null,
+    category_id: null,
+    project_status: 'Ongoing',
+    parent_project_id: parent?.project_id || null,
+  });
+
   const normalizeId = (value) =>
     value !== null && value !== undefined
       ? String(value).trim().toLowerCase()
       : '';
+
+  const getReportProjectId = (report) =>
+    report?.project_id?.project_id ||
+    report?.project_id?.id ||
+    report?.project_id ||
+    report?.project?.project_id ||
+    report?.project?.id ||
+    null;
+
+  const isReportPaid = (report) => {
+    const value = report?.payment_triggered;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return (
+        normalized === 'true' ||
+        normalized === '1' ||
+        normalized === 'paid' ||
+        normalized === 'yes'
+      );
+    }
+    return Boolean(value);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -82,13 +120,11 @@ const ProjectDashboardPanel = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/projects');
-      const active = response.data.filter(
-        (project) => project.isDeleted !== true,
-      );
-      setProjects(active);
-      const mainProjects = active.filter(
-        (project) => !project.parent_project_id,
+      const response = await api.get('/projects?includeDeleted=true');
+      const allProjects = response.data || [];
+      setProjects(allProjects);
+      const mainProjects = allProjects.filter(
+        (project) => !project.parent_project_id && project.isDeleted !== true,
       );
       if (!selectedProject && mainProjects.length === 0) {
         setSelectedProject(null);
@@ -163,6 +199,12 @@ const ProjectDashboardPanel = () => {
       setHistoryLoading(true);
       // Use project_id parameter to get all project-related logs including subprojects and reports
       const response = await api.get(`/audit-logs?project_id=${projectId}`);
+      console.log('[HISTORY] API Response:', {
+        projectId,
+        responseStatus: response.status,
+        data: response.data,
+      });
+
       // Handle different response formats
       let historyData = [];
       if (Array.isArray(response.data)) {
@@ -172,9 +214,14 @@ const ProjectDashboardPanel = () => {
       } else if (response.data?.logs && Array.isArray(response.data.logs)) {
         historyData = response.data.logs;
       }
+
+      console.log('[HISTORY] Parsed history data:', {
+        count: historyData.length,
+        records: historyData,
+      });
       setProjectHistory(historyData);
     } catch (error) {
-      console.error('Failed to fetch project history:', error);
+      console.error('[HISTORY] Failed to fetch project history:', error);
       toast.current?.show({
         severity: 'error',
         summary: 'Error',
@@ -195,8 +242,8 @@ const ProjectDashboardPanel = () => {
   };
 
   const getClientById = (clientId) =>
-    clients?.find((client) =>
-      normalizeId(client?.user_id) === normalizeId(clientId),
+    clients?.find(
+      (client) => normalizeId(client?.user_id) === normalizeId(clientId),
     ) || null;
 
   const getClientDisplayName = (client) => {
@@ -261,16 +308,31 @@ const ProjectDashboardPanel = () => {
       return { totalValue: 0, totalPaid: 0, totalPending: 0, totalUnpaid: 0 };
     }
 
-    const projectReports = reports.filter(
-      (r) => r.project_id === project.project_id && !r.isDeleted
-    );
+    const selectedProjectId = normalizeId(project.project_id);
+    const relatedProjectIds = new Set([selectedProjectId]);
+
+    projects.forEach((item) => {
+      const parentId = normalizeId(item?.parent_project_id);
+      if (parentId === selectedProjectId) {
+        const subProjectId = normalizeId(item?.project_id);
+        if (subProjectId) {
+          relatedProjectIds.add(subProjectId);
+        }
+      }
+    });
+
+    const projectReports = reports.filter((report) => {
+      if (report?.isDeleted) return false;
+      const reportProjectId = normalizeId(getReportProjectId(report));
+      return relatedProjectIds.has(reportProjectId);
+    });
 
     let totalPaid = 0;
     let totalPending = 0;
 
     projectReports.forEach((report) => {
       const amount = Number(report.payment_requested || 0);
-      if (report.payment_triggered) {
+      if (isReportPaid(report)) {
         totalPaid += amount;
       } else {
         totalPending += amount;
@@ -371,7 +433,7 @@ const ProjectDashboardPanel = () => {
     let onhold = 0;
     let completed = 0;
 
-    subProjects.forEach((project) => {
+    activeSubProjects.forEach((project) => {
       const normalized = String(project?.project_status || 'Ongoing')
         .toLowerCase()
         .trim();
@@ -387,16 +449,9 @@ const ProjectDashboardPanel = () => {
     return { ongoing, onhold, completed };
   };
 
-  const getRemainingBalance = () => {
-    const parentTotal = Number(selectedProject?.total_amount || 0);
-    const allocatedTotal = subProjects.reduce(
-      (sum, project) => sum + Number(project.total_amount || 0),
-      0,
-    );
-    return Math.max(0, parentTotal - allocatedTotal);
-  };
-
-  const mainProjects = projects.filter((project) => !project.parent_project_id);
+  const mainProjects = projects.filter(
+    (project) => !project.parent_project_id && project.isDeleted !== true,
+  );
 
   const filteredMainProjects = !searchQuery.trim()
     ? mainProjects
@@ -446,11 +501,31 @@ const ProjectDashboardPanel = () => {
       .sort((a, b) => a.clientName.localeCompare(b.clientName));
   }, [filteredMainProjects, clients]);
 
-  const subProjects = selectedProject
+  const allSubProjects = selectedProject
     ? projects.filter(
         (project) => project.parent_project_id === selectedProject.project_id,
       )
     : [];
+
+  const activeSubProjects = allSubProjects.filter(
+    (project) => project.isDeleted !== true,
+  );
+
+  const deletedSubProjects = allSubProjects.filter(
+    (project) => project.isDeleted === true,
+  );
+
+  const subProjects =
+    subProjectViewMode === 'deleted' ? deletedSubProjects : activeSubProjects;
+
+  const getRemainingBalance = () => {
+    const parentTotal = Number(selectedProject?.total_amount || 0);
+    const allocatedTotal = activeSubProjects.reduce(
+      (sum, project) => sum + Number(project.total_amount || 0),
+      0,
+    );
+    return Math.max(0, parentTotal - allocatedTotal);
+  };
 
   const pagedSubProjects = useMemo(() => {
     const start = subProjectFirst;
@@ -483,17 +558,17 @@ const ProjectDashboardPanel = () => {
       setCompletionRate(0);
       return;
     }
-    if (!subProjects.length) {
+    if (!activeSubProjects.length) {
       setCompletionRate(0);
       return;
     }
-    const total = subProjects.reduce(
+    const total = activeSubProjects.reduce(
       (sum, project) => sum + getCompletionRateForProject(project.project_id),
       0,
     );
-    const avg = Math.round(total / subProjects.length);
+    const avg = Math.round(total / activeSubProjects.length);
     setCompletionRate(avg);
-  }, [selectedProject?.project_id, subProjects, reports]);
+  }, [selectedProject?.project_id, activeSubProjects, reports]);
 
   const getCompletionRateForProject = (projectId) => {
     if (!projectId) return 0;
@@ -505,11 +580,11 @@ const ProjectDashboardPanel = () => {
   };
 
   const getChartData = useMemo(() => {
-    if (!subProjects.length) return [];
+    if (!activeSubProjects.length) return [];
 
     // Get all start and end dates
     const allDates = [];
-    subProjects.forEach((project) => {
+    activeSubProjects.forEach((project) => {
       if (project.project_start_date)
         allDates.push(new Date(project.project_start_date));
       if (project.project_deadline)
@@ -547,7 +622,7 @@ const ProjectDashboardPanel = () => {
 
     // Track last known progress for each subproject to create flat lines
     const lastProgress = {};
-    subProjects.forEach((project) => {
+    activeSubProjects.forEach((project) => {
       lastProgress[project.project_id] = null;
     });
 
@@ -560,31 +635,38 @@ const ProjectDashboardPanel = () => {
       const dataPoint = { month: label };
 
       // For each subproject, check if a report was generated IN this specific month
-      subProjects.forEach((project) => {
+      activeSubProjects.forEach((project) => {
         const projectReports = reports.filter(
-          (r) => r.project_id === project.project_id && !r.isDeleted
+          (r) => r.project_id === project.project_id && !r.isDeleted,
         );
 
         // Find reports generated specifically in this month
         const monthReports = projectReports.filter((r) => {
-          const reportDate = r.end_date ? new Date(r.end_date) : r.created_at ? new Date(r.created_at) : null;
+          const reportDate = r.end_date
+            ? new Date(r.end_date)
+            : r.created_at
+              ? new Date(r.created_at)
+              : null;
           if (!reportDate) return false;
-          
+
           // Check if report is within this specific month
-          return (
-            reportDate >= monthDate && 
-            reportDate <= monthEndDate
-          );
+          return reportDate >= monthDate && reportDate <= monthEndDate;
         });
 
-        const startDate = project.project_start_date ? new Date(project.project_start_date) : null;
+        const startDate = project.project_start_date
+          ? new Date(project.project_start_date)
+          : null;
         const hasStarted = startDate && startDate <= monthEndDate;
 
         if (monthReports.length > 0) {
           // Report(s) generated this month - use the latest one
           const sortedReports = monthReports.sort((a, b) => {
-            const dateA = a.end_date ? new Date(a.end_date) : new Date(a.created_at);
-            const dateB = b.end_date ? new Date(b.end_date) : new Date(b.created_at);
+            const dateA = a.end_date
+              ? new Date(a.end_date)
+              : new Date(a.created_at);
+            const dateB = b.end_date
+              ? new Date(b.end_date)
+              : new Date(b.created_at);
             return dateB - dateA;
           });
           const latestReport = sortedReports[0];
@@ -608,7 +690,7 @@ const ProjectDashboardPanel = () => {
     });
 
     return chartData;
-  }, [subProjects, reports]);
+  }, [activeSubProjects, reports]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -626,6 +708,7 @@ const ProjectDashboardPanel = () => {
   useEffect(() => {
     if (!selectedProject) return;
     setSubProjectFirst(0);
+    setSubProjectViewMode('active');
   }, [selectedProject?.project_id]);
 
   useEffect(() => {
@@ -693,21 +776,45 @@ const ProjectDashboardPanel = () => {
     }
   }, [subProjectFirst, subProjects.length]);
 
+  useEffect(() => {
+    setSubProjectFirst(0);
+  }, [subProjectViewMode]);
+
   const openSubProjectDialog = () => {
     if (!selectedProject) return;
+    setEditingSubProject(null);
+    setNewSubProject(getEmptySubProjectState(selectedProject));
+    setDisplaySubProjectDialog(true);
+  };
+
+  const openEditSubProjectDialog = (subproject) => {
+    if (!subproject || !selectedProject) return;
+
+    setEditingSubProject(subproject);
     setNewSubProject({
-      name: '',
-      description: '',
-      amount: '',
-      startDate: null,
-      endDate: null,
-      contractor_id: null,
-      client_id: selectedProject.client_id || null,
-      category_id: null,
-      project_status: 'Ongoing',
-      parent_project_id: selectedProject.project_id,
+      name: subproject.project_name || '',
+      description: subproject.project_description || '',
+      amount: Number(subproject.total_amount || 0),
+      startDate: subproject.project_start_date
+        ? new Date(subproject.project_start_date)
+        : null,
+      endDate: subproject.project_deadline
+        ? new Date(subproject.project_deadline)
+        : null,
+      contractor_id: subproject.contractor_id || null,
+      client_id: subproject.client_id || selectedProject.client_id || null,
+      category_id: subproject.category_id || null,
+      project_status: subproject.project_status || 'Ongoing',
+      parent_project_id:
+        subproject.parent_project_id || selectedProject.project_id,
     });
     setDisplaySubProjectDialog(true);
+  };
+
+  const closeSubProjectDialog = () => {
+    setDisplaySubProjectDialog(false);
+    setEditingSubProject(null);
+    setNewSubProject(getEmptySubProjectState(selectedProject));
   };
 
   const handleAddSubProject = async () => {
@@ -722,10 +829,16 @@ const ProjectDashboardPanel = () => {
 
     const parentTotal = Number(selectedProject?.total_amount || 0);
     const newAmount = Number(newSubProject.amount || 0);
-    const existingSubTotal = subProjects.reduce(
-      (sum, project) => sum + Number(project.total_amount || 0),
-      0,
-    );
+    const existingSubTotal = activeSubProjects.reduce((sum, project) => {
+      if (
+        editingSubProject &&
+        normalizeId(project.project_id) ===
+          normalizeId(editingSubProject.project_id)
+      ) {
+        return sum;
+      }
+      return sum + Number(project.total_amount || 0);
+    }, 0);
     if (parentTotal > 0 && existingSubTotal + newAmount > parentTotal) {
       toast.current?.show({
         severity: 'warn',
@@ -788,7 +901,7 @@ const ProjectDashboardPanel = () => {
 
     try {
       setLoading(true);
-      await api.post('/projects', {
+      const payload = {
         project_name: newSubProject.name,
         project_description: newSubProject.description,
         total_amount: newSubProject.amount,
@@ -797,28 +910,24 @@ const ProjectDashboardPanel = () => {
         contractor_id: newSubProject.contractor_id,
         client_id: newSubProject.client_id,
         category_id: newSubProject.category_id,
-        project_status: 'Ongoing',
+        project_status: newSubProject.project_status || 'Ongoing',
         parent_project_id: newSubProject.parent_project_id,
-      });
+      };
 
-      setDisplaySubProjectDialog(false);
-      setNewSubProject({
-        name: '',
-        description: '',
-        amount: '',
-        startDate: null,
-        endDate: null,
-        contractor_id: null,
-        client_id: null,
-        category_id: null,
-        project_status: 'Ongoing',
-        parent_project_id: null,
-      });
+      if (editingSubProject?.project_id) {
+        await api.patch(`/projects/${editingSubProject.project_id}`, payload);
+      } else {
+        await api.post('/projects', payload);
+      }
+
+      closeSubProjectDialog();
 
       toast.current?.show({
         severity: 'success',
         summary: 'Success',
-        detail: 'Sub-project created successfully',
+        detail: editingSubProject
+          ? 'Sub-project updated successfully'
+          : 'Sub-project created successfully',
       });
 
       fetchProjects();
@@ -841,8 +950,128 @@ const ProjectDashboardPanel = () => {
     }
   };
 
+  const handleDeleteSubProject = (subproject) => {
+    if (!subproject) return;
+
+    confirmDialog({
+      message: `Are you sure you want to delete "${subproject.project_name}"? This can be restored from the recycle bin.`,
+      header: 'Confirm Delete',
+      icon: 'pi pi-exclamation-triangle',
+      accept: async () => {
+        try {
+          setLoading(true);
+          await api.delete(`/projects/${subproject.project_id}`);
+
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Sub-project moved to recycle bin',
+          });
+
+          fetchProjects();
+          if (displayHistoryDialog && selectedProject) {
+            fetchProjectHistory(selectedProject.project_id);
+          }
+        } catch (error) {
+          console.error('Delete sub-project error:', error);
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail:
+              error.response?.data?.message ||
+              error.message ||
+              'Failed to delete sub-project',
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleRestoreSubProject = (subproject) => {
+    if (!subproject) return;
+
+    confirmDialog({
+      message: `Restore "${subproject.project_name}" to active projects?`,
+      header: 'Confirm Restore',
+      icon: 'pi pi-refresh',
+      accept: async () => {
+        try {
+          setLoading(true);
+          await api.patch(`/projects/${subproject.project_id}`, {
+            isDeleted: false,
+          });
+
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Sub-project restored successfully',
+          });
+
+          fetchProjects();
+          if (displayHistoryDialog && selectedProject) {
+            fetchProjectHistory(selectedProject.project_id);
+          }
+        } catch (error) {
+          console.error('Restore sub-project error:', error);
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail:
+              error.response?.data?.message ||
+              error.message ||
+              'Failed to restore sub-project',
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
+  const handlePermanentDeleteSubProject = (subproject) => {
+    if (!subproject) return;
+
+    confirmDialog({
+      message: `Permanently delete "${subproject.project_name}"? This cannot be undone.`,
+      header: 'Confirm Permanent Delete',
+      icon: 'pi pi-trash',
+      accept: async () => {
+        try {
+          setLoading(true);
+          await api.delete(`/projects/${subproject.project_id}?permanent=true`);
+
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Success',
+            detail: 'Sub-project permanently deleted',
+          });
+
+          fetchProjects();
+          if (displayHistoryDialog && selectedProject) {
+            fetchProjectHistory(selectedProject.project_id);
+          }
+        } catch (error) {
+          console.error('Permanent delete sub-project error:', error);
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Error',
+            detail:
+              error.response?.data?.message ||
+              error.message ||
+              'Failed to permanently delete sub-project',
+          });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
   return (
     <div className="panel-container">
+      <ConfirmDialog />
       <Toast ref={toast} />
 
       <div className="project-dashboard-header mb-6">
@@ -955,7 +1184,10 @@ const ProjectDashboardPanel = () => {
               </div>
 
               {/* Financial Metrics */}
-              <div className="project-dashboard-metrics" style={{ marginTop: '1rem' }}>
+              <div
+                className="project-dashboard-metrics"
+                style={{ marginTop: '1rem' }}
+              >
                 <div
                   style={{
                     padding: '0.65rem',
@@ -983,7 +1215,11 @@ const ProjectDashboardPanel = () => {
                       <Button
                         icon="pi pi-pencil"
                         className="p-button-text p-button-sm"
-                        style={{ padding: 0, minWidth: 'auto', color: '#6b7280' }}
+                        style={{
+                          padding: 0,
+                          minWidth: 'auto',
+                          color: '#6b7280',
+                        }}
                         onClick={startEditTotalValue}
                         tooltip="Edit total value"
                         tooltipOptions={{ position: 'top' }}
@@ -1025,7 +1261,11 @@ const ProjectDashboardPanel = () => {
                         <Button
                           icon="pi pi-check"
                           className="p-button-text p-button-sm"
-                          style={{ padding: 0, minWidth: 'auto', color: '#16a34a' }}
+                          style={{
+                            padding: 0,
+                            minWidth: 'auto',
+                            color: '#16a34a',
+                          }}
                           onClick={handleSaveTotalValue}
                           disabled={loading}
                           tooltip="Save"
@@ -1034,7 +1274,11 @@ const ProjectDashboardPanel = () => {
                         <Button
                           icon="pi pi-times"
                           className="p-button-text p-button-sm"
-                          style={{ padding: 0, minWidth: 'auto', color: '#6b7280' }}
+                          style={{
+                            padding: 0,
+                            minWidth: 'auto',
+                            color: '#6b7280',
+                          }}
                           onClick={cancelEditTotalValue}
                           disabled={loading}
                           tooltip="Cancel"
@@ -1058,11 +1302,31 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Paid
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#10B981', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
-                    {formatCurrency(calculateProjectFinancials(selectedProject).totalPaid)}
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '700',
+                      color: '#10B981',
+                      marginTop: '0.35rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {formatCurrency(
+                      calculateProjectFinancials(selectedProject).totalPaid,
+                    )}
                   </div>
                 </div>
 
@@ -1075,11 +1339,31 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Pending
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#F59E0B', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
-                    {formatCurrency(calculateProjectFinancials(selectedProject).totalPending)}
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '700',
+                      color: '#F59E0B',
+                      marginTop: '0.35rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {formatCurrency(
+                      calculateProjectFinancials(selectedProject).totalPending,
+                    )}
                   </div>
                 </div>
 
@@ -1092,17 +1376,40 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.65rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Unpaid
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '700', color: '#EF4444', marginTop: '0.35rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
-                    {formatCurrency(calculateProjectFinancials(selectedProject).totalUnpaid)}
+                  <div
+                    style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '700',
+                      color: '#EF4444',
+                      marginTop: '0.35rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {formatCurrency(
+                      calculateProjectFinancials(selectedProject).totalUnpaid,
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Sub-Project Status Metrics */}
-              <div className="project-dashboard-metrics" style={{ marginTop: '1.5rem' }}>
+              <div
+                className="project-dashboard-metrics"
+                style={{ marginTop: '1.5rem' }}
+              >
                 <div
                   style={{
                     padding: '1rem',
@@ -1112,10 +1419,28 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Ongoing
                   </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f97316', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: '#f97316',
+                      marginTop: '0.5rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {getSubProjectStatusCounts().ongoing}
                   </div>
                 </div>
@@ -1129,10 +1454,28 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     On Hold
                   </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#eab308', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: '#eab308',
+                      marginTop: '0.5rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {getSubProjectStatusCounts().onhold}
                   </div>
                 </div>
@@ -1146,10 +1489,28 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Completed
                   </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#16a34a', marginTop: '0.5rem', wordBreak: 'break-word', overflowWrap: 'break-word', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: '#16a34a',
+                      marginTop: '0.5rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {getSubProjectStatusCounts().completed}
                   </div>
                 </div>
@@ -1163,20 +1524,31 @@ const ProjectDashboardPanel = () => {
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: '#6b7280',
+                      fontWeight: '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
                     Unallocated Balance
                   </div>
-                  <div style={{ 
-                    fontSize: '1.25rem', 
-                    fontWeight: '700', 
-                    color: '#4f4d36', 
-                    marginTop: '0.5rem',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word',
-                    overflow: 'hidden',
-                    lineHeight: '1.2'
-                  }}>
-                    ₱{getRemainingBalance().toLocaleString(undefined, {
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: '700',
+                      color: '#4f4d36',
+                      marginTop: '0.5rem',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
+                      overflow: 'hidden',
+                      lineHeight: '1.2',
+                    }}
+                  >
+                    ₱
+                    {getRemainingBalance().toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -1275,7 +1647,14 @@ const ProjectDashboardPanel = () => {
                       <LineChart data={getChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                         <XAxis dataKey="month" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" label={{ value: 'Progress (%)', angle: -90, position: 'insideLeft' }} />
+                        <YAxis
+                          stroke="#9CA3AF"
+                          label={{
+                            value: 'Progress (%)',
+                            angle: -90,
+                            position: 'insideLeft',
+                          }}
+                        />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: '#F3F4F6',
@@ -1284,7 +1663,7 @@ const ProjectDashboardPanel = () => {
                           }}
                         />
                         <Legend />
-                        {subProjects.map((project, index) => {
+                        {activeSubProjects.map((project, index) => {
                           // Generate distinct colors for each subproject
                           const colors = [
                             '#10B981', // Green
@@ -1299,7 +1678,7 @@ const ProjectDashboardPanel = () => {
                             '#06B6D4', // Cyan
                           ];
                           const color = colors[index % colors.length];
-                          
+
                           return (
                             <Line
                               key={project.project_id}
@@ -1326,17 +1705,49 @@ const ProjectDashboardPanel = () => {
                   <h4>Projects</h4>
                   <span className="text-muted">{subProjects.length} total</span>
                 </div>
-                <Button
-                  label="Add Project"
-                  icon="pi pi-plus"
-                  severity="info"
-                  onClick={openSubProjectDialog}
+                <div
                   style={{
-                    backgroundColor: '#4A4A3A',
-                    color: '#ffffff',
+                    display: 'flex',
+                    gap: '0.75rem',
+                    alignItems: 'center',
                   }}
-                  className="p-button-sm"
-                />
+                >
+                  <Button
+                    label="Active Projects"
+                    icon="pi pi-folder"
+                    severity={
+                      subProjectViewMode === 'active' ? 'info' : 'secondary'
+                    }
+                    onClick={() => setSubProjectViewMode('active')}
+                    className="p-button-sm"
+                    text={subProjectViewMode !== 'active'}
+                    outlined={subProjectViewMode !== 'active'}
+                  />
+                  <Button
+                    label={`Recycle Bin (${deletedSubProjects.length})`}
+                    icon="pi pi-trash"
+                    severity={
+                      subProjectViewMode === 'deleted' ? 'info' : 'secondary'
+                    }
+                    onClick={() => setSubProjectViewMode('deleted')}
+                    className="p-button-sm"
+                    text={subProjectViewMode !== 'deleted'}
+                    outlined={subProjectViewMode !== 'deleted'}
+                  />
+                  {subProjectViewMode === 'active' && (
+                    <Button
+                      label="Add Project"
+                      icon="pi pi-plus"
+                      severity="info"
+                      onClick={openSubProjectDialog}
+                      style={{
+                        backgroundColor: '#4A4A3A',
+                        color: '#ffffff',
+                      }}
+                      className="p-button-sm"
+                    />
+                  )}
+                </div>
               </div>
               {subProjects.length === 0 ? (
                 <div className="project-dashboard-empty">
@@ -1362,15 +1773,18 @@ const ProjectDashboardPanel = () => {
                           </h5>
                           {statusTemplate(subproject)}
                         </div>
-                        <p className="subproject-desc" style={{ 
-                          fontSize: '0.875rem', 
-                          maxHeight: '3em', 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis', 
-                          display: '-webkit-box', 
-                          WebkitLineClamp: 2, 
-                          WebkitBoxOrient: 'vertical' 
-                        }}>
+                        <p
+                          className="subproject-desc"
+                          style={{
+                            fontSize: '0.875rem',
+                            maxHeight: '3em',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                        >
                           {subproject.project_description || 'No description'}
                         </p>
                         <div className="subproject-progress">
@@ -1387,7 +1801,14 @@ const ProjectDashboardPanel = () => {
                             {rate}% complete
                           </div>
                         </div>
-                        <div className="subproject-meta" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div
+                          className="subproject-meta"
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '0.75rem',
+                          }}
+                        >
                           <div>
                             <div className="metric-label">Contractor</div>
                             <div style={{ fontSize: '0.875rem' }}>
@@ -1396,11 +1817,15 @@ const ProjectDashboardPanel = () => {
                           </div>
                           <div>
                             <div className="metric-label">Category</div>
-                            <div style={{ fontSize: '0.875rem' }}>{getCategoryName(subproject.category_id)}</div>
+                            <div style={{ fontSize: '0.875rem' }}>
+                              {getCategoryName(subproject.category_id)}
+                            </div>
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
                             <div className="metric-label">Contract Amount</div>
-                            <div style={{ fontSize: '0.875rem' }}>{amountTemplate(subproject)}</div>
+                            <div style={{ fontSize: '0.875rem' }}>
+                              {amountTemplate(subproject)}
+                            </div>
                           </div>
                           <div>
                             <div className="metric-label">Start Date</div>
@@ -1428,20 +1853,67 @@ const ProjectDashboardPanel = () => {
                           </div>
                         </div>
                         <div className="subproject-actions">
-                          <Button
-                            icon="pi pi-file"
-                            label="Billings"
-                            severity="secondary"
-                            className="p-button-sm"
-                            style={{
-                              backgroundColor: '#4A4A3A',
-                              color: '#ffffff',
-                            }}
-                            onClick={() => {
-                              setReportsProject(subproject);
-                              setDisplayReportsDialog(true);
-                            }}
-                          />
+                          {subProjectViewMode === 'active' ? (
+                            <>
+                              <Button
+                                icon="pi pi-pencil"
+                                label="Edit"
+                                severity="secondary"
+                                className="p-button-sm"
+                                style={{
+                                  backgroundColor: '#4A4A3A',
+                                  color: '#ffffff',
+                                }}
+                                onClick={() =>
+                                  openEditSubProjectDialog(subproject)
+                                }
+                              />
+                              <Button
+                                icon="pi pi-trash"
+                                label="Delete"
+                                severity="danger"
+                                className="p-button-sm"
+                                onClick={() =>
+                                  handleDeleteSubProject(subproject)
+                                }
+                              />
+                              <Button
+                                icon="pi pi-file"
+                                label="Billings"
+                                severity="secondary"
+                                className="p-button-sm"
+                                style={{
+                                  backgroundColor: '#4A4A3A',
+                                  color: '#ffffff',
+                                }}
+                                onClick={() => {
+                                  setReportsProject(subproject);
+                                  setDisplayReportsDialog(true);
+                                }}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                icon="pi pi-refresh"
+                                label="Restore"
+                                severity="success"
+                                className="p-button-sm"
+                                onClick={() =>
+                                  handleRestoreSubProject(subproject)
+                                }
+                              />
+                              <Button
+                                icon="pi pi-times"
+                                label="Delete Permanently"
+                                severity="danger"
+                                className="p-button-sm"
+                                onClick={() =>
+                                  handlePermanentDeleteSubProject(subproject)
+                                }
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -1540,7 +2012,13 @@ const ProjectDashboardPanel = () => {
                                 {group.clientName}
                               </h4>
                               {group.client?.address && (
-                                <p style={{ fontSize: '0.85rem', color: '#999', margin: '4px 0 8px 0' }}>
+                                <p
+                                  style={{
+                                    fontSize: '0.85rem',
+                                    color: '#999',
+                                    margin: '4px 0 8px 0',
+                                  }}
+                                >
                                   {group.client.address}
                                 </p>
                               )}
@@ -1617,10 +2095,10 @@ const ProjectDashboardPanel = () => {
       <Dialog
         visible={displaySubProjectDialog}
         style={{ width: '90vw', maxWidth: '500px' }}
-        header="Add Project"
+        header={editingSubProject ? 'Edit Project' : 'Add Project'}
         contentStyle={{ padding: '1.5rem 2rem' }}
         modal
-        onHide={() => setDisplaySubProjectDialog(false)}
+        onHide={closeSubProjectDialog}
         className="p-fluid"
         headerStyle={{
           backgroundColor: '#4A4A3A',
@@ -1832,7 +2310,7 @@ const ProjectDashboardPanel = () => {
 
         <div className="flex justify-content-center mt-5">
           <Button
-            label="Create"
+            label={editingSubProject ? 'Save Changes' : 'Create'}
             onClick={handleAddSubProject}
             loading={loading}
             className="modal-primary-btn"
@@ -1886,8 +2364,17 @@ const ProjectDashboardPanel = () => {
         <div style={{ maxHeight: '700px', overflowY: 'auto' }}>
           {historyLoading ? (
             <div style={{ textAlign: 'center', padding: '3rem' }}>
-              <i className="pi pi-spin pi-spinner" style={{ fontSize: '2rem', color: '#4A4A3A' }}></i>
-              <p style={{ marginTop: '1rem', color: '#6b7280', fontSize: '0.9rem' }}>
+              <i
+                className="pi pi-spin pi-spinner"
+                style={{ fontSize: '2rem', color: '#4A4A3A' }}
+              ></i>
+              <p
+                style={{
+                  marginTop: '1rem',
+                  color: '#6b7280',
+                  fontSize: '0.9rem',
+                }}
+              >
                 Loading audit log...
               </p>
             </div>
@@ -1901,7 +2388,10 @@ const ProjectDashboardPanel = () => {
                 color: '#9ca3af',
               }}
             >
-              <i className="pi pi-info-circle" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
+              <i
+                className="pi pi-info-circle"
+                style={{ fontSize: '2rem', marginBottom: '0.5rem' }}
+              ></i>
               <p>No audit records for this project.</p>
             </div>
           ) : (
@@ -1935,7 +2425,13 @@ const ProjectDashboardPanel = () => {
               </div>
 
               {/* Log entries */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}
+              >
                 {projectHistory.map((log, index) => {
                   const timestamp = log.timestamp
                     ? new Date(log.timestamp).toLocaleString('en-US', {
@@ -1964,22 +2460,32 @@ const ProjectDashboardPanel = () => {
                     if (resource === 'PROJECT' && action === 'CREATE') {
                       const projectName = details.project_name || 'project';
                       if (details.parent_project_id) {
-                        const parentProject = projects.find(p => p.project_id === details.parent_project_id);
-                        const parentName = parentProject ? ` under "${parentProject.project_name}"` : '';
+                        const parentProject = projects.find(
+                          (p) => p.project_id === details.parent_project_id,
+                        );
+                        const parentName = parentProject
+                          ? ` under "${parentProject.project_name}"`
+                          : '';
                         detailsText = `Created subproject "${projectName}"${parentName}`;
                       } else {
                         detailsText = `Created project "${projectName}"`;
                       }
-                      
+
                       // Add contractor/client info if available
                       const extraInfo = [];
                       if (details.contractor_id) {
-                        const contractor = contractors.find(c => c.user_id === details.contractor_id);
-                        if (contractor) extraInfo.push(`Contractor: ${contractor.username}`);
+                        const contractor = contractors.find(
+                          (c) => c.user_id === details.contractor_id,
+                        );
+                        if (contractor)
+                          extraInfo.push(`Contractor: ${contractor.username}`);
                       }
                       if (details.client_id) {
-                        const client = clients.find(c => c.user_id === details.client_id);
-                        if (client) extraInfo.push(`Client: ${client.username}`);
+                        const client = clients.find(
+                          (c) => c.user_id === details.client_id,
+                        );
+                        if (client)
+                          extraInfo.push(`Client: ${client.username}`);
                       }
                       if (extraInfo.length > 0) {
                         detailsText += ` (${extraInfo.join(', ')})`;
@@ -1988,47 +2494,102 @@ const ProjectDashboardPanel = () => {
                       const fields = details.updatedFields || [];
                       if (fields.length > 0) {
                         // Format field names for better readability
-                        const formattedFields = fields.map(f => 
-                          f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        const formattedFields = fields.map((f) =>
+                          f
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, (l) => l.toUpperCase()),
                         );
                         detailsText = `Updated ${formattedFields.join(', ')}`;
                       } else {
                         detailsText = 'Updated project';
                       }
                     } else if (resource === 'PROJECT' && action === 'DELETE') {
-                      detailsText = details.permanentDelete ? 'Permanently deleted project' : 'Deleted project';
+                      detailsText = details.permanentDelete
+                        ? 'Permanently deleted project'
+                        : 'Deleted project';
                     } else if (resource === 'PROJECT' && action === 'RESTORE') {
                       detailsText = 'Restored project';
                     } else if (resource === 'REPORT' && action === 'CREATE') {
                       const payment = details.payment_requested;
                       const progress = details.current_progress;
                       detailsText = `Generated billing report`;
-                      if (payment) detailsText += ` with ₱${Number(payment).toLocaleString()} payment`;
+                      if (payment)
+                        detailsText += ` with ₱${Number(payment).toLocaleString()} payment`;
                       if (progress) detailsText += ` (${progress}% progress)`;
                     } else if (resource === 'REPORT' && action === 'UPDATE') {
                       const changes = details.changes || {};
-                      if (changes.payment_triggered !== undefined) {
-                        const amount = details.payment_requested || 0;
-                        if (changes.payment_triggered) {
-                          detailsText = `Marked report payment as paid`;
-                          if (amount) detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                      const paymentStatusChange = details.payment_status_change;
+                      const updatedFields = details.updatedFields || [];
+
+                      // Prioritize payment status changes
+                      if (
+                        changes.payment_triggered !== undefined ||
+                        paymentStatusChange
+                      ) {
+                        const amount =
+                          details.payment_requested ||
+                          paymentStatusChange?.amount ||
+                          0;
+
+                        if (paymentStatusChange) {
+                          const fromStatus = paymentStatusChange.from;
+                          const toStatus = paymentStatusChange.to;
+                          detailsText = `Payment status changed from ${fromStatus} to ${toStatus}`;
+                          if (amount)
+                            detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                          if (paymentStatusChange.billing_period_start) {
+                            const startDate = new Date(
+                              paymentStatusChange.billing_period_start,
+                            ).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                            const endDate = new Date(
+                              paymentStatusChange.billing_period_end,
+                            ).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            });
+                            detailsText += ` for period ${startDate} - ${endDate}`;
+                          }
                         } else {
-                          detailsText = `Marked report payment as pending`;
-                          if (amount) detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                          if (changes.payment_triggered === true) {
+                            detailsText = `Marked report as paid`;
+                            if (amount)
+                              detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                          } else if (changes.payment_triggered === false) {
+                            detailsText = `Marked report as pending`;
+                            if (amount)
+                              detailsText += ` (₱${Number(amount).toLocaleString()})`;
+                          }
+                        }
+                      } else if (updatedFields.length > 0) {
+                        const formattedFields = updatedFields.map((f) =>
+                          f
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, (l) => l.toUpperCase()),
+                        );
+                        detailsText = `Updated report: ${formattedFields.join(', ')}`;
+                        if (details.payment_requested) {
+                          detailsText += ` (₱${Number(details.payment_requested).toLocaleString()})`;
                         }
                       } else {
-                        const fields = details.updatedFields || [];
-                        if (fields.length > 0) {
-                          const formattedFields = fields.map(f => 
-                            f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                          );
-                          detailsText = `Updated report: ${formattedFields.join(', ')}`;
-                        } else {
-                          detailsText = 'Updated report';
-                        }
+                        detailsText = 'Updated report';
                       }
                     } else if (resource === 'REPORT' && action === 'DELETE') {
-                      detailsText = 'Deleted report';
+                      const payment = details.payment_requested;
+                      const progress = details.current_progress;
+                      const wasMarkedPaid = details.payment_triggered === true;
+                      detailsText = `Moved report to recycle bin`;
+                      if (payment) {
+                        detailsText += ` (₱${Number(payment).toLocaleString()})`;
+                      }
+                      if (wasMarkedPaid) {
+                        detailsText += ` [was marked paid]`;
+                      }
+                      if (progress) {
+                        detailsText += ` - ${progress}% progress`;
+                      }
                     } else {
                       detailsText = `${action} ${resource}`.toLowerCase();
                     }
@@ -2051,7 +2612,8 @@ const ProjectDashboardPanel = () => {
                         gridTemplateColumns: '60px 120px 140px 150px 1fr 100px',
                         gap: '1rem',
                         padding: '1rem',
-                        backgroundColor: index % 2 === 0 ? '#f9fafb' : '#ffffff',
+                        backgroundColor:
+                          index % 2 === 0 ? '#f9fafb' : '#ffffff',
                         borderRadius: '0.375rem',
                         border: '1px solid #e5e7eb',
                         alignItems: 'start',
@@ -2071,7 +2633,13 @@ const ProjectDashboardPanel = () => {
                       </div>
 
                       {/* Timestamp */}
-                      <div style={{ color: '#6b7280', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                      <div
+                        style={{
+                          color: '#6b7280',
+                          fontSize: '0.8rem',
+                          fontFamily: 'monospace',
+                        }}
+                      >
                         {timestamp}
                       </div>
 
@@ -2127,91 +2695,116 @@ const ProjectDashboardPanel = () => {
                       </div>
 
                       {/* Expandable details section */}
-                      {log.details && (() => {
-                        try {
-                          const details = JSON.parse(log.details);
-                          const hasDetails = details && Object.keys(details).length > 0;
-                          
-                          // Helper function to format display values
-                          const formatValue = (key, value) => {
-                            if (typeof value === 'object' && value !== null) {
-                              return JSON.stringify(value, null, 2);
-                            }
-                            
-                            // Map IDs to names
-                            if (key === 'contractor_id') {
-                              const contractor = contractors.find(c => c.user_id === value);
-                              return contractor ? contractor.username : value;
-                            }
-                            if (key === 'client_id') {
-                              const client = clients.find(c => c.user_id === value);
-                              return client ? client.username : value;
-                            }
-                            if (key === 'category_id') {
-                              const category = categories.find(c => c.category_id === value);
-                              return category ? category.category_name : value;
-                            }
-                            if (key === 'parent_project_id') {
-                              const parentProject = projects.find(p => p.project_id === value);
-                              return parentProject ? parentProject.project_name : value;
-                            }
-                            
-                            return String(value);
-                          };
-                          
-                          // Format key names for better readability
-                          const formatKey = (key) => {
-                            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                          };
-                          
-                          return hasDetails && (
-                            <div
-                              style={{
-                                gridColumn: '1 / -1',
-                                marginTop: '0.75rem',
-                                paddingTop: '0.75rem',
-                                borderTop: '1px solid #d1d5db',
-                                fontSize: '0.8rem',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: '600',
-                                  color: '#4A4A3A',
-                                  marginBottom: '0.5rem',
-                                  textTransform: 'uppercase',
-                                  fontSize: '0.7rem',
-                                  letterSpacing: '0.05em',
-                                }}
-                              >
-                                Additional Details
-                              </div>
-                              <div style={{ 
-                                display: 'grid', 
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                                gap: '0.75rem',
-                                color: '#374151' 
-                              }}>
-                                {Object.entries(details).map(([key, value]) => (
+                      {log.details &&
+                        (() => {
+                          try {
+                            const details = JSON.parse(log.details);
+                            const hasDetails =
+                              details && Object.keys(details).length > 0;
+
+                            // Helper function to format display values
+                            const formatValue = (key, value) => {
+                              if (typeof value === 'object' && value !== null) {
+                                return JSON.stringify(value, null, 2);
+                              }
+
+                              // Map IDs to names
+                              if (key === 'contractor_id') {
+                                const contractor = contractors.find(
+                                  (c) => c.user_id === value,
+                                );
+                                return contractor ? contractor.username : value;
+                              }
+                              if (key === 'client_id') {
+                                const client = clients.find(
+                                  (c) => c.user_id === value,
+                                );
+                                return client ? client.username : value;
+                              }
+                              if (key === 'category_id') {
+                                const category = categories.find(
+                                  (c) => c.category_id === value,
+                                );
+                                return category
+                                  ? category.category_name
+                                  : value;
+                              }
+                              if (key === 'parent_project_id') {
+                                const parentProject = projects.find(
+                                  (p) => p.project_id === value,
+                                );
+                                return parentProject
+                                  ? parentProject.project_name
+                                  : value;
+                              }
+
+                              return String(value);
+                            };
+
+                            // Format key names for better readability
+                            const formatKey = (key) => {
+                              return key
+                                .replace(/_/g, ' ')
+                                .replace(/\b\w/g, (l) => l.toUpperCase());
+                            };
+
+                            return (
+                              hasDetails && (
+                                <div
+                                  style={{
+                                    gridColumn: '1 / -1',
+                                    marginTop: '0.75rem',
+                                    paddingTop: '0.75rem',
+                                    borderTop: '1px solid #d1d5db',
+                                    fontSize: '0.8rem',
+                                  }}
+                                >
                                   <div
-                                    key={key}
                                     style={{
-                                      padding: '0.5rem',
-                                      backgroundColor: '#f3f4f6',
-                                      borderRadius: '0.25rem',
+                                      fontWeight: '600',
+                                      color: '#4A4A3A',
+                                      marginBottom: '0.5rem',
+                                      textTransform: 'uppercase',
+                                      fontSize: '0.7rem',
+                                      letterSpacing: '0.05em',
                                     }}
                                   >
-                                    <strong style={{ color: '#4A4A3A' }}>{formatKey(key)}:</strong>{' '}
-                                    {formatValue(key, value)}
+                                    Additional Details
                                   </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        } catch (e) {
-                          return null;
-                        }
-                      })()}
+                                  <div
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns:
+                                        'repeat(auto-fit, minmax(250px, 1fr))',
+                                      gap: '0.75rem',
+                                      color: '#374151',
+                                    }}
+                                  >
+                                    {Object.entries(details).map(
+                                      ([key, value]) => (
+                                        <div
+                                          key={key}
+                                          style={{
+                                            padding: '0.5rem',
+                                            backgroundColor: '#f3f4f6',
+                                            borderRadius: '0.25rem',
+                                          }}
+                                        >
+                                          <strong style={{ color: '#4A4A3A' }}>
+                                            {formatKey(key)}:
+                                          </strong>{' '}
+                                          {formatValue(key, value)}
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            );
+                          } catch (e) {
+                            return null;
+                          }
+                        })()}
                     </div>
                   );
                 })}

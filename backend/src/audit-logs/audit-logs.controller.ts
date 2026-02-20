@@ -10,7 +10,7 @@ export class AuditLogsController {
   constructor(private readonly auditLogsService: AuditLogsService) {}
 
   @Get()
-  @Roles('admin')
+  @UseGuards(JwtAuthGuard) // Allow all authenticated users but use RolesGuard for admin-only filters
   async findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,

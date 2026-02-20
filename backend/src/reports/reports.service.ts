@@ -125,6 +125,10 @@ export class ReportsService {
       where: { report_id: id },
     });
 
+    if (!existingReport) {
+      throw new NotFoundException(`Report with ID ${id} not found`);
+    }
+
     const updateData: any = {
       report_date: UpdateReportDto.report_date,
       start_date: UpdateReportDto.start_date,
@@ -140,10 +144,12 @@ export class ReportsService {
 
     await this.reportRepository.update(id, updateData);
 
-    // Log audit event - only log fields that actually changed
+    // Track all changes for audit
     const actualChanges: Record<string, any> = {};
+    const previousValues: Record<string, any> = {};
+
     Object.keys(UpdateReportDto).forEach((key) => {
-      if (existingReport && UpdateReportDto[key] !== undefined) {
+      if (UpdateReportDto[key] !== undefined) {
         const oldValue = (existingReport as any)[key];
         const newValue = UpdateReportDto[key];
 
@@ -157,31 +163,69 @@ export class ReportsService {
         }
 
         if (valuesAreDifferent) {
-          actualChanges[key] = UpdateReportDto[key];
+          actualChanges[key] = newValue;
+          previousValues[key] = oldValue;
         }
       }
     });
 
-    // Only log if there were actual changes
-    if (Object.keys(actualChanges).length > 0 && existingReport) {
+    // Log if there were actual changes
+    if (Object.keys(actualChanges).length > 0) {
+      const paymentStatusChanged =
+        actualChanges.payment_triggered !== undefined;
+      const auditDetails: any = {
+        project_id: existingReport.project_id,
+        report_id: id,
+        payment_requested: existingReport.payment_requested,
+        current_progress: existingReport.current_progress,
+        updatedFields: Object.keys(actualChanges),
+        changes: actualChanges,
+        previousValues: previousValues,
+      };
+
+      // Enhance details for payment status changes
+      if (paymentStatusChanged) {
+        const oldPaymentStatus =
+          previousValues.payment_triggered === true ? 'paid' : 'pending';
+        const newPaymentStatus =
+          actualChanges.payment_triggered === true ? 'paid' : 'pending';
+
+        auditDetails.payment_status_change = {
+          from: oldPaymentStatus,
+          to: newPaymentStatus,
+          amount: existingReport.payment_requested,
+          report_date: existingReport.report_date,
+          billing_period_start: existingReport.start_date,
+          billing_period_end: existingReport.end_date,
+        };
+      }
+
       await this.auditLogsService.create({
         userId: currentUser?.userId,
         userName: currentUser?.username,
         action: 'UPDATE',
         resource: 'REPORT',
         resourceId: id,
-        details: {
-          project_id: existingReport.project_id,
-          payment_requested: existingReport.payment_requested,
-          updatedFields: Object.keys(actualChanges),
-          changes: actualChanges,
-        },
+        details: auditDetails,
+      });
+
+      console.log('[AUDIT] Report updated:', {
+        reportId: id,
+        projectId: existingReport.project_id,
+        changes: Object.keys(actualChanges),
+        paymentStatusChanged,
+        timestamp: new Date().toISOString(),
       });
     }
   }
 
   //soft delete report from db table = reports
   async remove(id: string, currentUser?: any): Promise<void> {
+    // Get the report before deleting to capture context
+    const existingReport = await this.reportRepository.findOne({
+      where: { report_id: id },
+    });
+
     const result = await this.reportRepository.update(id, {
       isDeleted: true,
       deleted_at: new Date(),
@@ -191,14 +235,29 @@ export class ReportsService {
       throw new NotFoundException(`Report with ID ${id} not found`);
     }
 
-    // Log audit event
+    // Log audit event with full context
     await this.auditLogsService.create({
       userId: currentUser?.userId,
       userName: currentUser?.username,
       action: 'DELETE',
       resource: 'REPORT',
       resourceId: id,
-      details: { reportId: id },
+      details: {
+        reportId: id,
+        project_id: existingReport?.project_id,
+        payment_requested: existingReport?.payment_requested,
+        current_progress: existingReport?.current_progress,
+        payment_triggered: existingReport?.payment_triggered,
+        period_start: existingReport?.start_date,
+        period_end: existingReport?.end_date,
+      },
+    });
+
+    console.log('[AUDIT] Report deleted and logged:', {
+      reportId: id,
+      projectId: existingReport?.project_id,
+      wasPaid: existingReport?.payment_triggered,
+      timestamp: new Date().toISOString(),
     });
   }
 

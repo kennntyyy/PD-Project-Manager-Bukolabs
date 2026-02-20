@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AuditLog } from './entities/audit-log.entity';
+import { Report } from '../reports/entities/report.entity';
 
 export interface CreateAuditLogDto {
   userId?: string;
@@ -18,6 +19,8 @@ export class AuditLogsService {
   constructor(
     @InjectRepository(AuditLog)
     private auditLogRepository: Repository<AuditLog>,
+    @InjectRepository(Report)
+    private reportRepository: Repository<Report>,
   ) {}
 
   async create(data: CreateAuditLogDto): Promise<AuditLog> {
@@ -69,27 +72,69 @@ export class AuditLogsService {
       );
     }
 
-    // Filter by project_id: includes project updates, subproject creations, and report generations
+    // Filter by project_id using robust application-side matching to avoid JSON formatting issues
     if (projectId) {
-      query.andWhere(
-        '((audit_log.resource = :projectResource AND audit_log.resourceId = :projectId) OR ' +
-        '(audit_log.resource = :projectResource AND audit_log.details LIKE :parentProjectPattern) OR ' +
-        '(audit_log.resource = :reportResource AND audit_log.details LIKE :projectIdPattern))',
-        {
-          projectResource: 'PROJECT',
-          reportResource: 'REPORT',
-          projectId: projectId,
-          parentProjectPattern: `%"parent_project_id":"${projectId}"%`,
-          projectIdPattern: `%"project_id":"${projectId}"%`,
-        },
-      );
+      query.andWhere('audit_log.resource IN (:...resources)', {
+        resources: ['PROJECT', 'REPORT'],
+      });
+      console.log('[AUDIT-LOGS] Querying for project:', projectId);
     }
 
     query.orderBy('audit_log.timestamp', 'DESC');
-    query.skip((page - 1) * limit);
-    query.take(limit);
 
-    const [data, total] = await query.getManyAndCount();
+    let data: AuditLog[] = [];
+    let total = 0;
+
+    if (projectId) {
+      const candidateLogs = await query.getMany();
+      const reportIds = Array.from(
+        new Set(
+          candidateLogs
+            .filter(
+              (log) => log.resource === 'REPORT' && Boolean(log.resourceId),
+            )
+            .map((log) => log.resourceId as string),
+        ),
+      );
+
+      let reportProjectMap = new Map<string, string>();
+      if (reportIds.length > 0) {
+        const reports = await this.reportRepository.find({
+          where: {
+            report_id: In(reportIds),
+          },
+          select: ['report_id', 'project_id'],
+        });
+
+        reportProjectMap = new Map(
+          reports.map((report) => [
+            String(report.report_id),
+            String(report.project_id),
+          ]),
+        );
+      }
+
+      const filteredLogs = candidateLogs.filter((log) =>
+        this.isLogRelatedToProject(log, projectId, reportProjectMap),
+      );
+
+      total = filteredLogs.length;
+      const start = (page - 1) * limit;
+      data = filteredLogs.slice(start, start + limit);
+    } else {
+      query.skip((page - 1) * limit);
+      query.take(limit);
+      [data, total] = await query.getManyAndCount();
+    }
+
+    if (projectId) {
+      console.log('[AUDIT-LOGS] Query result:', {
+        projectId,
+        total,
+        found: data.length,
+        actions: data.map((d) => ({ action: d.action, resource: d.resource })),
+      });
+    }
 
     return {
       data,
@@ -115,5 +160,85 @@ export class AuditLogsService {
       where: { resource, resourceId },
       order: { timestamp: 'DESC' },
     });
+  }
+
+  private isLogRelatedToProject(
+    log: AuditLog,
+    projectId: string,
+    reportProjectMap: Map<string, string>,
+  ): boolean {
+    if (log.resource === 'PROJECT' && log.resourceId === projectId) {
+      return true;
+    }
+
+    if (log.resource === 'REPORT' && log.resourceId) {
+      const linkedProjectId = reportProjectMap.get(String(log.resourceId));
+      if (linkedProjectId === projectId) {
+        return true;
+      }
+    }
+
+    const details = this.parseDetails(log.details);
+
+    if (this.containsProjectReference(details, projectId)) {
+      return true;
+    }
+
+    if (typeof log.details === 'string' && log.details.includes(projectId)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private parseDetails(details?: string | object): unknown {
+    if (!details) {
+      return null;
+    }
+
+    if (typeof details === 'object') {
+      return details;
+    }
+
+    try {
+      return JSON.parse(details);
+    } catch {
+      return details;
+    }
+  }
+
+  private containsProjectReference(value: unknown, projectId: string): boolean {
+    if (value == null) {
+      return false;
+    }
+
+    if (typeof value === 'string') {
+      return value === projectId;
+    }
+
+    if (Array.isArray(value)) {
+      return value.some((entry) =>
+        this.containsProjectReference(entry, projectId),
+      );
+    }
+
+    if (typeof value === 'object') {
+      for (const [key, nestedValue] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        if (
+          (key === 'project_id' || key === 'parent_project_id') &&
+          nestedValue === projectId
+        ) {
+          return true;
+        }
+
+        if (this.containsProjectReference(nestedValue, projectId)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

@@ -622,11 +622,13 @@ const UserManagementPanel = ({
       {/* Title Section */}
       <div className="mb-6">
         <div
+          className="user-management-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '2rem',
+            flexWrap: 'wrap',
           }}
         >
           <div>
@@ -634,6 +636,7 @@ const UserManagementPanel = ({
             <p className="text-color-secondary m-0">{description}</p>
           </div>
           <div
+            className="user-management-actions"
             style={{
               display: 'flex',
               gap: '0.75rem',
@@ -641,53 +644,36 @@ const UserManagementPanel = ({
             }}
           >
             <Button
-              label={`Active ${entityPluralLabel}`}
-              icon="pi pi-users"
-              severity={viewMode === 'active' ? 'info' : 'secondary'}
-              onClick={() => {
-                setViewMode('active');
-                setSearchQuery('');
-              }}
-              className={
+              label={
                 viewMode === 'active'
-                  ? 'p-button-sm user-switch-btn active'
-                  : 'p-button-sm user-switch-btn'
+                  ? `Recycle Bin (${recycleCount})`
+                  : `Active ${entityPluralLabel}`
               }
-              text={viewMode !== 'active'}
-              outlined={viewMode !== 'active'}
-            />
-            <Button
-              label={`Recycle Bin (${recycleCount})`}
-              icon="pi pi-trash"
-              severity={viewMode === 'deleted' ? 'info' : 'secondary'}
+              icon={viewMode === 'active' ? 'pi pi-trash' : 'pi pi-users'}
               onClick={() => {
-                setViewMode('deleted');
+                setViewMode(viewMode === 'active' ? 'deleted' : 'active');
                 setSearchQuery('');
               }}
-              className={
-                viewMode === 'deleted'
-                  ? 'p-button-sm user-switch-btn active'
-                  : 'p-button-sm user-switch-btn'
-              }
-              text={viewMode !== 'deleted'}
-              outlined={viewMode !== 'deleted'}
+              className="p-button-sm user-switch-btn active"
             />
           </div>
-          <div className="reports-search-box">
-            <i className="pi pi-search"></i>
-            <InputText
-              placeholder={`Search ${entityPluralLabel.toLowerCase()}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="reports-search-input"
-            />
-            {searchQuery && (
-              <i
-                className="pi pi-times"
-                style={{ color: '#9ca3af', cursor: 'pointer' }}
-                onClick={() => setSearchQuery('')}
-              ></i>
-            )}
+          <div className="user-management-search-area">
+            <div className="reports-search-box">
+              <i className="pi pi-search"></i>
+              <InputText
+                placeholder={`Search ${entityPluralLabel.toLowerCase()}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="reports-search-input"
+              />
+              {searchQuery && (
+                <i
+                  className="pi pi-times"
+                  style={{ color: '#9ca3af', cursor: 'pointer' }}
+                  onClick={() => setSearchQuery('')}
+                ></i>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -911,7 +897,8 @@ const UserManagementPanel = ({
           />
         </div>
 
-        {(normalizedRoleFilter === 'client' || formData.user_role === 'client') && (
+        {(normalizedRoleFilter === 'client' ||
+          formData.user_role === 'client') && (
           <div className="field mt-3">
             <label htmlFor="address">Address</label>
             <InputText

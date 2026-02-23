@@ -65,6 +65,7 @@ const OverviewPanel = ({ users, onStatClick }) => {
 
     projects.forEach((project) => {
       if (project.isDeleted) return;
+      if (project.parent_project_id) return;
       totals.total += 1;
       const status = (project.project_status || 'ongoing').toLowerCase();
 
@@ -172,7 +173,7 @@ const OverviewPanel = ({ users, onStatClick }) => {
       statusColor: '#F59E0B',
     },
     {
-      amount: formatCurrency(financialTotals.totalPending),
+      amount: formatCurrency(totalUnpaid),
       label: '',
       status: 'Pending',
       statusColor: '#F59E0B',
@@ -184,7 +185,7 @@ const OverviewPanel = ({ users, onStatClick }) => {
       statusColor: '#10B981',
     },
     {
-      amount: formatCurrency(totalUnpaid),
+      amount: formatCurrency(financialTotals.totalPending),
       label: '',
       status: 'Unpaid',
       statusColor: '#EF4444',
@@ -197,6 +198,7 @@ const OverviewPanel = ({ users, onStatClick }) => {
     return projects
       .filter((project) => {
         if (project.isDeleted) return false;
+        if (project.parent_project_id) return false;
         const status = String(project.project_status || '').toLowerCase();
         return doneStatuses.has(status);
       })

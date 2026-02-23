@@ -209,11 +209,13 @@ const CategoriesPanel = () => {
       {/* Title Section */}
       <div className="mb-6">
         <div
+          className="categories-panel-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '2rem',
+            flexWrap: 'wrap',
           }}
         >
           <div>
@@ -222,21 +224,23 @@ const CategoriesPanel = () => {
               Manage project categories
             </p>
           </div>
-          <div className="reports-search-box">
-            <i className="pi pi-search"></i>
-            <InputText
-              placeholder="Search categories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="reports-search-input"
-            />
-            {searchQuery && (
-              <i
-                className="pi pi-times"
-                style={{ color: '#9ca3af', cursor: 'pointer' }}
-                onClick={() => setSearchQuery('')}
-              ></i>
-            )}
+          <div className="categories-panel-search-area">
+            <div className="reports-search-box">
+              <i className="pi pi-search"></i>
+              <InputText
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="reports-search-input"
+              />
+              {searchQuery && (
+                <i
+                  className="pi pi-times"
+                  style={{ color: '#9ca3af', cursor: 'pointer' }}
+                  onClick={() => setSearchQuery('')}
+                ></i>
+              )}
+            </div>
           </div>
         </div>
       </div>

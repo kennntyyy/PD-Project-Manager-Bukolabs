@@ -333,11 +333,13 @@ const AuditLogsPanel = () => {
       {/* Title Section */}
       <div className="mb-6">
         <div
+          className="audit-logs-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '2rem',
+            flexWrap: 'wrap',
           }}
         >
           <div>
@@ -346,21 +348,23 @@ const AuditLogsPanel = () => {
               Complete record of all system activities and changes
             </p>
           </div>
-          <div className="reports-search-box">
-            <i className="pi pi-search"></i>
-            <InputText
-              placeholder="Search audit logs..."
-              value={globalSearch}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="reports-search-input"
-            />
-            {globalSearch && (
-              <i
-                className="pi pi-times"
-                style={{ color: '#9ca3af', cursor: 'pointer' }}
-                onClick={resetFilters}
-              ></i>
-            )}
+          <div className="audit-logs-search-area">
+            <div className="reports-search-box">
+              <i className="pi pi-search"></i>
+              <InputText
+                placeholder="Search audit logs..."
+                value={globalSearch}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="reports-search-input"
+              />
+              {globalSearch && (
+                <i
+                  className="pi pi-times"
+                  style={{ color: '#9ca3af', cursor: 'pointer' }}
+                  onClick={resetFilters}
+                ></i>
+              )}
+            </div>
           </div>
         </div>
       </div>

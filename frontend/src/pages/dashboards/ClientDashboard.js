@@ -18,12 +18,14 @@ import { ProjectReportPDF } from '../dashboards/staff_panels/ProjectReportPDF';
 Font.register({
   family: 'Source Serif Pro',
   fonts: [
-    { src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica.ttf' },
-    { 
-      src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica-Bold.ttf', 
-      fontWeight: 'bold' 
-    }
-  ]
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica.ttf',
+    },
+    {
+      src: 'https://cdn.jsdelivr.net/npm/@canvas-fonts/helvetica@1.0.4/Helvetica-Bold.ttf',
+      fontWeight: 'bold',
+    },
+  ],
 });
 
 const ClientDashboard = () => {
@@ -31,133 +33,135 @@ const ClientDashboard = () => {
   const toast = useRef(null);
   const [clients, setClients] = useState([]);
 
-    const showToast = (severity, summary, detail) => {
-      toast.current.show({ severity, summary, detail, life: 3000 });
-    };
+  const showToast = (severity, summary, detail) => {
+    toast.current.show({ severity, summary, detail, life: 3000 });
+  };
 
-    const formatDateForFilename = (dateString) => {
-      if (!dateString) return 'unknown';
-      const date = new Date(dateString);
-      return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    };
+  const formatDateForFilename = (dateString) => {
+    if (!dateString) return 'unknown';
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+  };
 
-    const getClientName = (clientId) => {
+  const getClientName = (clientId) => {
     if (!clientId) return 'NO CLIENT RECORD';
     const client = clients.find((c) => c.user_id === clientId);
     return client ? `${client.first_name} ${client.last_name}` : '';
-    };
+  };
 
-    const getImageUrl = (imagePath) => {
+  const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
     const apiBaseUrl =
       process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
     const baseUrl = apiBaseUrl.replace('/api', '');
     if (imagePath.startsWith('http')) return imagePath;
     return `${baseUrl}${imagePath}`;
-   };
-    
-    const downloadReportPDF = async (report) => {
-        try {
-          console.log('Report object:', report); // Debug log
-          const project = projects.find((p) => p.project_id === report.project_id);
-          if (!project) {
-            showToast('error', 'Error', 'Project not found');
-            return;
-          }
-    
-          const reportDates = {
-            projectStart: project.project_start_date
-              ? new Date(project.project_start_date).toLocaleDateString()
-              : '',
-            projectEnd: project.project_deadline
-              ? new Date(project.project_deadline).toLocaleDateString()
-              : '',
-            reportStart: report.start_date
-              ? new Date(report.start_date).toLocaleDateString()
-              : report.report_date
-                ? new Date(report.report_date).toLocaleDateString()
-                : 'N/A',
-            reportEnd: report.end_date
-              ? new Date(report.end_date).toLocaleDateString()
-              : report.report_date
-                ? new Date(report.report_date).toLocaleDateString()
-                : 'N/A',
-          };
-    
-          // Convert relative image URLs to absolute URLs for PDF
-          const absoluteImageUrls = (report.image_urls || []).map((url) =>
-            getImageUrl(url) // This uses your helper function
-          );
-    
-          // Calculate total spent only for reports up to and including this report
-          const reportDate = new Date(report.created_at || report.start_date);
-          const projectReports = recentReports.filter(
-            (r) =>
-              r.project_id === report.project_id &&
-              new Date(r.created_at || r.start_date) <= reportDate,
-          );
-          const totalSpent = projectReports.reduce(
-            (sum, r) => sum + (Number(r.payment_requested) || 0),
-            0,
-          );
-          const enrichedProject = {
-            ...project,
-            total_amount_released: totalSpent,
-          };
-    
-          const doc = (
-            <ProjectReportPDF
-              data={enrichedProject}
-              clientName={getClientName(project.client_id)}
-              contractorName={getContractorName(project.contractor_id)}
-              completionRate={report.current_progress || 0}
-              reportDates={reportDates}
-              imageUrls={absoluteImageUrls}
-              imageComments={report.image_comments}
-              reportDescription={report.report_description}
-            />
-          );
-    
-          const blob = await pdf(doc).toBlob();
-          const fileName = `Report_${project.project_name}_${formatDateForFilename(report.start_date)}.pdf`;
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          link.click();
-          URL.revokeObjectURL(url);
-    
-          showToast('success', 'Success', 'PDF downloaded successfully');
-        } catch (error) {
-          console.error('Error generating PDF:', error);
-          showToast('error', 'Error', 'Failed to generate PDF');
-        }
+  };
+
+  const downloadReportPDF = async (report) => {
+    try {
+      console.log('Report object:', report); // Debug log
+      const project = projects.find((p) => p.project_id === report.project_id);
+      if (!project) {
+        showToast('error', 'Error', 'Project not found');
+        return;
+      }
+
+      const reportDates = {
+        projectStart: project.project_start_date
+          ? new Date(project.project_start_date).toLocaleDateString()
+          : '',
+        projectEnd: project.project_deadline
+          ? new Date(project.project_deadline).toLocaleDateString()
+          : '',
+        reportStart: report.start_date
+          ? new Date(report.start_date).toLocaleDateString()
+          : report.report_date
+            ? new Date(report.report_date).toLocaleDateString()
+            : 'N/A',
+        reportEnd: report.end_date
+          ? new Date(report.end_date).toLocaleDateString()
+          : report.report_date
+            ? new Date(report.report_date).toLocaleDateString()
+            : 'N/A',
       };
 
-    // Save as CSV
-    const handleSaveAsCSV = () => {
-      let csv = 'Project Details\n';
-      if (selectedProject) {
-        Object.entries(selectedProject).forEach(([key, value]) => {
-          csv += `${key},${value}\n`;
-        });
-      }
-      csv += '\nReports\n';
-      if (projectReports.length > 0) {
-        const reportKeys = Object.keys(projectReports[0]);
-        csv += reportKeys.join(',') + '\n';
-        projectReports.forEach(report => {
-          csv += reportKeys.map(key => JSON.stringify(report[key] ?? '')).join(',') + '\n';
-        });
-      }
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'project-details.csv';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    };
+      // Convert relative image URLs to absolute URLs for PDF
+      const absoluteImageUrls = (report.image_urls || []).map(
+        (url) => getImageUrl(url), // This uses your helper function
+      );
+
+      // Calculate total spent only for reports up to and including this report
+      const reportDate = new Date(report.created_at || report.start_date);
+      const projectReports = recentReports.filter(
+        (r) =>
+          r.project_id === report.project_id &&
+          new Date(r.created_at || r.start_date) <= reportDate,
+      );
+      const totalSpent = projectReports.reduce(
+        (sum, r) => sum + (Number(r.payment_requested) || 0),
+        0,
+      );
+      const enrichedProject = {
+        ...project,
+        total_amount_released: totalSpent,
+      };
+
+      const doc = (
+        <ProjectReportPDF
+          data={enrichedProject}
+          clientName={getClientName(project.client_id)}
+          contractorName={getContractorName(project.contractor_id)}
+          completionRate={report.current_progress || 0}
+          reportDates={reportDates}
+          imageUrls={absoluteImageUrls}
+          imageComments={report.image_comments}
+          reportDescription={report.report_description}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const fileName = `Report_${project.project_name}_${formatDateForFilename(report.start_date)}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'Success', 'PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      showToast('error', 'Error', 'Failed to generate PDF');
+    }
+  };
+
+  // Save as CSV
+  const handleSaveAsCSV = () => {
+    let csv = 'Project Details\n';
+    if (selectedProject) {
+      Object.entries(selectedProject).forEach(([key, value]) => {
+        csv += `${key},${value}\n`;
+      });
+    }
+    csv += '\nReports\n';
+    if (projectReports.length > 0) {
+      const reportKeys = Object.keys(projectReports[0]);
+      csv += reportKeys.join(',') + '\n';
+      projectReports.forEach((report) => {
+        csv +=
+          reportKeys.map((key) => JSON.stringify(report[key] ?? '')).join(',') +
+          '\n';
+      });
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'project-details.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
   const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(
@@ -174,7 +178,6 @@ const ClientDashboard = () => {
     return false;
   });
   const [isNarrow, setIsNarrow] = useState(false);
-  
 
   // Projects state
   const [projects, setProjects] = useState([]);
@@ -225,30 +228,29 @@ const ClientDashboard = () => {
     }
   };
   const fetchContractors = async () => {
-      try {
-        const response = await api.get('/users');
-        const contractorsList = response.data.filter(
-          (user) => user.user_role === 'contractor',
-        );
-        setContractors(contractorsList);
-      } catch (error) {
-        console.error('Failed to fetch contractors:', error);
-        toast.current?.show({
-          severity: 'error',
-          summary: 'Error',
-          detail: 'Failed to load contractors',
-        });
-      }
-    };
+    try {
+      const response = await api.get('/users');
+      const contractorsList = response.data.filter(
+        (user) => user.user_role === 'contractor',
+      );
+      setContractors(contractorsList);
+    } catch (error) {
+      console.error('Failed to fetch contractors:', error);
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to load contractors',
+      });
+    }
+  };
 
+  useEffect(() => {
+    fetchContractors();
+  }, []);
 
-    useEffect(() => {
-      fetchContractors();
-    }, []);
+  //get name of contractors
 
-    //get name of contractors
-
-    const getContractorName = (contractorId) => {
+  const getContractorName = (contractorId) => {
     if (!contractorId) return '';
     const contractor = contractors.find((c) => c.user_id === contractorId);
     return contractor
@@ -423,37 +425,39 @@ const ClientDashboard = () => {
   };
 
   const getFilteredProjects = () => {
-  // 1. Initial filter for deleted status
-  let filtered = projects.filter((project) => {
-    return project.isDeleted === false || project.isDeleted === undefined;
-  });
-
-  // 2. Apply search if query exists
-  if (searchQuery.trim()) {
-    const query = searchQuery.toLowerCase();
-
-    filtered = filtered.filter((project) => {
-      // Pre-fetch names from helpers and normalize to lowercase
-      const contractorName = getContractorName(project.contractor_id).toLowerCase();
-      const clientName = getClientName(project.client_id).toLowerCase();
-      
-      return (
-        project.project_name?.toLowerCase().includes(query) ||
-        project.project_description?.toLowerCase().includes(query) ||
-        project.total_amount?.toString().includes(query) ||
-        contractorName.includes(query) || // Search by Contractor
-        clientName.includes(query) ||     // Search by Client
-        (project.project_deadline &&
-          new Date(project.project_deadline)
-            .toLocaleDateString()
-            .toLowerCase()
-            .includes(query))
-      );
+    // 1. Initial filter for deleted status
+    let filtered = projects.filter((project) => {
+      return project.isDeleted === false || project.isDeleted === undefined;
     });
-  }
 
-  return filtered;
-};
+    // 2. Apply search if query exists
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+
+      filtered = filtered.filter((project) => {
+        // Pre-fetch names from helpers and normalize to lowercase
+        const contractorName = getContractorName(
+          project.contractor_id,
+        ).toLowerCase();
+        const clientName = getClientName(project.client_id).toLowerCase();
+
+        return (
+          project.project_name?.toLowerCase().includes(query) ||
+          project.project_description?.toLowerCase().includes(query) ||
+          project.total_amount?.toString().includes(query) ||
+          contractorName.includes(query) || // Search by Contractor
+          clientName.includes(query) || // Search by Client
+          (project.project_deadline &&
+            new Date(project.project_deadline)
+              .toLocaleDateString()
+              .toLowerCase()
+              .includes(query))
+        );
+      });
+    }
+
+    return filtered;
+  };
 
   const filteredProjects = getFilteredProjects();
   const mainProjects = filteredProjects.filter(
@@ -474,17 +478,15 @@ const ClientDashboard = () => {
 
   const getCompletionRateForProject = (projectId) => {
     if (!projectId) return 0;
-    const matchingReports = recentReports.filter(
-      (report) => {
-        const reportProjectId =
-          report?.project_id?.project_id ||
-          report?.project_id?.id ||
-          report?.project_id ||
-          report?.project?.project_id ||
-          report?.project?.id;
-        return reportProjectId === projectId;
-      },
-    );
+    const matchingReports = recentReports.filter((report) => {
+      const reportProjectId =
+        report?.project_id?.project_id ||
+        report?.project_id?.id ||
+        report?.project_id ||
+        report?.project?.project_id ||
+        report?.project?.id;
+      return reportProjectId === projectId;
+    });
     if (matchingReports.length === 0) return 0;
     return Math.max(
       ...matchingReports.map((report) => Number(report.current_progress || 0)),
@@ -517,15 +519,22 @@ const ClientDashboard = () => {
       <div className="dashboard-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <img src="/logo.png" alt="Logo" style={{
-              width: '200%', height: '200%',
-            }}/>
+            <img
+              src="/logo.png"
+              alt="Logo"
+              style={{
+                width: '200%',
+                height: '200%',
+              }}
+            />
           </div>
           <button
             type="button"
             className="sidebar-toggle"
             onClick={() => setSidebarCollapsed((prev) => !prev)}
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={
+              isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            }
           >
             <i
               className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
@@ -551,8 +560,15 @@ const ClientDashboard = () => {
               <span>{item.label}</span>
             </div>
           ))}
-        </div> 
-        <div className="sidebar-footer" style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+        </div>
+        <div
+          className="sidebar-footer"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
           <div className="sidebar-user-profile">
             <div className="sidebar-user-avatar">
               {user?.profile_pic ? (
@@ -568,7 +584,9 @@ const ClientDashboard = () => {
               <p className="sidebar-user-name">
                 {user?.first_name} {user?.last_name}
               </p>
-              <p className="sidebar-user-role">{user?.user_role?.toUpperCase()}</p>
+              <p className="sidebar-user-role">
+                {user?.user_role?.toUpperCase()}
+              </p>
             </div>
           </div>
           <Button
@@ -625,11 +643,7 @@ const ClientDashboard = () => {
           {activeTab === 'projects' && (
             <div className="projects-panel">
               <div className="panel-header">
-                <div className="search-filter-section" style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between'
-                }}>
+                <div className="search-filter-section">
                   <div>
                     <h1>PROJECTS</h1>
                     <p className="text-color-secondary m-0">
@@ -637,7 +651,6 @@ const ClientDashboard = () => {
                     </p>
                   </div>
                   <div className="p-inputgroup" style={{ maxWidth: '400px' }}>
-
                     <div className="reports-search-box">
                       <i className="pi pi-search"></i>
                       <InputText
@@ -654,7 +667,6 @@ const ClientDashboard = () => {
                         ></i>
                       )}
                     </div>
-                   
                   </div>
 
                   {/* <Dropdown
@@ -706,7 +718,10 @@ const ClientDashboard = () => {
                     </div>
                   </div>
                   <div className="stat-card">
-                    <i className="pi pi-pause-circle" style={{ color: 'red' }} />
+                    <i
+                      className="pi pi-pause-circle"
+                      style={{ color: 'red' }}
+                    />
                     <div>
                       <h3>
                         {
@@ -781,7 +796,8 @@ const ClientDashboard = () => {
                       value={selectedCompletionRate}
                       className="report-progress-bar"
                       style={{
-                        '--progress-color': getStatusMeta(selectedProject).color,
+                        '--progress-color':
+                          getStatusMeta(selectedProject).color,
                       }}
                     />
                     <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
@@ -806,7 +822,7 @@ const ClientDashboard = () => {
                       </div>
                     ) : (
                       <div className="subproject-grid">
-                        {selectedSubprojects.map((subproject) => (
+                        {selectedSubprojects.map((subproject) =>
                           (() => {
                             const subCompletion = getCompletionRateForProject(
                               subproject.project_id,
@@ -816,68 +832,78 @@ const ClientDashboard = () => {
                               subCompletion,
                             );
                             return (
-                          <div
-                            key={subproject.project_id}
-                            className="subproject-card"
-                          >
-                            <div className="subproject-card-header">
-                              <h5 className="subproject-title">
-                                {subproject.project_name}
-                              </h5>
-                              {statusTemplate(subproject)}
-                            </div>
-                            <p className="subproject-desc">
-                              {subproject.project_description ||
-                                'No description'}
-                            </p>
-                            <div className="subproject-progress">
-                              <ProgressBar
-                                value={subCompletion}
-                                className="report-progress-bar"
-                                style={{
-                                  height: '12px',
-                                  '--progress-color': getStatusMeta(subproject)
-                                    .color,
-                                }}
-                              />
-                              <div className="subproject-progress-text">
-                                {subCompletion}% complete
-                              </div>
-                            </div>
-                            <div className="subproject-meta">
-                              <div>
-                                <div className="metric-label">Contractor</div>
-                                <div>
-                                  {getContractorName(
-                                    subproject.contractor_id,
-                                  )}
+                              <div
+                                key={subproject.project_id}
+                                className="subproject-card"
+                              >
+                                <div className="subproject-card-header">
+                                  <h5 className="subproject-title">
+                                    {subproject.project_name}
+                                  </h5>
+                                  {statusTemplate(subproject)}
+                                </div>
+                                <p className="subproject-desc">
+                                  {subproject.project_description ||
+                                    'No description'}
+                                </p>
+                                <div className="subproject-progress">
+                                  <ProgressBar
+                                    value={subCompletion}
+                                    className="report-progress-bar"
+                                    style={{
+                                      height: '12px',
+                                      '--progress-color':
+                                        getStatusMeta(subproject).color,
+                                    }}
+                                  />
+                                  <div className="subproject-progress-text">
+                                    {subCompletion}% complete
+                                  </div>
+                                </div>
+                                <div className="subproject-meta">
+                                  <div>
+                                    <div className="metric-label">
+                                      Contractor
+                                    </div>
+                                    <div>
+                                      {getContractorName(
+                                        subproject.contractor_id,
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="metric-label">
+                                      Contract Amount
+                                    </div>
+                                    <div>{amountTemplate(subproject)}</div>
+                                  </div>
+                                  <div>
+                                    <div className="metric-label">Due Date</div>
+                                    <div>{dateTemplate(subproject)}</div>
+                                  </div>
+                                  <div>
+                                    <div className="metric-label">
+                                      Days Remaining
+                                    </div>
+                                    <div
+                                      style={{ color: subDaysRemaining.color }}
+                                    >
+                                      {subDaysRemaining.text}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                              <div>
-                                <div className="metric-label">Contract Amount</div>
-                                <div>{amountTemplate(subproject)}</div>
-                              </div>
-                              <div>
-                                <div className="metric-label">Due Date</div>
-                                <div>{dateTemplate(subproject)}</div>
-                              </div>
-                              <div>
-                                <div className="metric-label">Days Remaining</div>
-                                <div style={{ color: subDaysRemaining.color }}>
-                                  {subDaysRemaining.text}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
                             );
-                          })()
-                        ))}
+                          })(),
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
               ) : loading ? (
-                <div className="project-dashboard-empty">Loading projects...</div>
+                <div className="project-dashboard-empty">
+                  Loading projects...
+                </div>
               ) : mainProjects.length === 0 ? (
                 <div className="project-dashboard-empty">
                   {searchQuery || statusFilter !== 'all'
@@ -935,8 +961,6 @@ const ClientDashboard = () => {
           )}
         </div>
       </div>
-      
-
     </div>
   );
 };

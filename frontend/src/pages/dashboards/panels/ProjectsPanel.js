@@ -37,7 +37,9 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
   const toast = useRef(null);
 
   const normalizeStatus = (status) => {
-    const normalized = String(status || '').toLowerCase().trim();
+    const normalized = String(status || '')
+      .toLowerCase()
+      .trim();
     if (['done', 'completed', 'cancelled'].includes(normalized)) return 'done';
     if (['hold', 'on_hold', 'on hold'].includes(normalized)) return 'hold';
     return 'ongoing';
@@ -78,6 +80,7 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
     amount: '',
     startDate: null,
     endDate: null,
+    parent_project_id: null,
     contractor_id: null,
     client_id: null,
     project_status: 'Ongoing',
@@ -378,7 +381,7 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
     }
 
     const projectReports = reports.filter(
-      (r) => r.project_id === project.project_id && !r.isDeleted
+      (r) => r.project_id === project.project_id && !r.isDeleted,
     );
 
     let totalPaid = 0;
@@ -561,6 +564,7 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
       endDate: project.project_deadline
         ? new Date(project.project_deadline)
         : null,
+      parent_project_id: project.parent_project_id || null,
       contractor_id: project.contractor_id,
       client_id: project.client_id || null,
       project_status: project.project_status || 'Ongoing',
@@ -588,7 +592,9 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
         project_start_date: editingProject.startDate,
         project_deadline: editingProject.endDate,
         client_id: editingProject.client_id,
-        contractor_id: editingProject.contractor_id,
+        contractor_id: editingProject.parent_project_id
+          ? editingProject.contractor_id
+          : null,
         project_status: editingProject.project_status,
       });
 
@@ -779,11 +785,13 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
       {/* Title Section */}
       <div className="mb-6">
         <div
+          className="projects-panel-header"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '2rem',
+            flexWrap: 'wrap',
           }}
         >
           <div>
@@ -793,6 +801,7 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
             </p>
           </div>
           <div
+            className="projects-panel-actions"
             style={{
               display: 'flex',
               gap: '0.75rem',
@@ -800,36 +809,18 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
             }}
           >
             <Button
-              label="Active Projects"
-              icon="pi pi-folder"
-              severity={viewMode === 'active' ? 'info' : 'secondary'}
-              onClick={() => {
-                setViewMode('active');
-                setSearchQuery('');
-              }}
-              className={
+              label={
                 viewMode === 'active'
-                  ? 'p-button-sm user-switch-btn active'
-                  : 'p-button-sm user-switch-btn'
+                  ? `Recycle Bin (${projects.filter((p) => p.isDeleted).length})`
+                  : 'Active Projects'
               }
-              text={viewMode !== 'active'}
-              outlined={viewMode !== 'active'}
-            />
-            <Button
-              label={`Recycle Bin (${projects.filter((p) => p.isDeleted).length})`}
-              icon="pi pi-trash"
-              severity={viewMode === 'deleted' ? 'info' : 'secondary'}
+              icon={viewMode === 'active' ? 'pi pi-trash' : 'pi pi-folder'}
+              severity="info"
               onClick={() => {
-                setViewMode('deleted');
+                setViewMode(viewMode === 'active' ? 'deleted' : 'active');
                 setSearchQuery('');
               }}
-              className={
-                viewMode === 'deleted'
-                  ? 'p-button-sm user-switch-btn active'
-                  : 'p-button-sm user-switch-btn'
-              }
-              text={viewMode !== 'deleted'}
-              outlined={viewMode !== 'deleted'}
+              className="p-button-sm user-switch-btn active"
             />
           </div>
           <div className="projects-search-area">
@@ -857,7 +848,8 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
                 title="Clear status filter"
               >
                 <span>
-                  Status: {statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                  Status:{' '}
+                  {statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
                 </span>
                 <i className="pi pi-times"></i>
               </button>
@@ -924,11 +916,6 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
             sortable
           />
           <Column field="client_id" header="Client" body={clientTemplate} />
-          <Column
-            field="contractor_id"
-            header="Contractor"
-            body={contractorTemplate}
-          />
           <Column
             field="project_description"
             header="Description"
@@ -1375,7 +1362,13 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
               <h3 style={{ margin: 0, color: '#111827', fontSize: '1.25rem' }}>
                 {selectedProject.project_name}
               </h3>
-              <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+              <p
+                style={{
+                  margin: '0.25rem 0 0',
+                  color: '#6b7280',
+                  fontSize: '0.9rem',
+                }}
+              >
                 {selectedProject.project_description || 'No description'}
               </p>
             </div>
@@ -1389,66 +1382,148 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
               }}
             >
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Status
                 </div>
-                <div style={{ fontSize: '0.95rem' }}>{selectedProject.project_status || 'Ongoing'}</div>
+                <div style={{ fontSize: '0.95rem' }}>
+                  {selectedProject.project_status || 'Ongoing'}
+                </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Client
                 </div>
-                <div style={{ fontSize: '0.95rem' }}>{clientTemplate(selectedProject)}</div>
-              </div>
-              <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
-                  Contractor
+                <div style={{ fontSize: '0.95rem' }}>
+                  {clientTemplate(selectedProject)}
                 </div>
-                <div style={{ fontSize: '0.95rem' }}>{contractorTemplate(selectedProject)}</div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Total Value
                 </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#111827' }}>
-                  {formatCurrency(calculateProjectFinancials(selectedProject).totalValue)}
+                <div
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    color: '#111827',
+                  }}
+                >
+                  {formatCurrency(
+                    calculateProjectFinancials(selectedProject).totalValue,
+                  )}
                 </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Paid
                 </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#10B981' }}>
-                  {formatCurrency(calculateProjectFinancials(selectedProject).totalPaid)}
+                <div
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    color: '#10B981',
+                  }}
+                >
+                  {formatCurrency(
+                    calculateProjectFinancials(selectedProject).totalPaid,
+                  )}
                 </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Pending
                 </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#F59E0B' }}>
-                  {formatCurrency(calculateProjectFinancials(selectedProject).totalPending)}
+                <div
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    color: '#F59E0B',
+                  }}
+                >
+                  {formatCurrency(
+                    calculateProjectFinancials(selectedProject).totalUnpaid,
+                  )}
                 </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Unpaid
                 </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#EF4444' }}>
-                  {formatCurrency(calculateProjectFinancials(selectedProject).totalUnpaid)}
+                <div
+                  style={{
+                    fontSize: '0.95rem',
+                    fontWeight: '600',
+                    color: '#EF4444',
+                  }}
+                >
+                  {formatCurrency(
+                    calculateProjectFinancials(selectedProject).totalPending,
+                  )}
                 </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   Start Date
                 </div>
-                <div style={{ fontSize: '0.95rem' }}>{startDateTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>
+                  {startDateTemplate(selectedProject)}
+                </div>
               </div>
               <div>
-                <div style={{ color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>
+                <div
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                  }}
+                >
                   End Date
                 </div>
-                <div style={{ fontSize: '0.95rem' }}>{endDateTemplate(selectedProject)}</div>
+                <div style={{ fontSize: '0.95rem' }}>
+                  {endDateTemplate(selectedProject)}
+                </div>
               </div>
             </div>
 
@@ -1636,26 +1711,30 @@ const ProjectsPanel = ({ statusFilter, onStatusFilterClear }) => {
           />
         </div>
 
-        <div className="field mt-3">
-          <label
-            htmlFor="edit-project-contractor"
-            style={{ color: '#4A4A3A', fontWeight: '600' }}
-          >
-            Contractor
-          </label>
-          <Dropdown
-            id="edit-project-contractor"
-            value={editingProject.contractor_id}
-            onChange={(e) =>
-              setEditingProject({ ...editingProject, contractor_id: e.value })
-            }
-            options={contractors}
-            optionLabel={(option) => `${option.first_name} ${option.last_name}`}
-            optionValue="user_id"
-            placeholder="Select a contractor"
-            style={{ borderColor: '#cbd5e1' }}
-          />
-        </div>
+        {editingProject.parent_project_id && (
+          <div className="field mt-3">
+            <label
+              htmlFor="edit-project-contractor"
+              style={{ color: '#4A4A3A', fontWeight: '600' }}
+            >
+              Contractor
+            </label>
+            <Dropdown
+              id="edit-project-contractor"
+              value={editingProject.contractor_id}
+              onChange={(e) =>
+                setEditingProject({ ...editingProject, contractor_id: e.value })
+              }
+              options={contractors}
+              optionLabel={(option) =>
+                `${option.first_name} ${option.last_name}`
+              }
+              optionValue="user_id"
+              placeholder="Select a contractor"
+              style={{ borderColor: '#cbd5e1' }}
+            />
+          </div>
+        )}
 
         <div className="field mt-3">
           <label

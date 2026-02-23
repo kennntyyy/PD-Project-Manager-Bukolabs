@@ -841,6 +841,27 @@ const ReportsPanel = ({
     })}`;
   };
 
+  const getBillingBalancePreview = () => {
+    const contractAmount = Number(selectedProject?.total_amount) || 0;
+    const totalReleased = Number(selectedProject?.total_amount_released) || 0;
+    const currentPayment = editingReport
+      ? Number(editingReport.payment_requested || 0)
+      : 0;
+    const enteredAmount = Number(releasedAmount) || 0;
+
+    const totalReleasedBeforeCurrent = Math.max(
+      0,
+      totalReleased - currentPayment,
+    );
+    const remainingAfterEntry =
+      contractAmount - totalReleasedBeforeCurrent - enteredAmount;
+
+    return {
+      totalReleased,
+      remainingAfterEntry,
+    };
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Not set';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -1974,7 +1995,7 @@ const ReportsPanel = ({
                     alignItems: 'center',
                   }}
                 >
-                  {formatCurrency(selectedProject?.total_amount_released || 0)}
+                  {formatCurrency(getBillingBalancePreview().totalReleased)}
                 </div>
               </div>
 
@@ -2012,20 +2033,28 @@ const ReportsPanel = ({
                 <div
                   style={{
                     padding: '0.75rem',
-                    backgroundColor: '#f0fdf4',
+                    backgroundColor:
+                      getBillingBalancePreview().remainingAfterEntry < 0
+                        ? '#fef2f2'
+                        : '#f0fdf4',
                     borderRadius: '6px',
                     fontSize: '16px',
                     fontWeight: 'bold',
-                    color: '#065f46',
-                    border: '1px solid #86efac',
+                    color:
+                      getBillingBalancePreview().remainingAfterEntry < 0
+                        ? '#b91c1c'
+                        : '#065f46',
+                    border:
+                      getBillingBalancePreview().remainingAfterEntry < 0
+                        ? '1px solid #fecaca'
+                        : '1px solid #86efac',
                     height: '42px',
                     display: 'flex',
                     alignItems: 'center',
                   }}
                 >
                   {formatCurrency(
-                    (Number(selectedProject?.total_amount) || 0) -
-                      (selectedProject?.total_amount_released || 0),
+                    getBillingBalancePreview().remainingAfterEntry,
                   )}
                 </div>
               </div>

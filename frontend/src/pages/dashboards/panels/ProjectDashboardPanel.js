@@ -527,6 +527,31 @@ const ProjectDashboardPanel = () => {
     return Math.max(0, parentTotal - allocatedTotal);
   };
 
+  const getSubProjectBalancePreview = () => {
+    const parentTotal = Number(selectedProject?.total_amount || 0);
+    const inputAmount = Number(newSubProject.amount || 0);
+
+    const allocatedExcludingCurrent = activeSubProjects.reduce(
+      (sum, project) => {
+        if (
+          editingSubProject &&
+          normalizeId(project.project_id) ===
+            normalizeId(editingSubProject.project_id)
+        ) {
+          return sum;
+        }
+        return sum + Number(project.total_amount || 0);
+      },
+      0,
+    );
+
+    return {
+      remainingBeforeInput: parentTotal - allocatedExcludingCurrent,
+      remainingAfterInput:
+        parentTotal - allocatedExcludingCurrent - inputAmount,
+    };
+  };
+
   const pagedSubProjects = useMemo(() => {
     const start = subProjectFirst;
     const end = subProjectFirst + subProjectRows;
@@ -1210,7 +1235,7 @@ const ProjectDashboardPanel = () => {
                       gap: '0.35rem',
                     }}
                   >
-                    Total Value
+                    Contract Amount
                     {!isEditingTotalValue && (
                       <Button
                         icon="pi pi-pencil"
@@ -1362,7 +1387,7 @@ const ProjectDashboardPanel = () => {
                     }}
                   >
                     {formatCurrency(
-                      calculateProjectFinancials(selectedProject).totalPending,
+                      calculateProjectFinancials(selectedProject).totalUnpaid,
                     )}
                   </div>
                 </div>
@@ -1399,7 +1424,7 @@ const ProjectDashboardPanel = () => {
                     }}
                   >
                     {formatCurrency(
-                      calculateProjectFinancials(selectedProject).totalUnpaid,
+                      calculateProjectFinancials(selectedProject).totalPending,
                     )}
                   </div>
                 </div>
@@ -1705,46 +1730,31 @@ const ProjectDashboardPanel = () => {
                   <h4>Projects</h4>
                   <span className="text-muted">{subProjects.length} total</span>
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.75rem',
-                    alignItems: 'center',
-                  }}
-                >
+                <div className="project-dashboard-project-actions">
                   <Button
-                    label="Active Projects"
-                    icon="pi pi-folder"
-                    severity={
-                      subProjectViewMode === 'active' ? 'info' : 'secondary'
+                    label={
+                      subProjectViewMode === 'active'
+                        ? `Recycle Bin (${deletedSubProjects.length})`
+                        : 'Active Projects'
                     }
-                    onClick={() => setSubProjectViewMode('active')}
-                    className="p-button-sm"
-                    text={subProjectViewMode !== 'active'}
-                    outlined={subProjectViewMode !== 'active'}
-                  />
-                  <Button
-                    label={`Recycle Bin (${deletedSubProjects.length})`}
-                    icon="pi pi-trash"
-                    severity={
-                      subProjectViewMode === 'deleted' ? 'info' : 'secondary'
+                    icon={
+                      subProjectViewMode === 'active'
+                        ? 'pi pi-trash'
+                        : 'pi pi-folder'
                     }
-                    onClick={() => setSubProjectViewMode('deleted')}
-                    className="p-button-sm"
-                    text={subProjectViewMode !== 'deleted'}
-                    outlined={subProjectViewMode !== 'deleted'}
+                    onClick={() =>
+                      setSubProjectViewMode(
+                        subProjectViewMode === 'active' ? 'deleted' : 'active',
+                      )
+                    }
+                    className="p-button-sm user-switch-btn active"
                   />
                   {subProjectViewMode === 'active' && (
                     <Button
                       label="Add Project"
                       icon="pi pi-plus"
-                      severity="info"
                       onClick={openSubProjectDialog}
-                      style={{
-                        backgroundColor: '#4A4A3A',
-                        color: '#ffffff',
-                      }}
-                      className="p-button-sm"
+                      className="add-user-btn"
                     />
                   )}
                 </div>
@@ -1801,14 +1811,7 @@ const ProjectDashboardPanel = () => {
                             {rate}% complete
                           </div>
                         </div>
-                        <div
-                          className="subproject-meta"
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '0.75rem',
-                          }}
-                        >
+                        <div className="subproject-meta">
                           <div>
                             <div className="metric-label">Contractor</div>
                             <div style={{ fontSize: '0.875rem' }}>
@@ -1859,7 +1862,7 @@ const ProjectDashboardPanel = () => {
                                 icon="pi pi-pencil"
                                 label="Edit"
                                 severity="secondary"
-                                className="p-button-sm"
+                                className="p-button-sm subproject-action-btn"
                                 style={{
                                   backgroundColor: '#4A4A3A',
                                   color: '#ffffff',
@@ -1872,7 +1875,7 @@ const ProjectDashboardPanel = () => {
                                 icon="pi pi-trash"
                                 label="Delete"
                                 severity="danger"
-                                className="p-button-sm"
+                                className="p-button-sm subproject-action-btn"
                                 onClick={() =>
                                   handleDeleteSubProject(subproject)
                                 }
@@ -1881,7 +1884,7 @@ const ProjectDashboardPanel = () => {
                                 icon="pi pi-file"
                                 label="Billings"
                                 severity="secondary"
-                                className="p-button-sm"
+                                className="p-button-sm subproject-action-btn"
                                 style={{
                                   backgroundColor: '#4A4A3A',
                                   color: '#ffffff',
@@ -1943,7 +1946,7 @@ const ProjectDashboardPanel = () => {
                     Generate and review project billing
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div className="project-dashboard-billing-actions">
                   <Button
                     label="View History"
                     icon="pi pi-history"
@@ -2181,6 +2184,20 @@ const ProjectDashboardPanel = () => {
             maxFractionDigits={2}
             style={{ borderColor: '#cbd5e1' }}
           />
+          <small
+            style={{
+              display: 'block',
+              marginTop: '0.5rem',
+              color:
+                getSubProjectBalancePreview().remainingAfterInput < 0
+                  ? '#dc2626'
+                  : '#065f46',
+              fontWeight: '600',
+            }}
+          >
+            Balance Remaining:{' '}
+            {formatCurrency(getSubProjectBalancePreview().remainingAfterInput)}
+          </small>
         </div>
 
         <div className="field mt-3">

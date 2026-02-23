@@ -277,6 +277,14 @@
   margin-bottom: 0.75rem;
 }
 
+.project-dashboard-project-actions,
+.project-dashboard-billing-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .project-dashboard-divider {
   height: 1px;
   background: #e5e7eb;
@@ -406,10 +414,23 @@
   margin-top: auto;
 }
 
+.subproject-action-btn {
+  justify-content: center !important;
+  text-align: center;
+}
+
+.subproject-action-btn .p-button-label {
+  text-align: center;
+}
+
 .subproject-paginator {
   margin-top: 1rem;
   display: flex;
   justify-content: center;
+}
+
+.subproject-paginator .p-paginator {
+  flex-wrap: wrap;
 }
 
 @media (max-width: 900px) {
@@ -423,7 +444,53 @@
 }
 
 @media (max-width: 640px) {
+  .project-dashboard-project-actions,
+  .project-dashboard-billing-actions {
+    width: 100%;
+  }
+
+  .project-dashboard-project-actions .p-button,
+  .project-dashboard-billing-actions .p-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .project-dashboard-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .subproject-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .subproject-actions {
+    justify-content: stretch;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .subproject-actions .p-button {
+    flex: 1 1 calc(50% - 0.5rem);
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .subproject-actions .p-button-label {
+    white-space: normal;
+    text-align: center;
+  }
+
   .subproject-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .subproject-actions .p-button {
+    flex: 1 1 100%;
+  }
+
+  .project-dashboard-card {
+    overflow-x: hidden;
   }
 }

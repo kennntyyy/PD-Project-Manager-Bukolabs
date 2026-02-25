@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import imageCompression from 'browser-image-compression';
 import {
   Document,
   Page,
@@ -398,31 +399,59 @@ const ReportsPanel = ({
     setShowReportModal(true);
   };
 
-  const handleImageSelect = (e) => {
+  const handleImageSelect = async (e) => {
     const files = Array.from(e.target.files);
 
-    files.forEach((file) => {
+    // Supported image types
+    const supportedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ];
+
+    for (const file of files) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        showToast('error', 'Invalid File', 'Please select only image files');
-        return;
+        showToast('error', 'Error: Image Type not Supported', `File "${file.name}" is not an image. Please select only image files.`);
+        continue;
+      }
+
+      if (!supportedTypes.includes(file.type)) {
+        showToast('error', 'Error: Image Type not Supported', `File "${file.name}" type (${file.type}) is not supported. Supported types: JPG, PNG, GIF, WebP.`);
+        continue;
       }
 
       // Validate file size (max 5MB per file)
-      if (file.size > 5 * 1024 * 1024) {
-        showToast(
-          'error',
-          'File Too Large',
-          `${file.name} must be less than 5MB`,
-        );
-        return;
-      }
+      // if (file.size > 5 * 1024 * 1024) {
+      //   showToast(
+      //     'error',
+      //     'File Too Large',
+      //     `${file.name} must be less than 5MB`,
+      //   );
+      //   continue;
+      // }
 
       // Check if not already added
       if (
-        !reportImages.some((f) => f.name === file.name && f.size === file.size)
+        reportImages.some((f) => f.name === file.name && f.size === file.size)
       ) {
-        setReportImages((prev) => [...prev, file]);
+        continue;
+      }
+
+      // Compress the image
+      try {
+        const compressedFile = await imageCompression(file, {
+          maxSizeMB: 1, // Target max size (MB)
+          maxWidthOrHeight: 1920, // Resize if larger
+          useWebWorker: true,
+        });
+
+        console.log(
+          `Original: ${file.size} bytes, Compressed: ${compressedFile.size} bytes`
+        );
+
+        setReportImages((prev) => [...prev, compressedFile]);
         setImageComments((prev) => [...prev, '']);
 
         // Create preview
@@ -430,9 +459,11 @@ const ReportsPanel = ({
         reader.onloadend = () => {
           setImagePreviews((prev) => [...prev, reader.result]);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedFile);
+      } catch (err) {
+        showToast('error', 'Compression Error', `Failed to compress ${file.name}`);
       }
-    });
+    }
   };
 
   const removeImage = (index) => {
@@ -2206,26 +2237,7 @@ const ReportsPanel = ({
                 </div>
               </div>
 
-              {/* Row 6 - Description */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label
-                  style={{
-                    fontWeight: 'bold',
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontSize: '12px',
-                  }}
-                >
-                  Description *
-                </label>
-                <InputTextarea
-                  value={reportValue}
-                  onChange={(e) => setReportValue(e.target.value)}
-                  rows={4}
-                  style={{ width: '100%', padding: '0.75rem' }}
-                  placeholder="Enter report description..."
-                />
-              </div>
+              
             </div>
 
             {/* Full Width Sections Below */}
@@ -2387,7 +2399,28 @@ const ReportsPanel = ({
                   />
                 </div>
               </div>
-
+              
+              {/* Row 6 - Description */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontWeight: 'bold',
+                    display: 'block',
+                    marginBottom: '0.5rem',
+                    fontSize: '12px',
+                  }}
+                >
+                  Description *
+                </label>
+                <InputTextarea
+                  value={reportValue}
+                  onChange={(e) => setReportValue(e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', padding: '0.75rem' }}
+                  placeholder="Enter report description..."
+                />
+              </div>
+              
               {/* Photo Section */}
               <div
                 style={{
@@ -2412,7 +2445,6 @@ const ReportsPanel = ({
                   accept="image/*"
                   multiple
                   onChange={handleImageSelect}
-                  disabled={!!editingReport}
                   style={{ width: '100%' }}
                 />
                 <small
@@ -2422,9 +2454,7 @@ const ReportsPanel = ({
                     marginTop: '0.5rem',
                   }}
                 >
-                  {editingReport
-                    ? 'Image updates are not available while editing an existing billing.'
-                    : 'Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image)'}
+                  {'Supported formats: JPG, PNG, GIF, WebP (Max 5MB per image)'}
                 </small>
               </div>
 
@@ -2511,7 +2541,7 @@ const ReportsPanel = ({
                   </div>
                 </div>
               )}
-            </div>
+            </div>    
 
             {/* Generate Button */}
             <div

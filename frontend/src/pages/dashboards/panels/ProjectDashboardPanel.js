@@ -600,14 +600,34 @@ const ProjectDashboardPanel = () => {
     );
     const avg = Math.round(total / activeSubProjects.length);
     setCompletionRate(avg);
-    // Auto-update parent project status to Done if completionRate is 100%
-    if (selectedProject && avg >= 100 && selectedProject.project_status !== 'Done') {
+
+    // Auto-update parent project status based on completionRate
+    const normalizedStatus = String(selectedProject.project_status || '').toLowerCase().trim();
+    if (avg >= 100 && normalizedStatus !== 'done' && normalizedStatus !== 'completed') {
       api.patch(`/projects/${selectedProject.project_id}`, { project_status: 'Done' })
         .then(() => {
           setSelectedProject((prev) => ({ ...prev, project_status: 'Done' }));
+          setProjects((prev) => prev.map((proj) =>
+            proj.project_id === selectedProject.project_id
+              ? { ...proj, project_status: 'Done' }
+              : proj
+          ));
         })
         .catch((err) => {
           console.error('Failed to update project status to Done:', err);
+        });
+    } else if (avg < 100 && (normalizedStatus === 'done' || normalizedStatus === 'completed')) {
+      api.patch(`/projects/${selectedProject.project_id}`, { project_status: 'Ongoing' })
+        .then(() => {
+          setSelectedProject((prev) => ({ ...prev, project_status: 'Ongoing' }));
+          setProjects((prev) => prev.map((proj) =>
+            proj.project_id === selectedProject.project_id
+              ? { ...proj, project_status: 'Ongoing' }
+              : proj
+          ));
+        })
+        .catch((err) => {
+          console.error('Failed to update project status to Ongoing:', err);
         });
     }
   }, [selectedProject?.project_id, activeSubProjects, reports]);

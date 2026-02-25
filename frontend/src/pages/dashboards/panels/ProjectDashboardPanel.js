@@ -396,8 +396,15 @@ const ProjectDashboardPanel = () => {
   };
 
   const getStatusMeta = (rowData) => {
-    const status = rowData?.project_status || 'Ongoing';
-    const normalized = String(status).toLowerCase().trim();
+    let status = rowData?.project_status || 'Ongoing';
+    let normalized = String(status).toLowerCase().trim();
+
+    // If completion is 100% but status is not Done, update status
+    if (rowData && typeof rowData.completionRate === 'number' && rowData.completionRate >= 100 && normalized !== 'done') {
+      status = 'Done';
+      normalized = 'done';
+      rowData.project_status = 'Done';
+    }
 
     const statusClass =
       normalized === 'done' || normalized === 'completed'
@@ -593,6 +600,16 @@ const ProjectDashboardPanel = () => {
     );
     const avg = Math.round(total / activeSubProjects.length);
     setCompletionRate(avg);
+    // Auto-update parent project status to Done if completionRate is 100%
+    if (selectedProject && avg >= 100 && selectedProject.project_status !== 'Done') {
+      api.patch(`/projects/${selectedProject.project_id}`, { project_status: 'Done' })
+        .then(() => {
+          setSelectedProject((prev) => ({ ...prev, project_status: 'Done' }));
+        })
+        .catch((err) => {
+          console.error('Failed to update project status to Done:', err);
+        });
+    }
   }, [selectedProject?.project_id, activeSubProjects, reports]);
 
   const getCompletionRateForProject = (projectId) => {
@@ -1587,7 +1604,8 @@ const ProjectDashboardPanel = () => {
                   value={completionRate}
                   className="report-progress-bar"
                   style={{
-                    '--progress-color': getStatusMeta(selectedProject).color,
+                    '--progress-color':
+                      completionRate >= 100 ? '#16a34a' : getStatusMeta(selectedProject).color,
                   }}
                 />
                 <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>

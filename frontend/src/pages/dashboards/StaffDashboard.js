@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
 import './Dashboard.css';
+import './StaffDashboardMobileNav.css';
 import StaffProjectsPanel from './staff_panels/Staff_ProjectsPanel';
 import StaffReportsPanel from './staff_panels/Staff_ReportsPanel';
 
@@ -59,17 +60,14 @@ const StaffDashboard = () => {
   const isSidebarCollapsed = isNarrow ? true : sidebarCollapsed;
 
   return (
-    <div
-      className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
-    >
+    <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast ref={toast} />
       <ConfirmDialog />
-      <div className="dashboard-sidebar">
+      {/* Sidebar for desktop/tablet */}
+      <div className="dashboard-sidebar desktop-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <img className="sidebar-logo-img" src={logoUrl} alt="Logo" style={{
-               width: '200%', height: '200%',
-            }} />
+            <img className="sidebar-logo-img" src={logoUrl} alt="Logo" style={{ width: '200%', height: '200%' }} />
           </div>
           <button
             type="button"
@@ -77,9 +75,7 @@ const StaffDashboard = () => {
             onClick={() => setSidebarCollapsed((prev) => !prev)}
             aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <i
-              className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
-            ></i>
+            <i className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}></i>
           </button>
         </div>
         <div className="sidebar-nav">
@@ -110,17 +106,11 @@ const StaffDashboard = () => {
           <div className="user-profile">
             <div className="user-avatar">
               {(() => {
-                return user?.profile_pic &&
-                  typeof user.profile_pic === 'string' ? (
+                return user?.profile_pic && typeof user.profile_pic === 'string' ? (
                   <img
                     src={`data:image/jpeg;base64,${user.profile_pic}`}
                     alt={user?.username}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                    }}
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                   />
                 ) : (
                   user?.username?.charAt(0).toUpperCase()
@@ -142,6 +132,27 @@ const StaffDashboard = () => {
           />
         </div>
       </div>
+      {/* Bottom nav for mobile */}
+      <nav className="mobile-bottom-nav">
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            className={`mobile-nav-btn ${activeNav === item.key ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav(item.key);
+              setActiveTab(item.key);
+            }}
+            aria-label={item.label}
+          >
+            <i className={item.icon}></i>
+            <span>{item.label}</span>
+          </button>
+        ))}
+        <button className="mobile-nav-btn" onClick={logout} aria-label="Logout">
+          <i className="pi pi-sign-out"></i>
+          <span>Logout</span>
+        </button>
+      </nav>
       <div className="dashboard-content">
         <div className="dashboard-body">
           {activeTab === 'projects' && <StaffProjectsPanel />}

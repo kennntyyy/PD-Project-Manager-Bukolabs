@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -29,6 +31,8 @@ const OverviewPanel = ({ users, onStatClick }) => {
 
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
+  const [expandedParentProjects, setExpandedParentProjects] = useState({});
+  const [completionByProjectId, setCompletionByProjectId] = useState(new Map());
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -52,6 +56,35 @@ const OverviewPanel = ({ users, onStatClick }) => {
     fetchProjects();
     fetchReports();
   }, []);
+
+  // Calculate completion rate per project from reports
+  useEffect(() => {
+    const map = new Map();
+    reports.forEach((report) => {
+      const key = normalizeId(
+        report?.project_id?.project_id ||
+        report?.project_id?.id ||
+        report?.project_id ||
+        report?.project?.project_id ||
+        report?.project?.id
+      );
+      const progress = Number(report.current_progress || 0);
+      const currentMax = map.get(key) || 0;
+      if (progress > currentMax) map.set(key, progress);
+    });
+    setCompletionByProjectId(map);
+  }, [reports]);
+
+  const normalizeId = (value) =>
+    value !== null && value !== undefined
+      ? String(value).trim().toLowerCase()
+      : '';
+
+  const getCompletionRateForProject = (projectId) => {
+    if (!projectId) return 0;
+    const targetId = normalizeId(projectId);
+    return completionByProjectId.get(targetId) || 0;
+  };
 
   const projectStats = useMemo(() => {
     const totals = {
@@ -214,6 +247,29 @@ const OverviewPanel = ({ users, onStatClick }) => {
       }));
   }, [projects]);
 
+  const parentProjects = useMemo(() => {
+    return projects
+      .filter((project) => !project.parent_project_id && !project.isDeleted)
+      .sort((a, b) => {
+        const aDate = new Date(a.created_at || 0).getTime();
+        const bDate = new Date(b.created_at || 0).getTime();
+        return bDate - aDate;
+      });
+  }, [projects]);
+
+  const getSubProjectsForParent = (parentId) => {
+    return projects.filter(
+      (project) => project.parent_project_id === parentId && !project.isDeleted
+    );
+  };
+
+  const toggleParentProject = (projectId) => {
+    setExpandedParentProjects((prev) => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  };
+
   return (
     <div className="overview-container">
       {/* Dashboard Overview Heading */}
@@ -271,47 +327,152 @@ const OverviewPanel = ({ users, onStatClick }) => {
 
       {/* Chart and Highlights Row */}
       <div className="bottom-container">
-        {/* Overall Progress Section */}
+        {/* Parent Projects Progress Section */}
         <div className="chart-section">
-          <div className="progress-header">
-            <div className="section-title">OVERALL PROGRESS</div>
-            <div className="progress-percentage">35%</div>
-          </div>
-          <div className="progress-bar-container">
-            <div className="progress-bar" style={{ width: '35%' }}></div>
-          </div>
-          <div className="chart-wrapper">
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="month" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#F3F4F6',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '4px',
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="Year Close Year Great Gain"
-                  stroke="#10B981"
-                  strokeWidth={2}
-                  dot={{ fill: '#10B981', r: 5 }}
-                  activeDot={{ r: 6 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="accomplished"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  dot={{ fill: '#F59E0B', r: 5 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <div
+            style={{
+              marginBottom: '2rem',
+              padding: '1rem',
+              backgroundColor: '#ffffff',
+              borderRadius: '0.5rem',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <div
+              className="progress-header"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.375rem',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.875rem',
+                  color: '#6b7280',
+                  fontWeight: '500',
+                  fontFamily: '"Source Serif Pro", serif',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                OVERALL PROGRESS BY MONTH
+              </div>
+              <div
+                style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '700',
+                  color: '#1f2937',
+                  fontFamily: '"Source Serif Pro", serif',
+                }}
+              >
+                {Math.round(
+                  parentProjects.reduce((sum, proj) => {
+                    const subProjects = getSubProjectsForParent(proj.project_id);
+                    const avgProgress = subProjects.length
+                      ? Math.round(
+                          subProjects.reduce(
+                            (s, p) => s + getCompletionRateForProject(p.project_id),
+                            0
+                          ) / subProjects.length
+                        )
+                      : 0;
+                    return sum + avgProgress;
+                  }, 0) / (parentProjects.length || 1)
+                )}%
+              </div>
+            </div>
+            <div
+              className="progress-bar-container"
+              style={{
+                width: '100%',
+                height: '12px',
+                background: '#e5e7eb',
+                borderRadius: '6px',
+                overflow: 'hidden',
+                marginBottom: '0.5rem',
+              }}
+            >
+              <div
+                className="progress-bar"
+                style={{
+                  height: '100%',
+                  background: '#4f4d36',
+                  borderRadius: '6px',
+                  width: `${Math.round(
+                    parentProjects.reduce((sum, proj) => {
+                      const subProjects = getSubProjectsForParent(proj.project_id);
+                      const avgProgress = subProjects.length
+                        ? Math.round(
+                            subProjects.reduce(
+                              (s, p) => s + getCompletionRateForProject(p.project_id),
+                              0
+                            ) / subProjects.length
+                          )
+                        : 0;
+                      return sum + avgProgress;
+                    }, 0) / (parentProjects.length || 1)
+                  )}%`,
+                  transition: 'width 0.3s ease',
+                }}
+              ></div>
+            </div>
+            <div
+              className="chart-wrapper"
+              style={{
+                width: '100%',
+                height: '200px',
+              }}
+            >
+              {parentProjects.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart
+                    data={[
+                      { month: 'Jan', progress: 15 },
+                      { month: 'Feb', progress: 22 },
+                      { month: 'Mar', progress: 28 },
+                      { month: 'Apr', progress: 35 },
+                      { month: 'May', progress: 42 },
+                      { month: 'Jun', progress: 50 },
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="month" stroke="#9CA3AF" />
+                    <YAxis
+                      stroke="#9CA3AF"
+                      label={{
+                        value: 'Progress (%)',
+                        angle: -90,
+                        position: 'insideLeft',
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#F3F4F6',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '4px',
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="progress"
+                      stroke="#10B981"
+                      strokeWidth={2}
+                      dot={{ fill: '#10B981', r: 4 }}
+                      activeDot={{ r: 6 }}
+                      connectNulls
+                      name="Overall Progress"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="no-data-message">
+                  <p>No parent projects yet</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -299,7 +299,7 @@ const AdminDashboard = () => {
             className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
             onClick={() => {
               setSettingsOpen((prev) => !prev);
-              handleNavClick('settings', 'settings');
+              setActiveNav('settings');
             }}
             role="button"
             tabIndex={0}
@@ -307,7 +307,7 @@ const AdminDashboard = () => {
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 setSettingsOpen((prev) => !prev);
-                handleNavClick('settings', 'settings');
+                setActiveNav('settings');
               }
             }}
           >
@@ -318,21 +318,53 @@ const AdminDashboard = () => {
             ></i>
           </div>
           {settingsOpen && (
-            <div
-              className={`nav-subitem ${activeTab === 'settings-categories' ? 'active' : ''}`}
-              onClick={() => handleNavClick('settings', 'settings-categories')}
-              role="button"
-              tabIndex={0}
-              title="Categories"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleNavClick('settings', 'settings-categories');
-                }
-              }}
-            >
-              <i className="pi pi-tags"></i>
-              <span>Categories</span>
-            </div>
+            <>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-general' ? 'active' : ''}`}
+                onClick={() => handleNavClick('settings', 'settings-general')}
+                role="button"
+                tabIndex={0}
+                title="General Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleNavClick('settings', 'settings-general');
+                  }
+                }}
+              >
+                <i className="pi pi-cog"></i>
+                <span>General</span>
+              </div>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-security' ? 'active' : ''}`}
+                onClick={() => handleNavClick('settings', 'settings-security')}
+                role="button"
+                tabIndex={0}
+                title="Security Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleNavClick('settings', 'settings-security');
+                  }
+                }}
+              >
+                <i className="pi pi-shield"></i>
+                <span>Security</span>
+              </div>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-categories' ? 'active' : ''}`}
+                onClick={() => handleNavClick('settings', 'settings-categories')}
+                role="button"
+                tabIndex={0}
+                title="Categories"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleNavClick('settings', 'settings-categories');
+                  }
+                }}
+              >
+                <i className="pi pi-tags"></i>
+                <span>Categories</span>
+              </div>
+            </>
           )}
           
           <div
@@ -408,7 +440,8 @@ const AdminDashboard = () => {
           {activeTab === 'clients' && <ClientManagementPanel />}
           {activeTab === 'contractors' && <ContractorManagementPanel />}
           {activeTab === 'reports' && <ReportsPanel />}
-          {activeTab === 'settings' && <SettingsPanel />}
+          {activeTab === 'settings-general' && <SettingsPanel activeTab="general" />}
+          {activeTab === 'settings-security' && <SettingsPanel activeTab="security" />}
           {activeTab === 'settings-categories' && <CategoriesPanel />}
           {activeTab === 'projects' && (
             <ProjectsPanel

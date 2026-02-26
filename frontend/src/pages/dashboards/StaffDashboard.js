@@ -4,21 +4,23 @@ import { ConfirmDialog } from 'primereact/confirmdialog';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
+import SettingsPanel from './panels/SettingsPanel';
 import './Dashboard.css';
 import './StaffDashboardMobileNav.css';
 import StaffProjectsPanel from './staff_panels/Staff_ProjectsPanel';
 import StaffReportsPanel from './staff_panels/Staff_ReportsPanel';
+import StaffClientDashboardPanel from './staff_panels/StaffClientDashboardPanel';
+import StaffOverviewPanel from './staff_panels/StaffOverviewPanel';
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
-  const allowedTabs = ['projects', 'reports', 'settings'];
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('staffActiveTab');
-    return allowedTabs.includes(saved) ? saved : 'projects';
+    return saved || 'projects';
   });
   const [activeNav, setActiveNav] = useState(() => {
     const saved = localStorage.getItem('staffActiveNav');
-    return allowedTabs.includes(saved) ? saved : 'projects';
+    return saved || 'projects';
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('staffSidebarCollapsed');
@@ -27,21 +29,24 @@ const StaffDashboard = () => {
     }
     return false;
   });
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const saved = localStorage.getItem('staffSettingsOpen');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const storedTab = localStorage.getItem('staffActiveTab') || '';
+    return storedTab.startsWith('settings');
+  });
   const [isNarrow, setIsNarrow] = useState(false);
   const toast = useRef(null);
   const logoUrl = `${process.env.PUBLIC_URL}/logo.png`;
 
-  const navItems = [
-    { key: 'projects', icon: 'pi pi-folder', label: 'Projects' },
-    { key: 'reports', icon: 'pi pi-chart-bar', label: 'Reports' },
-    { key: 'settings', icon: 'pi pi-cog', label: 'Settings' },
-  ];
-
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('staffActiveTab', activeTab);
     localStorage.setItem('staffActiveNav', activeNav);
     localStorage.setItem('staffSidebarCollapsed', sidebarCollapsed.toString());
-  }, [activeTab, activeNav, sidebarCollapsed]);
+    localStorage.setItem('staffSettingsOpen', settingsOpen.toString());
+  }, [activeTab, activeNav, sidebarCollapsed, settingsOpen]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1024px)');
@@ -63,7 +68,6 @@ const StaffDashboard = () => {
     <div className={`dashboard-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <Toast ref={toast} />
       <ConfirmDialog />
-      {/* Sidebar for desktop/tablet */}
       <div className="dashboard-sidebar desktop-sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
@@ -79,28 +83,125 @@ const StaffDashboard = () => {
           </button>
         </div>
         <div className="sidebar-nav">
-          {navItems.map((item) => (
-            <div
-              key={item.key}
-              className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
-              onClick={() => {
-                setActiveNav(item.key);
-                setActiveTab(item.key);
-              }}
-              role="button"
-              tabIndex={0}
-              title={item.label}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  setActiveNav(item.key);
-                  setActiveTab(item.key);
-                }
-              }}
-            >
-              <i className={item.icon}></i>
-              <span>{item.label}</span>
-            </div>
-          ))}
+          {/* Overview nav item */}
+          <div
+            className={`nav-item ${activeNav === 'overview' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('overview');
+              setActiveTab('overview');
+            }}
+            title="Dashboard Overview"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setActiveNav('overview');
+                setActiveTab('overview');
+              }
+            }}
+          >
+            <i className="pi pi-home"></i>
+            <span>Dashboard</span>
+          </div>
+          {/* Client Dashboard nav item */}
+          <div
+            className={`nav-item ${activeNav === 'client-dashboard' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('client-dashboard');
+              setActiveTab('client-dashboard');
+            }}
+            title="Client Dashboard"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setActiveNav('client-dashboard');
+                setActiveTab('client-dashboard');
+              }
+            }}
+          >
+            <i className="pi pi-briefcase"></i>
+            <span>Client Dashboard</span>
+          </div>
+          {/* Projects nav item */}
+          <div
+            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('projects');
+              setActiveTab('projects');
+            }}
+            title="Projects"
+          >
+            <i className="pi pi-folder"></i>
+            <span>Projects</span>
+          </div>
+          {/* Reports nav item */}
+          {/* <div
+            className={`nav-item ${activeNav === 'reports' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('reports');
+              setActiveTab('reports');
+            }}
+            title="Reports"
+          >
+            <i className="pi pi-chart-bar"></i>
+            <span>Reports</span>
+          </div> */}
+          {/* Settings dropdown nav */}
+          <div
+            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('settings');
+              setSettingsOpen((prev) => !prev);
+            }}
+            title="Settings"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setActiveNav('settings');
+                setSettingsOpen((prev) => !prev);
+              }
+            }}
+          >
+            <i className="pi pi-cog"></i>
+            <span>Settings</span>
+            <i className={`pi ${settingsOpen ? 'pi-chevron-down' : 'pi-chevron-right'} nav-caret`}></i>
+          </div>
+          {settingsOpen && (
+            <>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-general' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-general')}
+                role="button"
+                tabIndex={0}
+                title="General Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-general');
+                  }
+                }}
+              >
+                <i className="pi pi-cog"></i>
+                <span>General</span>
+              </div>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-security' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-security')}
+                role="button"
+                tabIndex={0}
+                title="Security Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-security');
+                  }
+                }}
+              >
+                <i className="pi pi-shield"></i>
+                <span>Security</span>
+              </div>
+            </>
+          )}
         </div>
         <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div className="user-profile">
@@ -134,20 +235,61 @@ const StaffDashboard = () => {
       </div>
       {/* Bottom nav for mobile */}
       <nav className="mobile-bottom-nav">
-        {navItems.map((item) => (
-          <button
-            key={item.key}
-            className={`mobile-nav-btn ${activeNav === item.key ? 'active' : ''}`}
-            onClick={() => {
-              setActiveNav(item.key);
-              setActiveTab(item.key);
-            }}
-            aria-label={item.label}
-          >
-            <i className={item.icon}></i>
-            <span>{item.label}</span>
-          </button>
-        ))}
+        <button
+          className={`mobile-nav-btn ${activeNav === 'overview' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('overview');
+            setActiveTab('overview');
+          }}
+          aria-label="Dashboard Overview"
+        >
+          <i className="pi pi-home"></i>
+          <span>Dashboard</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${activeNav === 'client-dashboard' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('client-dashboard');
+            setActiveTab('client-dashboard');
+          }}
+          aria-label="Client Dashboard"
+        >
+          <i className="pi pi-briefcase"></i>
+          <span>Client Dashboard</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${activeNav === 'projects' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('projects');
+            setActiveTab('projects');
+          }}
+          aria-label="Projects"
+        >
+          <i className="pi pi-folder"></i>
+          <span>Projects</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${activeNav === 'reports' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('reports');
+            setActiveTab('reports');
+          }}
+          aria-label="Reports"
+        >
+          <i className="pi pi-chart-bar"></i>
+          <span>Reports</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${activeNav === 'settings' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveNav('settings');
+            setSettingsOpen((prev) => !prev);
+          }}
+          aria-label="Settings"
+        >
+          <i className="pi pi-cog"></i>
+          <span>Settings</span>
+        </button>
         <button className="mobile-nav-btn" onClick={logout} aria-label="Logout">
           <i className="pi pi-sign-out"></i>
           <span>Logout</span>
@@ -155,14 +297,12 @@ const StaffDashboard = () => {
       </nav>
       <div className="dashboard-content">
         <div className="dashboard-body">
+          {activeTab === 'overview' && <StaffOverviewPanel />}
+          {activeTab === 'client-dashboard' && <StaffClientDashboardPanel />}
           {activeTab === 'projects' && <StaffProjectsPanel />}
           {activeTab === 'reports' && <StaffReportsPanel />}
-          {activeTab === 'settings' && (
-            <div>
-              <h3>Settings</h3>
-              {/* Add staff settings panel here */}
-            </div>
-          )}
+          {activeTab === 'settings-general' && <SettingsPanel activeTab="general" />}
+          {activeTab === 'settings-security' && <SettingsPanel activeTab="security" />}
         </div>
       </div>
     </div>

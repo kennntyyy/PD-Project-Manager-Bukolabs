@@ -1,3 +1,118 @@
+.settings-overview-container {
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  padding: 2.5rem 2rem 3rem 2rem;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.settings-row-panels {
+  display: flex;
+  flex-direction: row;
+  gap: 3rem;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.settings-section-col {
+  flex: 1 1 0;
+  width: 50%;
+  min-width: 0;
+  max-width: 50%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+.settings-divider {
+  min-height: 320px;
+  align-self: stretch;
+}
+/* Settings Panel Grid Layout */
+
+/* Settings Panel - Overview Style */
+.settings-overview-container {
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  padding: 2.5rem 2rem 3rem 2rem;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.settings-overview-container .welcome-header {
+  margin-bottom: 2.5rem;
+}
+
+.settings-overview-container h1 {
+  font-size: 2.3rem;
+  font-weight: 700;
+  color: #232323;
+  margin-bottom: 0.5rem;
+  margin-top: 0;
+  letter-spacing: 0.01em;
+  font-family: 'Bebas Neue', 'Inter', Arial, sans-serif;
+}
+
+.settings-desc {
+  margin: 0.5rem 0 0 0;
+  font-size: 1.05rem;
+  color: #6b7280;
+}
+
+.settings-section {
+  margin-bottom: 2.5rem;
+  background: none;
+  padding: 0;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+.settings-section .section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.04em;
+  margin-bottom: 1.25rem;
+  font-family: 'Inter', Arial, sans-serif;
+  text-transform: uppercase;
+}
+
+.settings-section .dashboard-card {
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-section .card-title {
+  margin-bottom: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.02em;
+}
+
+.settings-section .p-field {
+  margin-bottom: 1.25rem;
+}
+
+.settings-section form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap');
 
 /* ===== Dashboard Container ===== */

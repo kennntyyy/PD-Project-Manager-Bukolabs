@@ -9,5 +9,6 @@ export class AuthResponseDto {
     last_name: string;
     user_role: string;
     profile_pic?: string;
+    address?: string | null;
   };
 }

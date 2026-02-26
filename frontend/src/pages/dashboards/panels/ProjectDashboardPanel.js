@@ -29,7 +29,7 @@ import './ProjectDashboardPanel.css';
 // View a particular project and its sub-projects
 // ============================================
 
-const ProjectDashboardPanel = () => {
+const ProjectDashboardPanel = ({ isStaff = false }) => {
   const [projects, setProjects] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [clients, setClients] = useState([]);
@@ -1909,15 +1909,17 @@ const ProjectDashboardPanel = () => {
                                   openEditSubProjectDialog(subproject)
                                 }
                               />
-                              <Button
-                                icon="pi pi-trash"
-                                label="Delete"
-                                severity="danger"
-                                className="p-button-sm subproject-action-btn"
-                                onClick={() =>
-                                  handleDeleteSubProject(subproject)
-                                }
-                              />
+                              {!isStaff && (
+                                <Button
+                                  icon="pi pi-trash"
+                                  label="Delete"
+                                  severity="danger"
+                                  className="p-button-sm subproject-action-btn"
+                                  onClick={() =>
+                                    handleDeleteSubProject(subproject)
+                                  }
+                                />
+                              )}
                               <Button
                                 icon="pi pi-file"
                                 label="Billings"
@@ -1944,15 +1946,17 @@ const ProjectDashboardPanel = () => {
                                   handleRestoreSubProject(subproject)
                                 }
                               />
-                              <Button
-                                icon="pi pi-times"
-                                label="Delete Permanently"
-                                severity="danger"
-                                className="p-button-sm"
-                                onClick={() =>
-                                  handlePermanentDeleteSubProject(subproject)
-                                }
-                              />
+                              {!isStaff && (
+                                <Button
+                                  icon="pi pi-times"
+                                  label="Delete Permanently"
+                                  severity="danger"
+                                  className="p-button-sm"
+                                  onClick={() =>
+                                    handlePermanentDeleteSubProject(subproject)
+                                  }
+                                />
+                              )}
                             </>
                           )}
                         </div>

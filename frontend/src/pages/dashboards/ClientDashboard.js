@@ -20,9 +20,11 @@ import {
 } from 'recharts';
 import api from '../../services/api';
 import { pdf, Font } from '@react-pdf/renderer';
+
 import './Dashboard.css';
 import './panels/ProjectDashboardPanel.css';
 import { ProjectReportPDF } from '../dashboards/staff_panels/ProjectReportPDF';
+import SettingsPanel from './panels/SettingsPanel';
 
 Font.register({
   family: 'Source Serif Pro',
@@ -186,6 +188,14 @@ const ClientDashboard = () => {
     }
     return false;
   });
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const saved = localStorage.getItem('clientSettingsOpen');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const storedTab = localStorage.getItem('clientActiveTab') || '';
+    return storedTab.startsWith('settings');
+  });
   const [isNarrow, setIsNarrow] = useState(false);
 
   // Projects state
@@ -211,7 +221,6 @@ const ClientDashboard = () => {
 
   const navItems = [
     { key: 'projects', icon: 'pi pi-folder', label: 'Projects' },
-    { key: 'settings', icon: 'pi pi-cog', label: 'Settings' },
   ];
 
   // Fetch client's projects
@@ -298,12 +307,13 @@ const ClientDashboard = () => {
     localStorage.setItem('clientActiveTab', activeTab);
     localStorage.setItem('clientActiveNav', activeNav);
     localStorage.setItem('clientSidebarCollapsed', sidebarCollapsed.toString());
+    localStorage.setItem('clientSettingsOpen', settingsOpen.toString());
 
     if (activeTab === 'projects') {
       fetchMyProjects();
       fetchReports();
     }
-  }, [activeTab, activeNav, sidebarCollapsed]);
+  }, [activeTab, activeNav, sidebarCollapsed, settingsOpen]);
 
   // Calculate completion rates from reports
   useEffect(() => {
@@ -616,20 +626,74 @@ const ClientDashboard = () => {
           </div> */}
         </div>
         <div className="sidebar-nav">
-          {navItems.map((item) => (
-            <div
-              key={item.key}
-              className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
-              onClick={() => {
-                setActiveNav(item.key);
-                setActiveTab(item.key);
-              }}
-              title={item.label}
-            >
-              <i className={item.icon}></i>
-              <span>{item.label}</span>
-            </div>
-          ))}
+          {/* Projects nav item */}
+          <div
+            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('projects');
+              setActiveTab('projects');
+            }}
+            title="Projects"
+          >
+            <i className="pi pi-folder"></i>
+            <span>Projects</span>
+          </div>
+
+          {/* Settings dropdown nav */}
+          <div
+            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('settings');
+              setSettingsOpen((prev) => !prev);
+            }}
+            title="Settings"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setActiveNav('settings');
+                setSettingsOpen((prev) => !prev);
+              }
+            }}
+          >
+            <i className="pi pi-cog"></i>
+            <span>Settings</span>
+            <i className={`pi ${settingsOpen ? 'pi-chevron-down' : 'pi-chevron-right'} nav-caret`}></i>
+          </div>
+          {settingsOpen && (
+            <>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-general' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-general')}
+                role="button"
+                tabIndex={0}
+                title="General Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-general');
+                  }
+                }}
+              >
+                <i className="pi pi-cog"></i>
+                <span>General</span>
+              </div>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-security' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-security')}
+                role="button"
+                tabIndex={0}
+                title="Security Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-security');
+                  }
+                }}
+              >
+                <i className="pi pi-shield"></i>
+                <span>Security</span>
+              </div>
+            </>
+          )}
         </div>
         <div
           className="sidebar-footer"
@@ -712,6 +776,91 @@ const ClientDashboard = () => {
         <div className="dashboard-body">
           {activeTab === 'projects' && (
             <div className="projects-panel">
+              
+              <div className="panel-header">
+                <div className="search-filter-section">
+                  <div>
+                    <h1>PROJECTS</h1>
+                    <p className="text-color-secondary m-0">
+                      Manage and track all project activities
+                    </p>
+                  </div>
+                  <div className="p-inputgroup" style={{ maxWidth: '400px' }}>
+                    <div className="reports-search-box">
+                      <i className="pi pi-search"></i>
+                      <InputText
+                        placeholder="Search projects..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="reports-search-input"
+                      />
+                      {searchQuery && (
+                        <i
+                          className="pi pi-times"
+                          style={{ color: '#9ca3af', cursor: 'pointer' }}
+                          onClick={() => setSearchQuery('')}
+                        ></i>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="projects-stats">
+                  <div className="stat-card">
+                    <i className="pi pi-folder" style={{ color: '#3B82F6' }} />
+                    <div>
+                      <h3>{parentProjectsForStats.length}</h3>
+                      <p>Total Projects</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <i
+                      className="pi pi-check-circle"
+                      style={{ color: '#10B981' }}
+                    />
+                    <div>
+                      <h3>
+                        {
+                          parentProjectsForStats.filter(
+                            (p) => p.project_status === 'done',
+                          ).length
+                        }
+                      </h3>
+                      <p>Completed</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <i className="pi pi-clock" style={{ color: 'blue' }} />
+                    <div>
+                      <h3>
+                        {
+                          parentProjectsForStats.filter(
+                            (p) => p.project_status === 'ongoing',
+                          ).length
+                        }
+                      </h3>
+                      <p>Ongoing</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <i
+                      className="pi pi-pause-circle"
+                      style={{ color: 'red' }}
+                    />
+                    <div>
+                      <h3>
+                        {
+                          parentProjectsForStats.filter(
+                            (p) => p.project_status === 'hold',
+                          ).length
+                        }
+                      </h3>
+                      <p>On Hold</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Overall Progress Chart */}
               <div
                 style={{
@@ -791,99 +940,9 @@ const ClientDashboard = () => {
                   </ResponsiveContainer>
                 )}
               </div>
-
-              <div className="panel-header">
-                <div className="search-filter-section">
-                  <div>
-                    <h1>PROJECTS</h1>
-                    <p className="text-color-secondary m-0">
-                      Manage and track all project activities
-                    </p>
-                  </div>
-                  <div className="p-inputgroup" style={{ maxWidth: '400px' }}>
-                    <div className="reports-search-box">
-                      <i className="pi pi-search"></i>
-                      <InputText
-                        placeholder="Search projects..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="reports-search-input"
-                      />
-                      {searchQuery && (
-                        <i
-                          className="pi pi-times"
-                          style={{ color: '#9ca3af', cursor: 'pointer' }}
-                          onClick={() => setSearchQuery('')}
-                        ></i>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* <Dropdown
-                    value={statusFilter}
-                    options={statusOptions}
-                    onChange={(e) => setStatusFilter(e.value)}
-                    optionLabel="label"
-                    optionValue="value"
-                    placeholder="Filter by status"
-                    style={{ minWidth: '200px' }}
-                  /> */}
-                </div>
-
-                <div className="projects-stats">
-                  <div className="stat-card">
-                    <i className="pi pi-folder" style={{ color: '#3B82F6' }} />
-                    <div>
-                      <h3>{parentProjectsForStats.length}</h3>
-                      <p>Total Projects</p>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <i
-                      className="pi pi-check-circle"
-                      style={{ color: '#10B981' }}
-                    />
-                    <div>
-                      <h3>
-                        {
-                          parentProjectsForStats.filter(
-                            (p) => p.project_status === 'done',
-                          ).length
-                        }
-                      </h3>
-                      <p>Completed</p>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <i className="pi pi-clock" style={{ color: 'blue' }} />
-                    <div>
-                      <h3>
-                        {
-                          parentProjectsForStats.filter(
-                            (p) => p.project_status === 'ongoing',
-                          ).length
-                        }
-                      </h3>
-                      <p>Ongoing</p>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <i
-                      className="pi pi-pause-circle"
-                      style={{ color: 'red' }}
-                    />
-                    <div>
-                      <h3>
-                        {
-                          parentProjectsForStats.filter(
-                            (p) => p.project_status === 'hold',
-                          ).length
-                        }
-                      </h3>
-                      <p>On Hold</p>
-                    </div>
-                  </div>
-                </div>
+              
+              <div style={{marginBottom: '1rem'}}>
+                <h3>YOUR PROJECTS</h3>
               </div>
 
               {selectedProject ? (
@@ -1098,17 +1157,8 @@ const ClientDashboard = () => {
               )}
             </div>
           )}
-
-          {activeTab === 'settings' && (
-            <div className="coming-soon">
-              <i
-                className="pi pi-clock"
-                style={{ fontSize: '3rem', color: '#6B7280' }}
-              />
-              <h3>Settings Panel</h3>
-              <p>Coming soon! This feature is under development.</p>
-            </div>
-          )}
+          {activeTab === 'settings-general' && <SettingsPanel activeTab="general" />}
+          {activeTab === 'settings-security' && <SettingsPanel activeTab="security" />}
         </div>
       </div>
     </div>

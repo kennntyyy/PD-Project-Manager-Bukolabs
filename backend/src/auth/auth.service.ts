@@ -91,6 +91,7 @@ export class AuthService {
         last_name: user.last_name,
         user_role: user.user_role,
         profile_pic: user.profile_pic,
+        address: user.address,
       },
     };
   }

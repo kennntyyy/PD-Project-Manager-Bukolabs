@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import SettingsPanel from './panels/SettingsPanel';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
@@ -24,18 +25,28 @@ const ContractorDashboard = () => {
   const [clients, setClients] = useState([]);
   const [contractors, setContractors] = useState([]);
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState(
-    () => localStorage.getItem('contractorActiveTab') || 'projects',
-  );
-  const [activeNav, setActiveNav] = useState(
-    () => localStorage.getItem('contractorActiveNav') || 'projects',
-  );
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('contractorActiveTab');
+    return saved || 'projects';
+  });
+  const [activeNav, setActiveNav] = useState(() => {
+    const saved = localStorage.getItem('contractorActiveNav');
+    return saved || 'projects';
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('contractorSidebarCollapsed');
     if (saved !== null) {
       return saved === 'true';
     }
     return false;
+  });
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const saved = localStorage.getItem('contractorSettingsOpen');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+    const storedTab = localStorage.getItem('contractorActiveTab') || '';
+    return storedTab.startsWith('settings');
   });
   const [isNarrow, setIsNarrow] = useState(false);
   const toast = useRef(null);
@@ -150,16 +161,14 @@ const ContractorDashboard = () => {
   useEffect(() => {
     localStorage.setItem('contractorActiveTab', activeTab);
     localStorage.setItem('contractorActiveNav', activeNav);
-    localStorage.setItem(
-      'contractorSidebarCollapsed',
-      sidebarCollapsed.toString(),
-    );
+    localStorage.setItem('contractorSidebarCollapsed', sidebarCollapsed.toString());
+    localStorage.setItem('contractorSettingsOpen', settingsOpen.toString());
 
     if (activeTab === 'projects') {
       fetchMyProjects();
       fetchReports();
     }
-  }, [activeTab, activeNav, sidebarCollapsed]);
+  }, [activeTab, activeNav, sidebarCollapsed, settingsOpen]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1024px)');
@@ -471,26 +480,75 @@ const getContractorName = (contractorId) => {
               className={`pi ${isSidebarCollapsed ? 'pi-angle-right' : 'pi-angle-left'}`}
             ></i>
           </button>
-          {/* <div className="sidebar-title">
-            <h3>Contractor</h3>
-            <p>Control Panel</p>
-          </div> */}
         </div>
         <div className="sidebar-nav">
-          {navItems.map((item) => (
-            <div
-              key={item.key}
-              className={`nav-item ${activeNav === item.key ? 'active' : ''}`}
-              onClick={() => {
-                setActiveNav(item.key);
-                setActiveTab(item.key);
-              }}
-              title={item.label}
-            >
-              <i className={item.icon}></i>
-              <span>{item.label}</span>
-            </div>
-          ))}
+          {/* Projects nav item */}
+          <div
+            className={`nav-item ${activeNav === 'projects' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('projects');
+              setActiveTab('projects');
+            }}
+            title="My Projects"
+          >
+            <i className="pi pi-folder"></i>
+            <span>My Projects</span>
+          </div>
+          {/* Settings dropdown nav */}
+          <div
+            className={`nav-item ${activeNav === 'settings' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNav('settings');
+              setSettingsOpen((prev) => !prev);
+            }}
+            title="Settings"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setActiveNav('settings');
+                setSettingsOpen((prev) => !prev);
+              }
+            }}
+          >
+            <i className="pi pi-cog"></i>
+            <span>Settings</span>
+            <i className={`pi ${settingsOpen ? 'pi-chevron-down' : 'pi-chevron-right'} nav-caret`}></i>
+          </div>
+          {settingsOpen && (
+            <>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-general' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-general')}
+                role="button"
+                tabIndex={0}
+                title="General Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-general');
+                  }
+                }}
+              >
+                <i className="pi pi-cog"></i>
+                <span>General</span>
+              </div>
+              <div
+                className={`nav-subitem ${activeTab === 'settings-security' ? 'active' : ''}`}
+                onClick={() => setActiveTab('settings-security')}
+                role="button"
+                tabIndex={0}
+                title="Security Settings"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setActiveTab('settings-security');
+                  }
+                }}
+              >
+                <i className="pi pi-shield"></i>
+                <span>Security</span>
+              </div>
+            </>
+          )}
         </div>
         <div className="sidebar-footer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div className="sidebar-user-profile">
@@ -532,17 +590,11 @@ const getContractorName = (contractorId) => {
             <div>
               <h2 className="header-title">
                 {activeTab === 'projects' && 'My Projects'}
-                {/* {activeTab === 'deliverables' && 'Deliverables'}
-                {activeTab === 'timesheets' && 'Timesheets'} */}
                 {activeTab === 'settings' && 'Settings'}
               </h2>
-              <p className="header-subtitle">
-                {activeTab === 'projects' &&
-                  'View and manage your assigned projects'}
-                {/* {activeTab === 'deliverables' &&
-                  'View and manage your deliverables'}
-                {activeTab === 'timesheets' && 'Track your timesheets'} */}
-                {activeTab === 'settings' && 'Configure your settings'}
+              <p className="text-color-secondary" style={{ margin: 0, marginBottom: 8, fontSize: 15 }}>
+                {activeTab === 'projects' && 'View and manage your assigned projects'}
+                {activeTab === 'settings' && 'Configure your account and security settings'}
               </p>
             </div>
           </div>
@@ -578,84 +630,7 @@ const getContractorName = (contractorId) => {
           {activeTab === 'projects' && (
             <div className="projects-panel">
               {/* Overall Progress Chart */}
-              <div
-                style={{
-                  background: '#ffffff',
-                  borderRadius: '12px',
-                  padding: '1.5rem',
-                  marginBottom: '1.5rem',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '1.125rem',
-                    fontWeight: '700',
-                    color: '#1f2937',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  OVERALL PROGRESS BY MONTH
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '1.125rem',
-                    fontWeight: '700',
-                    color: '#1f2937',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  {overallProgressData.avgProgress}%
-                </div>
-
-                <div
-                  style={{
-                    height: '12px',
-                    background: '#e5e7eb',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    marginBottom: '1.5rem',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      background: '#4f4d36',
-                      width: `${overallProgressData.avgProgress}%`,
-                      transition: 'width 0.3s ease',
-                    }}
-                  ></div>
-                </div>
-
-                {overallProgressData.monthlyData.length > 0 && (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={overallProgressData.monthlyData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#E5E7EB"
-                        vertical={false}
-                      />
-                      <XAxis dataKey="month" stroke="#9CA3AF" />
-                      <YAxis stroke="#9CA3AF" />
-                      <Tooltip
-                        contentStyle={{
-                          background: '#ffffff',
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '6px',
-                        }}
-                      />
-                      <Line
-                        dataKey="progress"
-                        stroke="#10B981"
-                        strokeWidth={2}
-                        dot={{ fill: '#10B981', r: 4 }}
-                        connectNulls
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+              
 
               <div className="panel-header">
                 <div className="search-filter-section" style={{
@@ -750,6 +725,87 @@ const getContractorName = (contractorId) => {
                     </div>
                   </div>
                 </div>
+              </div>
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                }}
+                >
+                <div
+                  style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  OVERALL PROGRESS BY MONTH
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {overallProgressData.avgProgress}%
+                </div>
+
+                <div
+                  style={{
+                    height: '12px',
+                    background: '#e5e7eb',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    marginBottom: '1.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      background: '#4f4d36',
+                      width: `${overallProgressData.avgProgress}%`,
+                      transition: 'width 0.3s ease',
+                    }}
+                  ></div>
+                </div>
+
+                {overallProgressData.monthlyData.length > 0 && (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={overallProgressData.monthlyData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#E5E7EB"
+                        vertical={false}
+                      />
+                      <XAxis dataKey="month" stroke="#9CA3AF" />
+                      <YAxis stroke="#9CA3AF" />
+                      <Tooltip
+                        contentStyle={{
+                          background: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '6px',
+                        }}
+                      />
+                      <Line
+                        dataKey="progress"
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        dot={{ fill: '#10B981', r: 4 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+              <div>
+                <h2>PROJECTS</h2>
               </div>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <Dropdown
@@ -1022,16 +1078,8 @@ const getContractorName = (contractorId) => {
             </div>
           )} */}
 
-          {activeTab === 'settings' && (
-            <div className="coming-soon">
-              <i
-                className="pi pi-clock"
-                style={{ fontSize: '3rem', color: '#6B7280' }}
-              />
-              <h3>Settings Panel</h3>
-              <p>Coming soon! This feature is under development.</p>
-            </div>
-          )}
+          {activeTab === 'settings-general' && <SettingsPanel activeTab="general" />}
+          {activeTab === 'settings-security' && <SettingsPanel activeTab="security" />}
         </div>
       </div>
 

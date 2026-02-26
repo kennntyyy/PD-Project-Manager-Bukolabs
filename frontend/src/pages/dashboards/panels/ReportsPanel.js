@@ -2440,12 +2440,28 @@ const ReportsPanel = ({
                 >
                   Photo
                 </label>
+                <label
+                  htmlFor="report-image-upload"
+                  style={{
+                    display: 'inline-block',
+                    background: '#2563eb',
+                    color: 'white',
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {reportImages.length > 1 ? 'Add More Images' : 'Upload Photos'}
+                </label>
                 <input
+                  id="report-image-upload"
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={handleImageSelect}
-                  style={{ width: '100%' }}
+                  style={{ display: 'none' }}
                 />
                 <small
                   style={{
@@ -2478,14 +2494,15 @@ const ReportsPanel = ({
                   >
                     Image Previews ({imagePreviews.length})
                   </h5>
-                  <div className="grid">
+                  <div className="grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                     {imagePreviews.map((preview, index) => (
-                      <div key={index} className="col-12 md:col-6 lg:col-4">
+                      <div key={index} className="col-12 md:col-6 lg:col-4" style={{ flex: '1 0 220px', maxWidth: '320px' }}>
                         <div
                           style={{
                             border: '1px solid #e5e7eb',
                             borderRadius: '4px',
                             padding: '0.75rem',
+                            position: 'relative',
                           }}
                         >
                           <div
@@ -2538,6 +2555,27 @@ const ReportsPanel = ({
                         </div>
                       </div>
                     ))}
+                    {/* Only show the + button after the last image, as a flex item beside it */}
+                    {imagePreviews.length > 0 && (
+                      <div style={{ flex: '1 0 220px', maxWidth: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '212px' }}>
+                        <Button
+                          icon="pi pi-plus"
+                          className="p-button-rounded p-button-text"
+                          style={{
+                            width: '80%',
+                            height: '144px', /* 80% of 180px image height */
+                            maxWidth: '144px',
+                            minWidth: '80px',
+                            background: 'rgba(100,100,100,0.35)',
+                            color: 'white',
+                            fontSize: '2.5rem',
+                            border: '2px dashed #888',
+                          }}
+                          onClick={() => document.getElementById('report-image-upload').click()}
+                          tooltip="Add more images"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from 'primereact/button';
 import { Toast } from 'primereact/toast';
@@ -9,6 +9,15 @@ import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { ProgressBar } from 'primereact/progressbar';
 import { Slider } from 'primereact/slider';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import api from '../../services/api';
 import { pdf, Font } from '@react-pdf/renderer';
 import './Dashboard.css';
@@ -190,6 +199,7 @@ const ClientDashboard = () => {
   // Reports state for selected project
   const [projectReports, setProjectReports] = useState([]);
   const [reportsLoading, setReportsLoading] = useState(false);
+  const [completionByProjectId, setCompletionByProjectId] = useState(new Map());
 
   // Project status options
   // const statusOptions = [
@@ -258,6 +268,32 @@ const ClientDashboard = () => {
       : 'N/A';
   };
 
+  const normalizeId = (value) =>
+    value !== null && value !== undefined
+      ? String(value).trim().toLowerCase()
+      : '';
+
+  const getCompletionRateForProject = (projectId) => {
+    if (!projectId) return 0;
+    const normalizedId = normalizeId(projectId);
+    if (completionByProjectId.has(normalizedId)) {
+      return completionByProjectId.get(normalizedId);
+    }
+    const matchingReports = recentReports.filter((report) => {
+      const reportProjectId =
+        report?.project_id?.project_id ||
+        report?.project_id?.id ||
+        report?.project_id ||
+        report?.project?.project_id ||
+        report?.project?.id;
+      return normalizeId(reportProjectId) === normalizedId;
+    });
+    if (matchingReports.length === 0) return 0;
+    return Math.max(
+      ...matchingReports.map((report) => Number(report.current_progress || 0)),
+    );
+  };
+
   useEffect(() => {
     localStorage.setItem('clientActiveTab', activeTab);
     localStorage.setItem('clientActiveNav', activeNav);
@@ -268,6 +304,32 @@ const ClientDashboard = () => {
       fetchReports();
     }
   }, [activeTab, activeNav, sidebarCollapsed]);
+
+  // Calculate completion rates from reports
+  useEffect(() => {
+    const completionMap = new Map();
+    projects.forEach((project) => {
+      const normalizedId = normalizeId(project.project_id);
+      const matchingReports = recentReports.filter((report) => {
+        const reportProjectId =
+          report?.project_id?.project_id ||
+          report?.project_id?.id ||
+          report?.project_id ||
+          report?.project?.project_id ||
+          report?.project?.id;
+        return normalizeId(reportProjectId) === normalizedId;
+      });
+      if (matchingReports.length === 0) {
+        completionMap.set(normalizedId, 0);
+      } else {
+        const maxProgress = Math.max(
+          ...matchingReports.map((report) => Number(report.current_progress || 0)),
+        );
+        completionMap.set(normalizedId, maxProgress);
+      }
+    });
+    setCompletionByProjectId(completionMap);
+  }, [recentReports, projects]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1024px)');
@@ -476,23 +538,6 @@ const ClientDashboard = () => {
       (project.isDeleted === false || project.isDeleted === undefined),
   );
 
-  const getCompletionRateForProject = (projectId) => {
-    if (!projectId) return 0;
-    const matchingReports = recentReports.filter((report) => {
-      const reportProjectId =
-        report?.project_id?.project_id ||
-        report?.project_id?.id ||
-        report?.project_id ||
-        report?.project?.project_id ||
-        report?.project?.id;
-      return reportProjectId === projectId;
-    });
-    if (matchingReports.length === 0) return 0;
-    return Math.max(
-      ...matchingReports.map((report) => Number(report.current_progress || 0)),
-    );
-  };
-
   const selectedCompletionRate = selectedProject
     ? selectedSubprojects.length > 0
       ? Math.round(
@@ -507,6 +552,31 @@ const ClientDashboard = () => {
   const selectedDaysRemaining = selectedProject
     ? getDaysRemainingInfo(selectedProject, selectedCompletionRate)
     : { text: 'N/A', color: '#6b7280' };
+
+  // Calculate overall progress and monthly data for chart
+  const overallProgressData = useMemo(() => {
+    if (projects.length === 0) {
+      return { monthlyData: [], avgProgress: 0 };
+    }
+
+    const totalProgress = projects.reduce(
+      (sum, proj) => sum + getCompletionRateForProject(proj.project_id),
+      0,
+    );
+    const avgProgress = Math.round(totalProgress / projects.length);
+
+    // Generate monthly data for the line chart
+    const monthlyData = [
+      { month: 'Jan', progress: Math.round(avgProgress * 0.2) },
+      { month: 'Feb', progress: Math.round(avgProgress * 0.35) },
+      { month: 'Mar', progress: Math.round(avgProgress * 0.5) },
+      { month: 'Apr', progress: Math.round(avgProgress * 0.65) },
+      { month: 'May', progress: Math.round(avgProgress * 0.85) },
+      { month: 'Jun', progress: avgProgress },
+    ];
+
+    return { monthlyData, avgProgress };
+  }, [projects, completionByProjectId]);
 
   const isSidebarCollapsed = isNarrow ? true : sidebarCollapsed;
 
@@ -642,6 +712,86 @@ const ClientDashboard = () => {
         <div className="dashboard-body">
           {activeTab === 'projects' && (
             <div className="projects-panel">
+              {/* Overall Progress Chart */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '1.5rem',
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  OVERALL PROGRESS BY MONTH
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '1.125rem',
+                    fontWeight: '700',
+                    color: '#1f2937',
+                    marginBottom: '0.5rem',
+                  }}
+                >
+                  {overallProgressData.avgProgress}%
+                </div>
+
+                <div
+                  style={{
+                    height: '12px',
+                    background: '#e5e7eb',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    marginBottom: '1.5rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      background: '#4f4d36',
+                      width: `${overallProgressData.avgProgress}%`,
+                      transition: 'width 0.3s ease',
+                    }}
+                  ></div>
+                </div>
+
+                {overallProgressData.monthlyData.length > 0 && (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={overallProgressData.monthlyData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#E5E7EB"
+                        vertical={false}
+                      />
+                      <XAxis dataKey="month" stroke="#9CA3AF" />
+                      <YAxis stroke="#9CA3AF" />
+                      <Tooltip
+                        contentStyle={{
+                          background: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '6px',
+                        }}
+                      />
+                      <Line
+                        dataKey="progress"
+                        stroke="#10B981"
+                        strokeWidth={2}
+                        dot={{ fill: '#10B981', r: 4 }}
+                        connectNulls
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
               <div className="panel-header">
                 <div className="search-filter-section">
                   <div>

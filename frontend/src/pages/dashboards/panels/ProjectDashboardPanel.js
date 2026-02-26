@@ -1664,7 +1664,7 @@ const ProjectDashboardPanel = () => {
                         textTransform: 'uppercase',
                       }}
                     >
-                      SUBPROJECT PROGRESS BY MONTH
+                      PROGRESS BY MONTH
                     </div>
                     <div
                       style={{

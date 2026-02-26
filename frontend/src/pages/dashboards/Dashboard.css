@@ -732,8 +732,12 @@
   .dashboard-sidebar {
     width: 100%;
     height: auto;
-    position: static;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    order: 2;
+    z-index: 100;
   }
 
   .dashboard-container.sidebar-collapsed .dashboard-sidebar {
@@ -741,10 +745,14 @@
   }
 
   .sidebar-header {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     background: inherit;
-    z-index: 2;
+    z-index: 101;
+    width: 100%;
+    display: flex;
   }
 
   .sidebar-toggle {
@@ -793,6 +801,9 @@
 
   .dashboard-content {
     margin-left: 0;
+    order: 1;
+    padding-top: 90px;
+    padding-bottom: 120px;
   }
 
   .dashboard-container.sidebar-collapsed .dashboard-content {
